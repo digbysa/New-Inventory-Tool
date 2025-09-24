@@ -503,9 +503,14 @@ function Populate-Department-Combo([string]$current){
     if(-not $cmbDept){ return }
     $existing = $cmbDept.Text
     $cmbDept.Items.Clear()
-    if(-not $script:DepartmentList){ Load-DepartmentMaster }
-    if($script:DepartmentList){
-      [void]$cmbDept.Items.AddRange($script:DepartmentList)
+    $items = @()
+    if($script:DepartmentList){ $items = @($script:DepartmentList) }
+    if($items.Count -eq 0){
+      Load-DepartmentMaster
+      if($script:DepartmentList){ $items = @($script:DepartmentList) }
+    }
+    if($items.Count -gt 0){
+      [void]$cmbDept.Items.AddRange([object[]]$items)
     }
     if($current){
       $cmbDept.Text = $current
@@ -566,6 +571,7 @@ function Load-DataFolder([string]$folder){
   if(-not $script:OutputFolder){ $script:OutputFolder = $folder }
   Load-LocationMaster $folder
   Load-RoundingMapping $folder
+  try { Load-DepartmentMaster } catch {}
   $cfile   = Join-Path $folder 'Computers.csv'
   $mfile   = Join-Path $folder 'Monitors.csv'
   $micfile = Join-Path $folder 'Mics.csv'
@@ -1323,6 +1329,9 @@ function Validate-Location($rec){
   try{
     $d = $deptVal
     $okD = $false
+    if(-not $script:DepartmentListNorm -or $script:DepartmentListNorm.Count -eq 0){
+      try { Load-DepartmentMaster } catch {}
+    }
     if($d -and $script:DepartmentListNorm){ $okD = $script:DepartmentListNorm.Contains((Normalize-Field $d)) }
     $colorD = if($okD){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
     if($txtDept){ $txtDept.BackColor = $colorD }
@@ -1872,6 +1881,7 @@ Create a 'Data' folder next to the script and add your CSVs."
   }
   Load-DataFolder $script:DataFolder
   Update-Counters
+  try { Populate-Department-Combo ($txtDept.Text) } catch {}
   $lblDataPath.Visible=$false; $lblOutputPath.Visible=$false; $lblDataStatus.Visible=$false; $statusLabel.Text = ("Data: " + $script:DataFolder + " | Output: " + $script:OutputFolder); $statusLabel.ForeColor=[System.Drawing.Color]::DarkGreen
   $lblOutputPath.Text = "Output: " + $script:OutputFolder
   $statusLabel.Text   = "Data OK"; $statusLabel.ForeColor=[System.Drawing.Color]::DarkGreen
