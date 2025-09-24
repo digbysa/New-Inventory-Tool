@@ -544,6 +544,28 @@ function Save-DepartmentUserAdd([string]$dept){
 }
 function Populate-Department-Combo([string]$current){
   try{
+    if(-not $script:DepartmentList -or $script:DepartmentList.Count -eq 0){
+      try { Load-DepartmentMaster } catch {}
+    }
+    $items = @()
+    if($script:DepartmentList){
+      $items = @($script:DepartmentList | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    }
+    foreach($combo in @($cmbDept,$cmbDepartment,$ddlDept,$ddlDepartment)){
+      if(-not $combo){ continue }
+      try {
+        $combo.BeginUpdate()
+        $combo.Items.Clear()
+        if($items.Count -gt 0){ $combo.Items.AddRange(@($items)) }
+        if($null -ne $current){ $combo.Text = $current }
+        $combo.AutoCompleteMode  = [System.Windows.Forms.AutoCompleteMode]::SuggestAppend
+        $combo.AutoCompleteSource = [System.Windows.Forms.AutoCompleteSource]::ListItems
+      } finally {
+        try { $combo.EndUpdate() } catch {}
+      }
+    }
+    foreach($txt in @($txtDept,$txtDepartment)){
+      if($txt -and $null -ne $current){ $txt.Text = $current }
     }
   } catch {}
 }
