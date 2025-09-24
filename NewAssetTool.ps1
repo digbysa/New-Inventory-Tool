@@ -962,11 +962,10 @@ $tlpAssoc.Dock = 'Fill'
 $tlpAssoc.ColumnCount = 1
 $tlpAssoc.RowCount = 2
 $tlpAssoc.RowStyles.Clear()
-$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 $tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle -ArgumentList ([System.Windows.Forms.SizeType]::AutoSize)) )
+$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 $tlpAssoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tlpAssoc.Margin  = New-Object System.Windows.Forms.Padding($GAP)
-$tlpAssoc.Controls.Add($dgv,0,0)
 # Toolbar row
 $lblAdd = New-Object System.Windows.Forms.Label
 $lblAdd.Text = "Add Peripheral (AssetTag/Serial):"
@@ -1142,7 +1141,8 @@ $tlpAssocStrip.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.
 $tlpAssocStrip.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
 $tlpAssocStrip.Controls.Add($tlpAssocTop,0,0)
 $tlpAssocStrip.Controls.Add($grpPrev,   0,1)
-$tlpAssoc.Controls.Add($tlpAssocStrip,0,1)
+$tlpAssoc.Controls.Add($tlpAssocStrip,0,0)
+$tlpAssoc.Controls.Add($dgv,0,1)
 $grpAssoc.Controls.Add($tlpAssoc)
 # Rounding group
 $grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Fill'
