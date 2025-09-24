@@ -1754,9 +1754,9 @@ $pc.serial_number}else{$null}
     PeripheralsOK    = $chkPeriph.Checked
     MaintenanceType = $cmbMaintType.Text
     Department       = $cmbDept.Text
-$cmbDept.Visible = $false  # Hidden until Edit Location is active
     RoundingUrl      = $url
   }
+  $cmbDept.Visible = $false  # Hidden until Edit Location is active
   if(-not $exists){ $row | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
   else { $row | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
   foreach($cb in @($chkCable,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked = $false }
@@ -2275,8 +2275,12 @@ function Apply-NearbySort {
   # Reorder rows in the grid
   $idx = 0
   foreach ($it in $sorted) {
-    $it.Row.DisplayIndex = $idx
-    $idx++
+    if ($it.Row -and $it.Row.PSObject.Properties['DisplayIndex']) {
+      try {
+        $it.Row.DisplayIndex = $idx
+      } catch {}
+      $idx++
+    }
   }
 }
 # Double-click: open on Main and switch
@@ -2360,6 +2364,9 @@ if ($pc) {
     if (-not $exists) { $ev | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
     else { $ev | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
     # Update in-memory
+    if (-not ($script:RoundingEvents -is [System.Collections.IList])) {
+      $script:RoundingEvents = @($script:RoundingEvents)
+    }
     $script:RoundingEvents += $ev
     if ($pc) { $pc | Add-Member -NotePropertyName LastRounded -NotePropertyValue (Get-Date) -Force }
     $saved++
