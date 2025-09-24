@@ -1139,51 +1139,78 @@ function Apply-ResponsiveHeights {
     $tlpLeft.RowStyles[0].Height   = $minSummary
     $tlpLeft.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
     $tlpLeft.RowStyles[1].Height   = $minLocation
-    $minAssoc   = [Math]::Max($grpAssoc.PreferredSize.Height, 360)
+    $rowsShown = [Math]::Max([Math]::Min($dgv.Rows.Count, $MAX_ASSOC_GRID_ROWS), 1)
+    $assocInfo = Size-AssocForRows $rowsShown
+    $assocTarget = 0
+    if($assocInfo -and $assocInfo.Target){
+      $assocTarget = [Math]::Max([int]$assocInfo.Target, 0)
+    }
+    $stripHeight = $tlpAssocStrip.PreferredSize.Height
+    if($stripHeight -le 0){
+      $stripHeight = [Math]::Max($grpPrev.PreferredSize.Height, 0) + 34
+    }
+    $assocPadding = $grpAssoc.Padding.Vertical + $grpAssoc.Margin.Vertical + $tlpAssoc.Margin.Vertical
+    $minAssoc   = [Math]::Max($assocTarget + $stripHeight + $assocPadding, 220)
     $minRound   = [Math]::Max($grpMaint.PreferredSize.Height, 220)
     $tlpRight.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Absolute
     $tlpRight.RowStyles[0].Height   = $minAssoc
     $tlpRight.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
     $tlpRight.RowStyles[1].Height   = $minRound
-    try {
-      $rowsShown = [Math]::Max([Math]::Min($dgv.Rows.Count, $MAX_ASSOC_GRID_ROWS), 1)
-      $bodyH     = $rowsShown * $dgv.RowTemplate.Height
-      $hdrH      = if ($dgv.ColumnHeadersVisible) { [int]$dgv.ColumnHeadersHeight } else { 0 }
-      $gridH     = [int]([Math]::Min(($bodyH + $hdrH + 10), 520))
-      $tabHeader = 0
-      $targetTabH = $gridH + $tabHeader + 8
-      $tlpAssoc.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Absolute
-      $tlpAssoc.RowStyles[0].Height   = $targetTabH
-      $tlpAssoc.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Percent
-      $tlpAssoc.RowStyles[1].Height   = 100
-    } catch { }
   } catch { }
 }
-function Size-AssocForRows([int]$rows){
+function Get-AssocSizing([int]$rows){
+  $result = [pscustomobject]@{ Target = 0; Grid = 0; Rows = 0 }
   try{
     if($rows -lt 1){ $rows = 1 }
-    $rowH   = [Math]::Max($dgv.RowTemplate.Height, 22)
-    $hdrH   = [Math]::Max($dgv.ColumnHeadersHeight, 24)
-    $gridH  = $hdrH + ($rowH * $rows) + 6
-    # Reserve space for horizontal scrollbar if needed
+    $result.Rows = $rows
+    $visibleHeight = 0
+    $visibleCount  = 0
+    foreach($row in $dgv.Rows){
+      if($null -eq $row){ continue }
+      if($row.IsNewRow){ continue }
+      if(-not $row.Visible){ continue }
+      $visibleHeight += [int][Math]::Max($row.Height, 0)
+      $visibleCount++
+      if($visibleCount -ge $rows){ break }
+    }
+    if($visibleCount -lt $rows){
+      $rowH = [Math]::Max($dgv.RowTemplate.Height, 22)
+      $visibleHeight += ($rows - $visibleCount) * $rowH
+    }
+    $hdrH = 0
+    if($dgv.ColumnHeadersVisible){
+      $hdrH = [Math]::Max($dgv.ColumnHeadersHeight, 24)
+    }
+    $gridH = $visibleHeight + $hdrH
+    $gridH += [Math]::Max([System.Windows.Forms.SystemInformation]::BorderSize.Height * 2, 2)
     $totalColW = 0
     foreach($c in $dgv.Columns){ if($c.Visible){ $totalColW += [int]$c.Width } }
-    $clientW = $dgv.ClientSize.Width; if($clientW -le 0){ $clientW = $dgv.DisplayRectangle.Width }
+    $clientW = [Math]::Max($dgv.ClientSize.Width, $dgv.DisplayRectangle.Width)
+    if($clientW -le 0){ $clientW = $dgv.Width }
     if($totalColW -gt $clientW){
       $gridH += [System.Windows.Forms.SystemInformation]::HorizontalScrollBarHeight
     }
-    $tabHeader = $tabAssoc.Height - $tabAssoc.DisplayRectangle.Height
-    if($tabHeader -lt 0 -or $tabHeader -gt 200){ $tabHeader = 28 }
-    $targetTabH = $gridH + $tabHeader + 8
-    $tlpAssoc.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Absolute
-    $tlpAssoc.RowStyles[0].Height   = $targetTabH
-    $tlpAssoc.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Percent
-    $tlpAssoc.RowStyles[1].Height   = 100
+    $target = $gridH + $dgv.Margin.Vertical + $tlpAssoc.Padding.Vertical
+    $result.Target = [Math]::Max([int]$target, 0)
+    $result.Grid   = [Math]::Max([int]$gridH, 0)
   } catch { }
+  return $result
+}
+function Size-AssocForRows([int]$rows){
+  $info = Get-AssocSizing $rows
+  try{
+    if($info.Target -gt 0){
+      $tlpAssoc.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Absolute
+      $tlpAssoc.RowStyles[0].Height   = $info.Target
+      $tlpAssoc.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::AutoSize
+      $tlpAssoc.RowStyles[1].Height   = 0
+    }
+  } catch { }
+  return $info
 }
 $form.Add_Shown({
   Apply-ResponsiveHeights
-  Size-AssocForRows([Math]::Min([Math]::Max($dgv.Rows.Count,1), $MAX_ASSOC_GRID_ROWS))
+  Size-AssocForRows([Math]::Min([Math]::Max($dgv.Rows.Count,1), $MAX_ASSOC_GRID_ROWS)) | Out-Null
 })
 # -------- UI logic ---------
 function Update-Counters(){ $locCount = $script:LocationRows.Count; $lblDataStatus.Text = ("Computers: {0} | Monitors: {1} | Mics: {2} | Scanners: {3} | Carts: {4} | Locations: {5}" -f `
@@ -1277,7 +1304,7 @@ $txtDept.Text = $Department  # mirror read-only display; dropdown only when edit
   } catch {}
 }
 function Refresh-AssocGrid($parentRec){
-  $dgv.Rows.Clear(); if(-not $parentRec){ Size-AssocForRows(1); return }
+  $dgv.Rows.Clear(); if(-not $parentRec){ Size-AssocForRows(1) | Out-Null; return }
   $prow = $dgv.Rows.Add()
   $dgv.Rows[$prow].Cells['Role'].Value='Parent'
   $dgv.Rows[$prow].Cells['Type'].Value='Computer'
@@ -1309,7 +1336,7 @@ function Refresh-AssocGrid($parentRec){
       } else { $r.Cells['RITM'].Style.ForeColor=[System.Drawing.Color]::IndianRed }
     }
   }
-  Size-AssocForRows([Math]::Min([Math]::Max($dgv.Rows.Count,1), $MAX_ASSOC_GRID_ROWS))
+  Size-AssocForRows([Math]::Min([Math]::Max($dgv.Rows.Count,1), $MAX_ASSOC_GRID_ROWS)) | Out-Null
 }
 function Make-Card($title,$kvPairs,[System.Drawing.Color]$ritmColor,[bool]$showRITM,[bool]$showRetire,$tagPayload){
   $p = New-Object System.Windows.Forms.Panel
@@ -1675,7 +1702,7 @@ function Clear-UI(){
   foreach($cb in @($chkCable,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked=$false }
   $btnFixName.Enabled = $false
   $statusLabel.Text = "Ready - scan or enter a device."
-  Size-AssocForRows(1)
+  Size-AssocForRows(1) | Out-Null
 }
 # ---- Events ----
 $btnLookup.Add_Click({ Do-Lookup })
