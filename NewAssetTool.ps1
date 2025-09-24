@@ -893,7 +893,10 @@ $dgv.Columns.Add((New-TextCol 'Serial' 'Serial' 120))  | Out-Null
 $dgv.Columns.Add((New-TextCol 'RITM' 'RITM' 100))      | Out-Null
 $dgv.Columns.Add((New-TextCol 'Retire' 'Retire  120')) | Out-Null
 $tabGrid.Controls.Add($dgv)
-try{ $dgv.Columns['Name'].AutoSizeMode='Fill'; $dgv.Columns['RITM'].Width=120 } catch {}
+try{
+  $dgv.Columns['Name'].AutoSizeMode = [System.Windows.Forms.DataGridViewAutoSizeColumnMode]::DisplayedCells
+  $dgv.Columns['RITM'].Width = 120
+} catch {}
 $cards = New-Object System.Windows.Forms.FlowLayoutPanel
 $cards.Dock='Fill'; $cards.AutoScroll=$true; $cards.WrapContents=$true; $cards.FlowDirection='LeftToRight'
 $tabCards.Controls.Add($cards)
@@ -913,7 +916,8 @@ $lblAdd.Text = "Add Peripheral (AssetTag/Serial):"
 $lblAdd.AutoSize = $true
 $lblAdd.Margin   = '6,8,6,6'
 $txtAdd = New-Object System.Windows.Forms.TextBox
-$txtAdd.Dock   = 'Fill'
+$txtAdd.Width  = 220
+$txtAdd.Anchor = 'Top,Left'
 $txtAdd.Margin = '0,4,6,4'
 $btnRemove = New-Object System.Windows.Forms.Button
 $btnRemove.Text   = 'Remove Selected'
@@ -937,7 +941,7 @@ $tlpAssocTop.RowStyles.Clear()
 $tlpAssocTop.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 $tlpAssocTop.ColumnStyles.Clear()
 $tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle -ArgumentList ([System.Windows.Forms.SizeType]::AutoSize)) )
-$tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
+$tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)) )
 $tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle -ArgumentList ([System.Windows.Forms.SizeType]::AutoSize)) )
 $tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle -ArgumentList ([System.Windows.Forms.SizeType]::AutoSize)) )
 $tlpAssocTop.Controls.Add($lblAdd, 0, 0)
