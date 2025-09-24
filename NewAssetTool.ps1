@@ -956,7 +956,11 @@ $grpPrev.AutoSize=$true
 $grpPrev.AutoSizeMode=[System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $grpPrev.Dock='Top'
 $grpPrev.Text = 'Peripheral Preview'
-$grpPrev.Dock = 'Fill'
+# keep the preview height bound to its content instead of filling remaining space
+$grpPrev.Dock = 'Top'
+$grpPrev.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor `
+    [System.Windows.Forms.AnchorStyles]::Left -bor `
+    [System.Windows.Forms.AnchorStyles]::Right
 # tighten the bottom margin so the next section sits closer
 $grpPrev.Margin = New-Object System.Windows.Forms.Padding(8,8,8,2)
 # Ensure all labels/values exist and use the requested captions
@@ -1023,7 +1027,10 @@ $tlpPrev = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpPrev.Dock='Top'
 $tlpPrev.AutoSize       = $true
 $tlpPrev.AutoSizeMode   = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
-$tlpPrev.Dock           = 'Fill'
+$tlpPrev.Dock           = 'Top'
+$tlpPrev.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor `
+    [System.Windows.Forms.AnchorStyles]::Left -bor `
+    [System.Windows.Forms.AnchorStyles]::Right
 $tlpPrev.CellBorderStyle= [System.Windows.Forms.TableLayoutPanelCellBorderStyle]::None
 $tlpPrev.Padding        = New-Object System.Windows.Forms.Padding(2)
 $tlpPrev.Margin         = New-Object System.Windows.Forms.Padding(0)
@@ -1065,10 +1072,13 @@ $grpPrev.Controls.Add($tlpPrev)
 # === /Peripheral Preview ===
 $tlpAssocStrip = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpAssocStrip.Dock = 'Fill'
+$tlpAssocStrip.AutoSize = $true
+$tlpAssocStrip.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $tlpAssocStrip.ColumnCount = 1
 $tlpAssocStrip.RowCount = 2
+$tlpAssocStrip.RowStyles.Clear()
 $tlpAssocStrip.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)) )
-$tlpAssocStrip.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
+$tlpAssocStrip.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
 $tlpAssocStrip.Controls.Add($tlpAssocTop,0,0)
 $tlpAssocStrip.Controls.Add($grpPrev,   0,1)
 $tlpAssoc.Controls.Add($tlpAssocStrip,0,1)
