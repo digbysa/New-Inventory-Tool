@@ -321,24 +321,27 @@ function Match-Token-To-Record([string]$token,$rec){
 }
 function Validate-ParentAndName($displayRec,$parentRec){
   if($displayRec -and $displayRec.Type -ne 'Computer'){
-    $raw = $null; if($displayRec.PSObject.Properties['u_parent_asset']){ $raw = $displayRec.u_parent_asset }
+       $raw = $null
+    if($displayRec.PSObject.Properties['u_parent_asset']){ $raw = $displayRec.u_parent_asset }
     if([string]::IsNullOrWhiteSpace($raw)){
-      $txtParent.Text='(blank)'; $txtParent.BackColor=[System.Drawing.Color]::MistyRose; $tip.SetToolTip($txtParent,"u_parent_asset is blank.")
-if([string]::IsNullOrWhiteSpace($valPrevPropParent.Text)){ $valPrevPropParent.Text = $valPrevParent.Text }
+            $txtParent.Text='(blank)'
+      $txtParent.BackColor=[System.Drawing.Color]::MistyRose
+      $tip.SetToolTip($txtParent,"u_parent_asset is blank.")
     } else {
       $txtParent.Text=$raw
-if([string]::IsNullOrWhiteSpace($valPrevPropParent.Text)){ $valPrevPropParent.Text = $valPrevParent.Text }
       $ok = $false
       $msg = ""
-      if($parentRec -and (Match-ParentToken $raw $parentRec)){ $ok = $true; $msg = "u_parent_asset matches the resolved parent." }
-      else {
+ if($parentRec -and (Match-ParentToken $raw $parentRec)){
+        $ok = $true
+        $msg = "u_parent_asset matches the resolved parent."
+      } else {
         if($parentRec -and ($displayRec.Type -eq 'Mic' -or $displayRec.Type -eq 'Scanner') -and ($parentRec.name -match '^(?i)AO')){
           $carts = Find-CartsForComputer $parentRec
           if($carts.Count -gt 0){
             foreach($ct in $carts){
               if(Match-Token-To-Record $raw $ct){ $ok = $true; $msg = "u_parent_asset matches the resolved cart '"+$ct.name+"'."; break }
             }
-            if(-not $ok){ $msg = "u_parent_asset does not match resolved cart for this Tangent."; }
+            if(-not $ok){ $msg = "u_parent_asset does not match resolved cart for this Tangent." }
           } else {
             $msg = "No Cart found for this Tangent; expected u_parent_asset to match the Tangent or its Cart."
           }
@@ -349,14 +352,25 @@ if([string]::IsNullOrWhiteSpace($valPrevPropParent.Text)){ $valPrevPropParent.Te
       if($ok){ $txtParent.BackColor=[System.Drawing.Color]::PaleGreen } else { $txtParent.BackColor=[System.Drawing.Color]::MistyRose }
       $tip.SetToolTip($txtParent,$msg)
     }
-  } else { $txtParent.Text='(n/a)'; $txtParent.BackColor=[System.Drawing.Color]::White; $tip.SetToolTip($txtParent,"") }
-if([string]::IsNullOrWhiteSpace($valPrevPropParent.Text)){ $valPrevPropParent.Text = $valPrevParent.Text }
+  } else {
+    $txtParent.Text='(n/a)'
+    $txtParent.BackColor=[System.Drawing.Color]::White
+    $tip.SetToolTip($txtParent,"")
+  }
+  Ensure-PrevPropParentLabel
   if($displayRec -and $parentRec -and $displayRec.Type -ne 'Computer'){
     $expected = Compute-ProposedName $displayRec $parentRec
     if($expected -and $displayRec.name -and ($displayRec.name.Trim().ToUpper() -ne $expected.Trim().ToUpper())){
-      $txtHost.BackColor=[System.Drawing.Color]::MistyRose; $tip.SetToolTip($txtHost, "Expected name: " + $expected)
-    } else { $txtHost.BackColor=[System.Drawing.Color]::White; $tip.SetToolTip($txtHost,"") }
-  } else { $txtHost.BackColor=[System.Drawing.Color]::White; $tip.SetToolTip($txtHost,"") }
+      $txtHost.BackColor=[System.Drawing.Color]::MistyRose
+      $tip.SetToolTip($txtHost, "Expected name: " + $expected)
+    } else {
+      $txtHost.BackColor=[System.Drawing.Color]::White
+      $tip.SetToolTip($txtHost,"")
+    }
+  } else {
+    $txtHost.BackColor=[System.Drawing.Color]::White
+    $tip.SetToolTip($txtHost,"")
+  }
 }
 function Find-CartsForComputer($pc){
   $res = New-Object System.Collections.ArrayList
@@ -1362,9 +1376,16 @@ function Refresh-AssocCards($parentRec){
 function Refresh-AssocViews($parentRec){ Refresh-AssocGrid $parentRec; Refresh-AssocCards $parentRec }
 # ----- Peripheral Preview/Link/Remove + logging -----
 function Update-LinkButton(){ if($script:PreviewIsLinkable){ $btnAdd.Enabled=$true } else { $btnAdd.Enabled=$false } }
+function Ensure-PrevPropParentLabel(){
+  if($valPrevPropParent -and $valPrevParent){
+    if([string]::IsNullOrWhiteSpace($valPrevPropParent.Text)){
+      $valPrevPropParent.Text = $valPrevParent.Text
+    }
+  }
+}
 function Preview-Peripheral([string]$query,$parentRec){
   $valPrevType.Text=''; $valPrevName.Text=''; $valPrevAT.Text=''; $valPrevSN.Text=''; $valPrevParent.Text=''; $valPrevRITM.Text=''; $valPrevRetire.Text=''; $valPrevProposed.Text=''
-if([string]::IsNullOrWhiteSpace($valPrevPropParent.Text)){ $valPrevPropParent.Text = $valPrevParent.Text }
+  $valPrevPropParent.Text=''
   $script:PreviewCandidate = $null; $script:PreviewIsLinkable = $false
   $n = Normalize-Scan $query; if(-not $n){ Update-LinkButton; return }
   $key=$n.Value.ToUpper()
@@ -1376,7 +1397,7 @@ if([string]::IsNullOrWhiteSpace($valPrevPropParent.Text)){ $valPrevPropParent.Te
   $script:PreviewCandidate = $cand
   $valPrevType.Text=$cand.Type; $valPrevName.Text=$cand.name; $valPrevAT.Text=$cand.asset_tag; $valPrevSN.Text=$cand.serial_number
   if([string]::IsNullOrWhiteSpace($cand.u_parent_asset)){ $valPrevParent.Text='(none)' } else { $valPrevParent.Text=$cand.u_parent_asset }
-if([string]::IsNullOrWhiteSpace($valPrevPropParent.Text)){ $valPrevPropParent.Text = $valPrevParent.Text }
+  Ensure-PrevPropParentLabel
   if($parentRec){
     $prop = Compute-ProposedName $cand $parentRec
     if($prop){ $valPrevProposed.Text = $prop }
@@ -1520,13 +1541,14 @@ function Populate-UI($displayRec,$parentRec){
   $txtHost.Text=$displayRec.name
   $txtAT.Text=$displayRec.asset_tag
   $txtSN.Text=$displayRec.serial_number
-  if($displayRec.Type -eq 'Computer'){ $txtParent.Text='(n/a)' }
-if([string]::IsNullOrWhiteSpace($valPrevPropParent.Text)){ $valPrevPropParent.Text = $valPrevParent.Text }
-  else {
-    if($displayRec.PSObject.Properties['u_parent_asset'] -and $displayRec.u_parent_asset){ $txtParent.Text=$displayRec.u_parent_asset }
-if([string]::IsNullOrWhiteSpace($valPrevPropParent.Text)){ $valPrevPropParent.Text = $valPrevParent.Text }
-    else { $txtParent.Text='(blank)' }
-if([string]::IsNullOrWhiteSpace($valPrevPropParent.Text)){ $valPrevPropParent.Text = $valPrevParent.Text }
+   if($displayRec.Type -eq 'Computer'){
+    $txtParent.Text='(n/a)'
+  } else {
+    if($displayRec.PSObject.Properties['u_parent_asset'] -and $displayRec.u_parent_asset){
+      $txtParent.Text=$displayRec.u_parent_asset
+    } else {
+      $txtParent.Text='(blank)'
+    }
   }
   $txtRITM.Text=$displayRec.RITM
   $txtRetire.Text = Fmt-DateLong $displayRec.Retire
@@ -1832,16 +1854,15 @@ if (-not (Get-Variable -Scope Script -Name RoundingEvents -ErrorAction SilentlyC
   $script:RoundingEvents = @()
 }
 function Load-RoundingEvents {
-$file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
-  if (Test-Path $file) {
-    try {
-      $script:RoundingEvents = Import-Csv $file
-    } catch {
-      $script:RoundingEvents = @()
+  $script:RoundingEvents = @()
+  try {
+    $base = if($script:OutputFolder){ $script:OutputFolder } else { $script:DataFolder }
+    if(-not $base){ return }
+    $file = Join-Path $base 'RoundingEvents.csv'
+    if(Test-Path $file){
+      try { $script:RoundingEvents = Import-Csv $file } catch { $script:RoundingEvents = @() }
     }
-  } else {
-    $script:RoundingEvents = @()
-  }
+  } catch { $script:RoundingEvents = @() }
 }
 Load-RoundingEvents
 function ScopeKey([string]$city,[string]$loc,[string]$b,[string]$f){
@@ -1865,35 +1886,51 @@ function Add-NearbyScopeFromDevice($pc){
   Add-NearbyScope $city $pc.location $pc.u_building $pc.u_floor
 }
 function Get-RoundedToday-Set {
-  $set = New-Object System.Collections.Generic.HashSet[string]
-  if (-not $script:RoundingEvents) { return $set }
+  $set = New-Object 'System.Collections.Generic.HashSet[string]'
+  if(-not $script:RoundingEvents){ return $set }
   $today = (Get-Date).Date
   foreach ($e in $script:RoundingEvents) {
     try {
-      $dt = Get-Date $e.Timestamp
-      if ($dt.Date -eq $today) {
-        $at = $(if($e.AssetTag){$e.AssetTag}else{""}).Trim().ToUpper()
-        if ($at) { [void]$set.Add($at) }
+      $timestamp = $null
+      if($e -and $e.PSObject.Properties['Timestamp'] -and $e.Timestamp){
+        try { $timestamp = [datetime]::Parse($e.Timestamp) } catch {}
+      } elseif($e.Timestamp){
+        try { $timestamp = Get-Date $e.Timestamp } catch {}
       }
-    } catch { }
+      if($timestamp -and $timestamp.Date -eq $today){
+        $assetTag = ''
+        if($e.PSObject.Properties['AssetTag'] -and $e.AssetTag){ $assetTag = $e.AssetTag }
+        elseif($e.AssetTag){ $assetTag = $e.AssetTag }
+        $normalized = $assetTag.Trim().ToUpper()
+        if($normalized){ [void]$set.Add($normalized) }
+      }
+    } catch {}
   }
   return $set
 }
 function Get-LatestRoundForAsset([string]$assetTag,[Nullable[datetime]]$fallback){
   $best = $null
-  $atU = $null; if ($assetTag) { $atU = $assetTag.Trim().ToUpper() }
-  if ($atU -and $script:RoundingEvents) {
-    foreach ($e in $script:RoundingEvents) {
-      if (($e.AssetTag + "").Trim().ToUpper() -eq $atU) {
-        try {
-          $d = Get-Date $e.Timestamp
-          if (-not $best -or $d -gt $best) { $best = $d }
-        } catch { }
-      }
+if($assetTag -and $script:RoundingEvents){
+    $needle = $assetTag.Trim().ToUpper()
+    foreach($e in $script:RoundingEvents){
+      try {
+        $assetRaw = ''
+        if($e.PSObject.Properties['AssetTag'] -and $e.AssetTag){ $assetRaw = $e.AssetTag }
+        elseif($e.AssetTag){ $assetRaw = $e.AssetTag }
+        $candidate = $assetRaw.Trim().ToUpper()
+        if($candidate -ne $needle){ continue }
+        $timestamp = $null
+        if($e.PSObject.Properties['Timestamp'] -and $e.Timestamp){
+          try { $timestamp = [datetime]::Parse($e.Timestamp) } catch {}
+        } elseif($e.Timestamp){
+          try { $timestamp = Get-Date $e.Timestamp } catch {}
+        }
+        if($timestamp -and (-not $best -or $timestamp -gt $best)){ $best = $timestamp }
+      } catch {}
     }
   }
-  if ($best) { return $best }
-  if ($fallback) { return $fallback }
+  if($best){ return $best }
+  if($fallback){ return $fallback }
   return $null
 }
 # ---- Build Nearby UI ----
@@ -2379,70 +2416,6 @@ function Get-StatusOptionsFromGrid {
 }
 [void]$form.ShowDialog()
 
-# ======= PS 5.1 compatibility helpers (appended) =======
-# (Re)load rounding events from Output (or Data) folder.
-function Load-RoundingEvents {
-  try {
-    $base = $script:OutputFolder
-    if (-not $base) { $base = $script:DataFolder }
-$file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
-    $script:RoundingEvents = @()
-    if (Test-Path $file) {
-      try { $script:RoundingEvents = Import-Csv $file } catch { $script:RoundingEvents = @() }
-    }
-  } catch { $script:RoundingEvents = @() }
-}
-# HashSet of AssetTags that have an event dated "today"
-function Get-RoundedToday-Set {
-  $set = New-Object 'System.Collections.Generic.HashSet[string]'
-  try {
-    if ($script:RoundingEvents) {
-      $today = (Get-Date).Date
-      foreach ($e in $script:RoundingEvents) {
-        try {
-          $ts = $null
-          if ($e.PSObject.Properties['Timestamp'] -and $e.Timestamp) {
-            try { $ts = [datetime]::Parse($e.Timestamp) } catch {}
-          }
-          if ($ts -and $ts.Date -eq $today) {
-            $atRaw = ""
-            if ($e.PSObject.Properties['AssetTag'] -and $e.AssetTag) { $atRaw = $e.AssetTag }
-            $at = $atRaw.Trim().ToUpper()
-            if ($at) { [void]$set.Add($at) }
-          }
-        } catch {}
-      }
-    }
-  } catch {}
-  return $set
-}
-# Returns the most recent rounding timestamp for an AssetTag, or a fallback date if provided.
-function LatestRoundForAsset([string]$assetTag,[Nullable[datetime]]$fallback){
-  $best = $null
-  try {
-    if ($assetTag -and $script:RoundingEvents) {
-      $needle = $assetTag.Trim().ToUpper()
-      foreach ($e in $script:RoundingEvents) {
-        try {
-          $atRaw = ""
-          if ($e.PSObject.Properties['AssetTag'] -and $e.AssetTag) { $atRaw = $e.AssetTag }
-          $at = $atRaw.Trim().ToUpper()
-          if ($at -eq $needle) {
-            $ts = $null
-            if ($e.PSObject.Properties['Timestamp'] -and $e.Timestamp) {
-              try { $ts = [datetime]::Parse($e.Timestamp) } catch {}
-            }
-            if ($ts -and (-not $best -or $ts -gt $best)) { $best = $ts }
-          }
-        } catch {}
-      }
-    }
-  } catch {}
-  if ($best) { return $best }
-  if ($fallback) { return $fallback }
-  return $null
-}
-# ======= end PS 5.1 helpers =======
   # Department
   $txtDept.Text = $rec.u_department_location
   $okD = $false
