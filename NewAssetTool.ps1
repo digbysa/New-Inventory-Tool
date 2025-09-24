@@ -891,7 +891,7 @@ $dgv.Columns.Add((New-TextCol 'Name' 'Name' 140))      | Out-Null
 $dgv.Columns.Add((New-TextCol 'AssetTag' 'Asset Tag' 120)) | Out-Null
 $dgv.Columns.Add((New-TextCol 'Serial' 'Serial' 120))  | Out-Null
 $dgv.Columns.Add((New-TextCol 'RITM' 'RITM' 100))      | Out-Null
-$dgv.Columns.Add((New-TextCol 'Retire' 'Retire  120')) | Out-Null
+$dgv.Columns.Add((New-TextCol 'Retire' 'Retire' 120)) | Out-Null
 $tabGrid.Controls.Add($dgv)
 try{ $dgv.Columns['Name'].AutoSizeMode='Fill'; $dgv.Columns['RITM'].Width=120 } catch {}
 $cards = New-Object System.Windows.Forms.FlowLayoutPanel
