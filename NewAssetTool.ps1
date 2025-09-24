@@ -436,48 +436,92 @@ function Extract-RoomCode([string]$s){
   if($m.Success){ return $m.Value } else { return '' }
 }
 # ---- Department master/user-adds ----
+function Get-DepartmentFile([string]$fileName){
+  $path = $null
+  try { if($script:DataFolder){ $path = Join-Path $script:DataFolder $fileName } } catch {}
+  if(-not $path -or -not (Test-Path $path)){
+    try { $path = Join-Path $PSScriptRoot (Join-Path 'Data' $fileName) } catch {}
+  }
+  if(-not $path -or -not (Test-Path $path)){
+    try { $path = $fileName } catch {}
+  }
+  if($path -and (Test-Path $path)){ return $path }
+  return $null
+}
+function Import-DepartmentRows([string]$path){
+  $rows = @()
+  if(-not $path){ return $rows }
+  try {
+    $lines = Get-Content -Path $path -Encoding UTF8
+  } catch { return $rows }
+  if(-not $lines){ return $rows }
+  if(-not ($lines -is [System.Collections.IEnumerable])){ $lines = @($lines) }
+  $cleanLines = @()
+  foreach($line in $lines){
+    if($null -eq $line){ continue }
+    $txt = [string]$line
+    if($txt){
+      $trimmed = $txt.Trim()
+      if($trimmed.Length -gt 0){ $cleanLines += $txt }
+    }
+  }
+  if($cleanLines.Count -eq 0){ return $rows }
+  $first = [string]$cleanLines[0]
+  $firstNoQuotes = ($first -replace '^[\uFEFF\"\s]+','') -replace '[\"\s]+$',''
+  $hasHeader = ((Normalize-Field $firstNoQuotes) -eq (Normalize-Field 'Department'))
+  if(-not $hasHeader){ $cleanLines = @('Department') + $cleanLines }
+  try {
+    $rows = $cleanLines | ConvertFrom-Csv
+  } catch {
+    $fallback = New-Object System.Collections.Generic.List[object]
+    foreach($line in $cleanLines){
+      $txt = [string]$line
+      if(-not $txt){ continue }
+      $value = $txt.Trim()
+      if((Normalize-Field $value) -eq 'DEPARTMENT'){ continue }
+      if($value.StartsWith('"') -and $value.EndsWith('"')){ $value = $value.Substring(1, $value.Length-2) }
+      $value = $value -replace '""','"'
+      $fallback.Add([pscustomobject]@{ Department = $value }) | Out-Null
+    }
+    $rows = $fallback.ToArray()
+  }
+  return $rows
+}
+function Add-DepartmentValue([string]$dept){
+  if([string]::IsNullOrWhiteSpace($dept)){ return }
+  $display = ($dept -replace '[\uFEFF]', '').Trim()
+  if([string]::IsNullOrWhiteSpace($display)){ return }
+  $norm = Normalize-Field $display
+  if(-not $norm){ return }
+  if(-not $script:DepartmentListNorm.Contains($norm)){
+    [void]$script:DepartmentList.Add($display)
+    [void]$script:DepartmentListNorm.Add($norm)
+  }
+}
 function Load-DepartmentMaster(){
   try{
     $script:DepartmentMaster = @()
     $script:DepartmentUserAdds = @()
     $script:DepartmentList = New-Object System.Collections.Generic.List[string]
     $script:DepartmentListNorm = New-Object System.Collections.Generic.HashSet[string]
-    $fileD = $null; try { if($script:DataFolder){ $fileD = Join-Path $script:DataFolder 'DepartmentMaster.csv' } } catch {}
-    if(-not $fileD -or -not (Test-Path $fileD)){
-      try { $fileD = Join-Path $PSScriptRoot 'Data/DepartmentMaster.csv' } catch {}
-    }
-    if(-not $fileD -or -not (Test-Path $fileD)){
-      try { $fileD = 'DepartmentMaster.csv' } catch {}
-    }
-    if(Test-Path $fileD){
-      $script:DepartmentMaster = Import-Csv -Path $fileD
+    $fileD = Get-DepartmentFile 'DepartmentMaster.csv'
+    if($fileD){
+      $script:DepartmentMaster = Import-DepartmentRows $fileD
       foreach($row in $script:DepartmentMaster){
-        $d = Normalize-Field $row.Department
-        if($d -and -not $script:DepartmentListNorm.Contains($d)){
-          [void]$script:DepartmentList.Add($row.Department)
-          [void]$script:DepartmentListNorm.Add($d)
-        }
+        if($row -and $row.PSObject.Properties['Department']){ Add-DepartmentValue $row.Department }
       }
     }
-    $fileDU = $null; try { if($script:DataFolder){ $fileDU = Join-Path $script:DataFolder 'DepartmentMaster-UserAdds.csv' } } catch {}
-    if(-not $fileDU -or -not (Test-Path $fileDU)){
-      try { $fileDU = Join-Path $PSScriptRoot 'Data/DepartmentMaster-UserAdds.csv' } catch {}
-    }
-    if(-not $fileDU -or -not (Test-Path $fileDU)){
-      try { $fileDU = 'DepartmentMaster-UserAdds.csv' } catch {}
-    }
-    if(Test-Path $fileDU){
-      $script:DepartmentUserAdds = Import-Csv -Path $fileDU
+    $fileDU = Get-DepartmentFile 'DepartmentMaster-UserAdds.csv'
+    if($fileDU){
+      $script:DepartmentUserAdds = Import-DepartmentRows $fileDU
       foreach($row in $script:DepartmentUserAdds){
-        $d = Normalize-Field $row.Department
-        if($d -and -not $script:DepartmentListNorm.Contains($d)){
-          [void]$script:DepartmentList.Add($row.Department)
-          [void]$script:DepartmentListNorm.Add($d)
-        }
+        if($row -and $row.PSObject.Properties['Department']){ Add-DepartmentValue $row.Department }
       }
     }
-    $script:DepartmentList = ($script:DepartmentList | Sort-Object -Unique)
-  } catch { }
+    $sorted = @($script:DepartmentList | Sort-Object -Unique)
+    $script:DepartmentList = New-Object System.Collections.Generic.List[string]
+    foreach($item in $sorted){ [void]$script:DepartmentList.Add($item) }
+  } catch {}
 }
 function Save-DepartmentUserAdd([string]$dept){
   try{
@@ -500,24 +544,6 @@ function Save-DepartmentUserAdd([string]$dept){
 }
 function Populate-Department-Combo([string]$current){
   try{
-    if(-not $cmbDept){ return }
-    $existing = $cmbDept.Text
-    $cmbDept.Items.Clear()
-    $items = @()
-    if($script:DepartmentList){ $items = @($script:DepartmentList) }
-    if($items.Count -eq 0){
-      Load-DepartmentMaster
-      if($script:DepartmentList){ $items = @($script:DepartmentList) }
-    }
-    if($items.Count -gt 0){
-      [void]$cmbDept.Items.AddRange([object[]]$items)
-    }
-    if($current){
-      $cmbDept.Text = $current
-    } elseif(-not [string]::IsNullOrWhiteSpace($existing)){
-      $cmbDept.Text = $existing
-    } elseif($cmbDept.Items.Count -gt 0){
-      $cmbDept.SelectedIndex = 0
     }
   } catch {}
 }
