@@ -436,6 +436,48 @@ function Extract-RoomCode([string]$s){
   if($m.Success){ return $m.Value } else { return '' }
 }
 # ---- Department master/user-adds ----
+function Add-DepartmentOption([string]$value){
+  if([string]::IsNullOrWhiteSpace($value)){ return }
+  $raw = [string]$value
+  $norm = Normalize-Field $raw
+  if([string]::IsNullOrWhiteSpace($norm)){ return }
+  if(-not $script:DepartmentListNorm.Contains($norm)){
+    [void]$script:DepartmentList.Add($raw.Trim())
+    [void]$script:DepartmentListNorm.Add($norm)
+  }
+}
+function Get-DepartmentValuesFromFile([string]$path){
+  $values = New-Object System.Collections.Generic.List[string]
+  if([string]::IsNullOrWhiteSpace($path) -or -not (Test-Path $path)){ return $values }
+  $lines = @()
+  try { $lines = Get-Content -Path $path } catch { return $values }
+  if(-not $lines -or $lines.Count -eq 0){ return $values }
+  $firstNonEmpty = $null
+  foreach($line in $lines){
+    if(-not [string]::IsNullOrWhiteSpace($line)){ $firstNonEmpty = $line; break }
+  }
+  $rows = @()
+  $treatAsHeader = $false
+  if($firstNonEmpty){
+    $probe = $firstNonEmpty.Trim().Trim([char]34)
+    if($probe.ToUpperInvariant() -eq 'DEPARTMENT'){ $treatAsHeader = $true }
+  }
+  if($treatAsHeader){
+    try { $rows = Import-Csv -Path $path } catch { $rows = @() }
+  } else {
+    try { $rows = ConvertFrom-Csv -InputObject $lines -Header 'Department' } catch { $rows = @() }
+  }
+  foreach($row in $rows){
+    if(-not $row){ continue }
+    $props = $row.PSObject.Properties | Where-Object { $_.Value -and -not [string]::IsNullOrWhiteSpace([string]$_.Value) }
+    if(-not $props){ continue }
+    $prop = $props | Where-Object { $_.Name -eq 'Department' } | Select-Object -First 1
+    if(-not $prop){ $prop = $props | Select-Object -First 1 }
+    if(-not $prop){ continue }
+    [void]$values.Add([string]$prop.Value)
+  }
+  return $values
+}
 function Load-DepartmentMaster(){
   try{
     $script:DepartmentMaster = @()
@@ -450,14 +492,8 @@ function Load-DepartmentMaster(){
       try { $fileD = 'DepartmentMaster.csv' } catch {}
     }
     if(Test-Path $fileD){
-      $script:DepartmentMaster = Import-Csv -Path $fileD
-      foreach($row in $script:DepartmentMaster){
-        $d = Normalize-Field $row.Department
-        if($d -and -not $script:DepartmentListNorm.Contains($d)){
-          [void]$script:DepartmentList.Add($row.Department)
-          [void]$script:DepartmentListNorm.Add($d)
-        }
-      }
+      $script:DepartmentMaster = Get-DepartmentValuesFromFile $fileD
+      foreach($val in $script:DepartmentMaster){ Add-DepartmentOption $val }
     }
     $fileDU = $null; try { if($script:DataFolder){ $fileDU = Join-Path $script:DataFolder 'DepartmentMaster-UserAdds.csv' } } catch {}
     if(-not $fileDU -or -not (Test-Path $fileDU)){
@@ -467,14 +503,8 @@ function Load-DepartmentMaster(){
       try { $fileDU = 'DepartmentMaster-UserAdds.csv' } catch {}
     }
     if(Test-Path $fileDU){
-      $script:DepartmentUserAdds = Import-Csv -Path $fileDU
-      foreach($row in $script:DepartmentUserAdds){
-        $d = Normalize-Field $row.Department
-        if($d -and -not $script:DepartmentListNorm.Contains($d)){
-          [void]$script:DepartmentList.Add($row.Department)
-          [void]$script:DepartmentListNorm.Add($d)
-        }
-      }
+      $script:DepartmentUserAdds = Get-DepartmentValuesFromFile $fileDU
+      foreach($val in $script:DepartmentUserAdds){ Add-DepartmentOption $val }
     }
     $script:DepartmentList = ($script:DepartmentList | Sort-Object -Unique)
   } catch { }
@@ -483,7 +513,10 @@ function Save-DepartmentUserAdd([string]$dept){
   try{
     if([string]::IsNullOrWhiteSpace($dept)){ return }
     $n = Normalize-Field $dept
-    if($script:DepartmentListNorm.Contains($n)){ return }
+    if(-not $script:DepartmentListNorm -or $script:DepartmentListNorm.Count -eq 0){
+      try { Load-DepartmentMaster } catch {}
+    }
+    if($script:DepartmentListNorm -and $script:DepartmentListNorm.Contains($n)){ return }
     $fileDU = $null; try { if($script:DataFolder){ $fileDU = Join-Path $script:DataFolder 'DepartmentMaster-UserAdds.csv' } } catch {}
     if(-not $fileDU -or -not (Test-Path $fileDU)){
       try { $fileDU = Join-Path $PSScriptRoot 'Data/DepartmentMaster-UserAdds.csv' } catch {}
@@ -501,13 +534,21 @@ function Save-DepartmentUserAdd([string]$dept){
 function Populate-Department-Combo([string]$current){
   try{
     if(-not $cmbDept){ return }
+    $existing = $cmbDept.Text
     $cmbDept.Items.Clear()
-    if(-not $script:DepartmentList){ Load-DepartmentMaster }
-    if($script:DepartmentList){
-      [void]$cmbDept.Items.AddRange($script:DepartmentList)
+    $items = @()
+    if($script:DepartmentList){ $items = @($script:DepartmentList) }
+    if($items.Count -eq 0){
+      Load-DepartmentMaster
+      if($script:DepartmentList){ $items = @($script:DepartmentList) }
+    }
+    if($items.Count -gt 0){
+      [void]$cmbDept.Items.AddRange([object[]]$items)
     }
     if($current){
       $cmbDept.Text = $current
+    } elseif(-not [string]::IsNullOrWhiteSpace($existing)){
+      $cmbDept.Text = $existing
     } elseif($cmbDept.Items.Count -gt 0){
       $cmbDept.SelectedIndex = 0
     }
@@ -563,6 +604,7 @@ function Load-DataFolder([string]$folder){
   if(-not $script:OutputFolder){ $script:OutputFolder = $folder }
   Load-LocationMaster $folder
   Load-RoundingMapping $folder
+  try { Load-DepartmentMaster } catch {}
   $cfile   = Join-Path $folder 'Computers.csv'
   $mfile   = Join-Path $folder 'Monitors.csv'
   $micfile = Join-Path $folder 'Mics.csv'
@@ -848,7 +890,7 @@ $cmbLocation=New-Object System.Windows.Forms.ComboBox; $cmbLocation.Location='12
 $cmbBuilding=New-Object System.Windows.Forms.ComboBox; $cmbBuilding.Location='120,85'; $cmbBuilding.Size='360,24'; $cmbBuilding.Visible=$false; $cmbBuilding.DropDownStyle='DropDown'
 $cmbFloor=New-Object System.Windows.Forms.ComboBox; $cmbFloor.Location='120,115'; $cmbFloor.Size='360,24'; $cmbFloor.Visible=$false; $cmbFloor.DropDownStyle='DropDown'
 $cmbRoom=New-Object System.Windows.Forms.ComboBox; $cmbRoom.Location='120,145'; $cmbRoom.Size='360,24'; $cmbRoom.Visible=$false; $cmbRoom.DropDownStyle='DropDown'
-$cmbDept=New-Object System.Windows.Forms.ComboBox; $cmbDept.Location='120,175'; $cmbDept.Width=360; $cmbDept.Visible=$false; $cmbDept.DropDownStyle='DropDownList'
+$cmbDept=New-Object System.Windows.Forms.ComboBox; $cmbDept.Location='120,175'; $cmbDept.Width=360; $cmbDept.Visible=$false; $cmbDept.DropDownStyle='DropDown'
 $cmbDept.Visible = $false
 $grpLoc.Controls.AddRange(@($cmbCity,$cmbLocation,$cmbBuilding,$cmbFloor,$cmbRoom,$cmbDept))
 Populate-Department-Combo ''
@@ -1257,12 +1299,19 @@ function Validate-Location($rec){
   if($script:editing){ return }
   # Show raw values in UI
   $txtCity.Text     = Get-City-ForLocation $rec.location
-$txtDept.Text = $Department  # mirror read-only display; dropdown only when editing
+  $deptVal = ''
+  try{
+    if($rec){
+      if($rec.PSObject.Properties['u_department_location']){ $deptVal = $rec.u_department_location }
+      elseif($rec.PSObject.Properties['Department']){ $deptVal = $rec.Department }
+    }
+  } catch {}
+  if($txtDept){ $txtDept.Text = $deptVal }
   $txtLocation.Text = $rec.location
   $txtBldg.Text     = $rec.u_building
   $txtFloor.Text    = $rec.u_floor
   $txtRoom.Text     = $rec.u_room
-  try{ $cmbDept.Text = $rec.u_department_location } catch {}
+  try{ $cmbDept.Text = $deptVal } catch {}
 
   $tip.SetToolTip($txtRoom, "")
   $okC=$false; $okL=$false; $okB=$false; $okF=$false; $okR=$false
@@ -1307,10 +1356,15 @@ $txtDept.Text = $Department  # mirror read-only display; dropdown only when edit
   $txtFloor.BackColor    = if($okF){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
   $txtRoom.BackColor     = if($okR){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
   try{
-    $d=$rec.u_department_location
+    $d = $deptVal
     $okD = $false
+    if(-not $script:DepartmentListNorm -or $script:DepartmentListNorm.Count -eq 0){
+      try { Load-DepartmentMaster } catch {}
+    }
     if($d -and $script:DepartmentListNorm){ $okD = $script:DepartmentListNorm.Contains((Normalize-Field $d)) }
-    $cmbDept.BackColor = if($okD){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
+    $colorD = if($okD){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
+    if($txtDept){ $txtDept.BackColor = $colorD }
+    if($cmbDept){ $cmbDept.BackColor = $colorD }
   } catch {}
 }
 function Refresh-AssocGrid($parentRec){
@@ -1634,6 +1688,7 @@ function Toggle-EditLocation(){
   $script:editing = -not $script:editing
   if($script:editing){
     Populate-Location-Combos $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text
+    try { Populate-Department-Combo ($txtDept.Text) } catch {}
     $cmbCity.Visible=$true; $cmbLocation.Visible=$true; $cmbBuilding.Visible=$true; $cmbFloor.Visible=$true; $cmbRoom.Visible=$true
     $txtCity.Visible=$false; $txtLocation.Visible=$false; $txtBldg.Visible=$false; $txtFloor.Visible=$false; $txtRoom.Visible=$false
     if ($cmbDept) { $cmbDept.Visible=$true } ; if ($txtDept) { $txtDept.Visible=$false }
@@ -1642,6 +1697,9 @@ function Toggle-EditLocation(){
     $btnEditLoc.Text="Save Location"
   } else {
     $city=$cmbCity.Text; $loc=$cmbLocation.Text; $b=$cmbBuilding.Text; $f=$cmbFloor.Text; $r=$cmbRoom.Text
+    $dept = ''
+    if($cmbDept -and $cmbDept.Text){ $dept = $cmbDept.Text }
+    elseif($txtDept -and $txtDept.Text){ $dept = $txtDept.Text }
     $exists = $script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'City')) -eq (Normalize-Field $city) -and (Normalize-Field (Get-LocVal $_ 'Location')) -eq (Normalize-Field $loc) -and (Normalize-Field (Get-LocVal $_ 'Building')) -eq (Normalize-Field $b) -and (Normalize-Field (Get-LocVal $_ 'Floor')) -eq (Normalize-Field $f) -and (Normalize-Field (Get-LocVal $_ 'Room')) -eq (Normalize-Field $r) }
     if($exists.Count -eq 0 -and $city -and $loc -and $b -and $f -and $r){
       $new=[pscustomobject]@{City=$city;Location=$loc;Building=$b;Floor=$f;Room=$r}
@@ -1650,12 +1708,19 @@ function Toggle-EditLocation(){
       Rebuild-RoomCaches
     }
     $txtCity.Text=$city; $txtLocation.Text=$loc; $txtBldg.Text=$b; $txtFloor.Text=$f; $txtRoom.Text=$r
-    $tmp=[pscustomobject]@{location=$loc;u_building=$b;u_floor=$f;u_room=$r}
+    if($dept){
+      try { Save-DepartmentUserAdd $dept } catch {}
+      try { Populate-Department-Combo $dept } catch {}
+    }
+    if($txtDept){ $txtDept.Text = $dept }
+    if($cmbDept){ $cmbDept.Text = $dept }
+    $tmp=[pscustomobject]@{location=$loc;u_building=$b;u_floor=$f;u_room=$r;u_department_location=$dept;Department=$dept}
     $script:editing = $false
     Validate-Location $tmp
     $cmbCity.Visible=$false; $cmbLocation.Visible=$false; $cmbBuilding.Visible=$false; $cmbFloor.Visible=$false; $cmbRoom.Visible=$false
-    $txtCity.Visible=$true; $txtLocation.Visible=$true; $txtBldg.Visible=$true; $txtFloor.Visible=$true; $txtRoom.Visible=$true; if($cmbDept){ $txtDept.Text = $cmbDept.Text }
-    if ($cmbDept) { $cmbDept.Visible=$false } ; if ($txtDept) { $txtDept.Visible=$true; $txtDept.Text = $cmbDept.Text }
+    $txtCity.Visible=$true; $txtLocation.Visible=$true; $txtBldg.Visible=$true; $txtFloor.Visible=$true; $txtRoom.Visible=$true
+    if ($cmbDept) { $cmbDept.Visible=$false }
+    if ($txtDept) { $txtDept.Visible=$true }
     $btnEditLoc.Text="Edit Location"
   }
 }
@@ -1767,6 +1832,15 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
   if($pc){
       try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
  $url = Get-RoundingUrlForParent $pc }
+  $deptValue = ''
+  if($cmbDept -and $cmbDept.Text){ $deptValue = $cmbDept.Text }
+  elseif($txtDept -and $txtDept.Text){ $deptValue = $txtDept.Text }
+  if($deptValue){
+    try { Save-DepartmentUserAdd $deptValue } catch {}
+    if($txtDept){ $txtDept.Text = $deptValue }
+    if($cmbDept){ $cmbDept.Text = $deptValue }
+    try { Populate-Department-Combo $deptValue } catch {}
+  }
   $row = [pscustomobject]@{
     Timestamp        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
     AssetTag         = if($pc){
@@ -1790,7 +1864,7 @@ $pc.serial_number}else{$null}
     CartOK           = $chkCart.Checked
     PeripheralsOK    = $chkPeriph.Checked
     MaintenanceType = $cmbMaintType.Text
-    Department       = $cmbDept.Text
+    Department       = $deptValue
     RoundingUrl      = $url
   }
   $cmbDept.Visible = $false  # Hidden until Edit Location is active
@@ -1836,6 +1910,7 @@ Create a 'Data' folder next to the script and add your CSVs."
   }
   Load-DataFolder $script:DataFolder
   Update-Counters
+  try { Populate-Department-Combo ($txtDept.Text) } catch {}
   $lblDataPath.Visible=$false; $lblOutputPath.Visible=$false; $lblDataStatus.Visible=$false; $statusLabel.Text = ("Data: " + $script:DataFolder + " | Output: " + $script:OutputFolder); $statusLabel.ForeColor=[System.Drawing.Color]::DarkGreen
   $lblOutputPath.Text = "Output: " + $script:OutputFolder
   $statusLabel.Text   = "Data OK"; $statusLabel.ForeColor=[System.Drawing.Color]::DarkGreen
@@ -2459,9 +2534,3 @@ function Get-StatusOptionsFromGrid {
   return ($opts | Where-Object { $_ -and $_.Trim().Length -gt 0 } | Sort-Object -Unique)
 }
 [void]$form.ShowDialog()
-
-  # Department
-  $txtDept.Text = $rec.u_department_location
-  $okD = $false
-  $nDept = Normalize-Field $rec.u_department_location
-  if($script:DepartmentListNorm -and $nDept){ $okD = $script:DepartmentListNorm.Contains($nDept) }
