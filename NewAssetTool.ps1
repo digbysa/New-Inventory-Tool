@@ -1270,15 +1270,11 @@ function Get-AssocSizing([int]$rows){
 function Size-AssocForRows([int]$rows){
   $info = Get-AssocSizing $rows
   try{
-    $tlpAssoc.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Percent
-    $tlpAssoc.RowStyles[0].Height   = 100
-    $tlpAssoc.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::AutoSize
-    $tlpAssoc.RowStyles[1].Height   = 0
     if($info.Target -gt 0){
-      $desiredGrid = [Math]::Max([int]$info.Grid, 0)
-      if($desiredGrid -gt 0){
-        $dgv.MinimumSize = [System.Drawing.Size]::new($dgv.MinimumSize.Width, $desiredGrid)
-      }
+      $tlpAssoc.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Absolute
+      $tlpAssoc.RowStyles[0].Height   = $info.Target
+      $tlpAssoc.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::AutoSize
+      $tlpAssoc.RowStyles[1].Height   = 0
     }
   } catch { }
   return $info
