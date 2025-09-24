@@ -962,11 +962,10 @@ $tlpAssoc.Dock = 'Fill'
 $tlpAssoc.ColumnCount = 1
 $tlpAssoc.RowCount = 2
 $tlpAssoc.RowStyles.Clear()
-$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 $tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle -ArgumentList ([System.Windows.Forms.SizeType]::AutoSize)) )
+$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 $tlpAssoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tlpAssoc.Margin  = New-Object System.Windows.Forms.Padding($GAP)
-$tlpAssoc.Controls.Add($dgv,0,0)
 # Toolbar row
 $lblAdd = New-Object System.Windows.Forms.Label
 $lblAdd.Text = "Add Peripheral (AssetTag/Serial):"
@@ -1142,7 +1141,8 @@ $tlpAssocStrip.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.
 $tlpAssocStrip.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
 $tlpAssocStrip.Controls.Add($tlpAssocTop,0,0)
 $tlpAssocStrip.Controls.Add($grpPrev,   0,1)
-$tlpAssoc.Controls.Add($tlpAssocStrip,0,1)
+$tlpAssoc.Controls.Add($tlpAssocStrip,0,0)
+$tlpAssoc.Controls.Add($dgv,0,1)
 $grpAssoc.Controls.Add($tlpAssoc)
 # Rounding group
 $grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Fill'
@@ -1270,11 +1270,15 @@ function Get-AssocSizing([int]$rows){
 function Size-AssocForRows([int]$rows){
   $info = Get-AssocSizing $rows
   try{
+    $tlpAssoc.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Percent
+    $tlpAssoc.RowStyles[0].Height   = 100
+    $tlpAssoc.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::AutoSize
+    $tlpAssoc.RowStyles[1].Height   = 0
     if($info.Target -gt 0){
-      $tlpAssoc.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Absolute
-      $tlpAssoc.RowStyles[0].Height   = $info.Target
-      $tlpAssoc.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::AutoSize
-      $tlpAssoc.RowStyles[1].Height   = 0
+      $desiredGrid = [Math]::Max([int]$info.Grid, 0)
+      if($desiredGrid -gt 0){
+        $dgv.MinimumSize = [System.Drawing.Size]::new($dgv.MinimumSize.Width, $desiredGrid)
+      }
     }
   } catch { }
   return $info
