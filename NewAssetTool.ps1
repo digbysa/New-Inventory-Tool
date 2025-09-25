@@ -1635,8 +1635,13 @@ function Show-AddPeripheralDialog($parentRec){
     }
   })
   $btnDialogAdd.Add_Click({
-    if(-not $lookupResult){ return }
-    if(Link-Peripheral $txtSearch.Text $parentRec $lookupResult){
+    $result = $lookupResult
+    if(-not $result){
+      $result = Resolve-PeripheralLookup $txtSearch.Text
+      & $applyPreview $result
+    }
+    if(-not $result){ return }
+    if(Link-Peripheral $txtSearch.Text $parentRec $result){
       $dialog.DialogResult = [System.Windows.Forms.DialogResult]::OK
       $dialog.Close()
     }
