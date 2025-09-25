@@ -739,7 +739,6 @@ $($out)","Save") | Out-Null
 $LEFT_COL_PERCENT   = 46
 $RIGHT_COL_PERCENT  = 54
 $GAP                = 6
-$MAX_ASSOC_GRID_ROWS = 4
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Inventory Assoc Finder - OMI"
 $lblPaths = New-Object System.Windows.Forms.Label
@@ -930,7 +929,9 @@ $dgv = New-Object System.Windows.Forms.DataGridView
 $dgv.Dock='Fill'; $dgv.AutoGenerateColumns=$false; $dgv.AllowUserToAddRows=$false; $dgv.ReadOnly=$true
 $dgv.SelectionMode=[System.Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
 $dgv.MultiSelect=$true; $dgv.RowHeadersVisible=$false; $dgv.BackgroundColor=[System.Drawing.Color]::White; $dgv.BorderStyle='FixedSingle'
-$dgv.AutoSizeColumnsMode='DisplayedCells'
+$dgv.AutoSizeColumnsMode='Fill'
+$dgv.AutoSizeRowsMode=[System.Windows.Forms.DataGridViewAutoSizeRowsMode]::AllCells
+$dgv.ScrollBars=[System.Windows.Forms.ScrollBars]::None
 # Enable double buffering to reduce flicker
 try { $dgv.GetType().GetProperty('DoubleBuffered', [System.Reflection.BindingFlags] 'NonPublic,Instance').SetValue($dgv, $true, $null) } catch {}
 function New-TextCol([string]$name,[string]$header,[int]$width,[bool]$ro=$true){
@@ -947,8 +948,13 @@ $dgv.Columns.Add((New-TextCol 'RITM' 'RITM' 100))      | Out-Null
 $dgv.Columns.Add((New-TextCol 'Retire' 'Retire' 120)) | Out-Null
 $tabGrid.Controls.Add($dgv)
 try{
-  $dgv.Columns['Name'].AutoSizeMode = [System.Windows.Forms.DataGridViewAutoSizeColumnMode]::DisplayedCells
-  $dgv.Columns['RITM'].Width = 120
+  $dgv.Columns['Role'].FillWeight   = 60
+  $dgv.Columns['Type'].FillWeight   = 90
+  $dgv.Columns['Name'].FillWeight   = 170
+  $dgv.Columns['AssetTag'].FillWeight = 120
+  $dgv.Columns['Serial'].FillWeight = 120
+  $dgv.Columns['RITM'].FillWeight   = 90
+  $dgv.Columns['Retire'].FillWeight = 110
 } catch {}
 $cards = New-Object System.Windows.Forms.FlowLayoutPanel
 $cards.Dock='Fill'; $cards.AutoScroll=$true; $cards.WrapContents=$true; $cards.FlowDirection='LeftToRight'
@@ -957,9 +963,11 @@ $tlpAssoc = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpAssoc.Dock = 'Fill'
 $tlpAssoc.ColumnCount = 1
 $tlpAssoc.RowCount = 2
+$tlpAssoc.ColumnStyles.Clear()
+$tlpAssoc.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 $tlpAssoc.RowStyles.Clear()
-$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle -ArgumentList ([System.Windows.Forms.SizeType]::AutoSize)) )
 $tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
+$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
 $tlpAssoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tlpAssoc.Margin  = New-Object System.Windows.Forms.Padding($GAP)
 # Toolbar row
@@ -967,44 +975,27 @@ $btnAddPeripheral = New-Object System.Windows.Forms.Button
 $btnAddPeripheral.Text   = 'Add Peripheral'
 $btnAddPeripheral.AutoSize = $true
 $btnAddPeripheral.AutoSizeMode = 'GrowAndShrink'
-$btnAddPeripheral.Margin = '0,4,6,4'
-$btnAddPeripheral.Anchor = 'Right'
+$btnAddPeripheral.Margin = '0,6,6,0'
+$btnAddPeripheral.Anchor = 'Left'
 $btnRemove = New-Object System.Windows.Forms.Button
 $btnRemove.Text   = 'Remove Peripheral'
 $btnRemove.AutoSize = $true
 $btnRemove.AutoSizeMode = 'GrowAndShrink'
-$btnRemove.Margin = '0,4,0,4'
-$btnRemove.Anchor = 'Right'
-$tlpAssocTop = New-Object System.Windows.Forms.TableLayoutPanel
-$tlpAssocTop.Dock = 'Fill'
-$tlpAssocTop.RowCount = 1
-$tlpAssocTop.ColumnCount = 3
-$tlpAssocTop.Padding = '0,0,0,0'
-$tlpAssocTop.Margin  = '0,0,0,0'
-$tlpAssocTop.RowStyles.Clear()
-$tlpAssocTop.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
-$tlpAssocTop.ColumnStyles.Clear()
-$tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
-$tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)) )
-$tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)) )
-$assocSpacer = New-Object System.Windows.Forms.Panel
-$assocSpacer.Dock = 'Fill'
-$assocSpacer.Margin = '0,0,0,0'
-$assocSpacer.Padding = '0,0,0,0'
-$tlpAssocTop.Controls.Add($assocSpacer, 0, 0)
-$tlpAssocTop.Controls.Add($btnAddPeripheral, 1, 0)
-$tlpAssocTop.Controls.Add($btnRemove, 2, 0)
-$tlpAssocStrip = New-Object System.Windows.Forms.TableLayoutPanel
-$tlpAssocStrip.Dock = 'Fill'
-$tlpAssocStrip.AutoSize = $true
-$tlpAssocStrip.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
-$tlpAssocStrip.ColumnCount = 1
-$tlpAssocStrip.RowCount = 1
-$tlpAssocStrip.RowStyles.Clear()
-$tlpAssocStrip.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)) )
-$tlpAssocStrip.Controls.Add($tlpAssocTop,0,0)
-$tlpAssoc.Controls.Add($tlpAssocStrip,0,0)
-$tlpAssoc.Controls.Add($dgv,0,1)
+$btnRemove.Margin = '0,6,0,0'
+$btnRemove.Anchor = 'Left'
+$assocButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
+$assocButtonsPanel.Dock = 'Fill'
+$assocButtonsPanel.AutoSize = $true
+$assocButtonsPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+$assocButtonsPanel.WrapContents = $false
+$assocButtonsPanel.FlowDirection = 'LeftToRight'
+$assocButtonsPanel.Margin = '0,0,0,0'
+$assocButtonsPanel.Padding = '0,0,0,0'
+$assocButtonsPanel.Anchor = 'Top,Left'
+$assocButtonsPanel.Controls.Add($btnAddPeripheral)
+$assocButtonsPanel.Controls.Add($btnRemove)
+$tlpAssoc.Controls.Add($dgv,0,0)
+$tlpAssoc.Controls.Add($assocButtonsPanel,0,1)
 $grpAssoc.Controls.Add($tlpAssoc)
 # Rounding group
 $grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Fill'
@@ -1072,13 +1063,14 @@ function Apply-ResponsiveHeights {
     $tlpLeft.RowStyles[0].Height   = $minSummary
     $tlpLeft.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
     $tlpLeft.RowStyles[1].Height   = $minLocation
-    $rowsShown = [Math]::Max([Math]::Min($dgv.Rows.Count, $MAX_ASSOC_GRID_ROWS), 1)
+    $rowsShown = [Math]::Max($dgv.Rows.Count, 1)
     $assocInfo = Size-AssocForRows $rowsShown
     $assocTarget = 0
     if($assocInfo -and $assocInfo.Target){
       $assocTarget = [Math]::Max([int]$assocInfo.Target, 0)
     }
-    $stripHeight = $tlpAssocStrip.PreferredSize.Height
+    $stripHeight = $assocButtonsPanel.PreferredSize.Height
+    if($stripHeight -le 0){ $stripHeight = [Math]::Max($btnAddPeripheral.PreferredSize.Height, $btnRemove.PreferredSize.Height) }
     if($stripHeight -le 0){ $stripHeight = 34 }
     $assocPadding = $grpAssoc.Padding.Vertical + $grpAssoc.Margin.Vertical + $tlpAssoc.Margin.Vertical
     $minAssoc   = [Math]::Max($assocTarget + $stripHeight + $assocPadding, 220)
@@ -1141,7 +1133,7 @@ function Size-AssocForRows([int]$rows){
 }
 $form.Add_Shown({
   Apply-ResponsiveHeights
-  Size-AssocForRows([Math]::Min([Math]::Max($dgv.Rows.Count,1), $MAX_ASSOC_GRID_ROWS)) | Out-Null
+  Size-AssocForRows([Math]::Max($dgv.Rows.Count,1)) | Out-Null
 })
 # -------- UI logic ---------
 function Update-Counters(){ $locCount = $script:LocationRows.Count; $lblDataStatus.Text = ("Computers: {0} | Monitors: {1} | Mics: {2} | Scanners: {3} | Carts: {4} | Locations: {5}" -f `
@@ -1279,7 +1271,7 @@ function Refresh-AssocGrid($parentRec){
       } else { $r.Cells['RITM'].Style.ForeColor=[System.Drawing.Color]::IndianRed }
     }
   }
-  Size-AssocForRows([Math]::Min([Math]::Max($dgv.Rows.Count,1), $MAX_ASSOC_GRID_ROWS)) | Out-Null
+  Size-AssocForRows([Math]::Max($dgv.Rows.Count,1)) | Out-Null
 }
 function Make-Card($title,$kvPairs,[System.Drawing.Color]$ritmColor,[bool]$showRITM,[bool]$showRetire,$tagPayload){
   $p = New-Object System.Windows.Forms.Panel
