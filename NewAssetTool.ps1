@@ -40,12 +40,18 @@ $script:IndexBySerial = @{}
 $script:IndexByName = @{}
 $script:ComputerByAsset = @{}
 $script:ComputerByName = @{} 
-$script:ChildrenByParent = @{} 
+$script:ChildrenByParent = @{}
 $script:LocationRows = @()
-$script:RoundingByAssetTag = @{} 
+$script:RoundingByAssetTag = @{}
 $script:CurrentDisplay = $null
 $script:CurrentParent  = $null
 $script:editing = $false
+# Canonical column order for rounding event exports (includes Comments column)
+$script:RoundingEventColumns = @(
+  'Timestamp','AssetTag','Name','Serial','City','Location','Building','Floor','Room',
+  'CheckStatus','RoundingMinutes','CableMgmtOK','LabelOK','CartOK','PeripheralsOK',
+  'MaintenanceType','Department','RoundingUrl','Comments'
+)
 # Tolerant header map + fast caches for Room validation
 $script:LocCols = @{}
 $script:RoomsNorm  = @()  # all normalized Room strings from LocationMaster*.csv
@@ -1039,7 +1045,13 @@ $btnSave=New-Object System.Windows.Forms.Button; $btnSave.Text="Save Event"; $bt
 $btnSave.TabIndex = 8
 $btnManualRound=New-Object System.Windows.Forms.Button; $btnManualRound.Text="Manual Round"; $btnManualRound.Location='396,160'; $btnManualRound.Size='180,30'; $btnManualRound.Enabled=$false
 $btnManualRound.TabIndex = 9
-$grpMaint.Controls.AddRange(@($lblMaintType,$cmbMaintType,$lblChkStatus,$cmbChkStatus,$lblTime,$numTime,$chkCable,$chkCart,$chkLabels,$chkPeriph,$btnCheckComplete,$btnSave,$btnManualRound))
+$lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments:'; $lblComments.AutoSize=$true; $lblComments.Location='12,202'
+$lblComments.TabIndex = 10
+$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Location='12,222'; $txtComments.Size='564,72'; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='None'; $txtComments.Anchor='Top,Left,Right'; $txtComments.TabIndex=11
+$txtComments.WordWrap = $true
+$grpMaint.Controls.AddRange(@($lblMaintType,$cmbMaintType,$lblChkStatus,$cmbChkStatus,$lblTime,$numTime,$chkCable,$chkCart,$chkLabels,$chkPeriph,$btnCheckComplete,$btnSave,$btnManualRound,$lblComments,$txtComments))
+$txtComments.Add_TextChanged({ Update-RoundingCommentsLayout })
+$txtComments.Add_SizeChanged({ Update-RoundingCommentsLayout })
 $grpMaint.Controls.Add($lblMaintType); $grpMaint.Controls.Add($cmbMaintType)
 # Compose columns
 $tlpRight.Controls.Add($grpAssoc,0,0)
@@ -1089,6 +1101,26 @@ function Apply-ResponsiveHeights {
     $tlpRight.RowStyles[0].Height   = $minAssoc
     $tlpRight.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
     $tlpRight.RowStyles[1].Height   = $minRound
+  } catch { }
+}
+function Update-RoundingCommentsLayout {
+  try {
+    if(-not $txtComments){ return }
+    $width = [int][Math]::Max($txtComments.ClientSize.Width, 100)
+    if($width -le 0){ $width = [Math]::Max($txtComments.Width - 8, 100) }
+    $measureSize = New-Object System.Drawing.Size($width, 0)
+    $flags = [System.Windows.Forms.TextFormatFlags]::WordBreak -bor [System.Windows.Forms.TextFormatFlags]::TextBoxControl
+    $text = $txtComments.Text
+    if([string]::IsNullOrEmpty($text)){ $text = ' ' }
+    $measured = [System.Windows.Forms.TextRenderer]::MeasureText($text + ' ', $txtComments.Font, $measureSize, $flags)
+    $padding = $txtComments.Height - $txtComments.ClientSize.Height
+    if($padding -le 0){ $padding = 8 }
+    $minHeight = 72
+    $desired = [Math]::Max($measured.Height + $padding, $minHeight)
+    if([Math]::Abs($desired - $txtComments.Height) -gt 2){
+      $txtComments.Height = $desired
+    }
+    Apply-ResponsiveHeights
   } catch { }
 }
 function Get-AssocSizing([int]$rows){
@@ -1145,6 +1177,7 @@ $form.Add_Shown({
   Apply-ResponsiveHeights
   Size-AssocForRows([Math]::Max($dgv.Rows.Count,1)) | Out-Null
 })
+$form.Add_Shown({ Update-RoundingCommentsLayout })
 # -------- UI logic ---------
 function Update-Counters(){ $locCount = $script:LocationRows.Count; $lblDataStatus.Text = ("Computers: {0} | Monitors: {1} | Mics: {2} | Scanners: {3} | Carts: {4} | Locations: {5}" -f `
     $script:Computers.Count,$script:Monitors.Count,$script:Mics.Count,$script:Scanners.Count,$script:Carts.Count,$locCount) }
@@ -1860,7 +1893,7 @@ function Do-Lookup(){
 }
 function Clear-UI(){
   $script:CurrentDisplay = $null; $script:CurrentParent  = $null
-  foreach($tb in @($txtType,$txtHost,$txtAT,$txtSN,$txtParent,$txtRITM,$txtRetire,$txtRound,$txtCity,$txtLocation,$txtBldg,$txtFloor,$txtRoom)){
+  foreach($tb in @($txtType,$txtHost,$txtAT,$txtSN,$txtParent,$txtRITM,$txtRetire,$txtRound,$txtCity,$txtLocation,$txtBldg,$txtFloor,$txtRoom,$txtComments)){
     $tb.Text = ''; $tb.BackColor = [System.Drawing.Color]::White
   }
   try { $dgv.Rows.Clear() } catch {}
@@ -1919,6 +1952,7 @@ $btnSave.Add_Click({
   if(-not (Test-Path $out)){ New-Item -ItemType Directory -Path $out -Force | Out-Null }
 $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
   $exists = Test-Path $file
+  if($exists){ Ensure-RoundingCommentsColumn $file }
   $pc = $script:CurrentParent
   if(-not $pc){ $pc = Resolve-ParentComputer (Find-RecordRaw $txtAT.Text) }
   if(-not $pc){ $pc = $script:CurrentDisplay }
@@ -1960,10 +1994,12 @@ $pc.serial_number}else{$null}
     MaintenanceType = $cmbMaintType.Text
     Department       = $deptValue
     RoundingUrl      = $url
+    Comments         = $txtComments.Text
   }
   $cmbDept.Visible = $false  # Hidden until Edit Location is active
-  if(-not $exists){ $row | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
-  else { $row | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
+  $rowOut = $row | Select-Object $script:RoundingEventColumns
+  if(-not $exists){ $rowOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
+  else { $rowOut | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
   foreach($cb in @($chkCable,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked = $false }
   [System.Windows.Forms.MessageBox]::Show(("Saved rounding event to
 " + $file),"Save Event") | Out-Null
@@ -2059,6 +2095,39 @@ if (-not $script:NEAR_STATUSES) {
 if (-not (Get-Variable -Scope Script -Name RoundingEvents -ErrorAction SilentlyContinue)) {
   $script:RoundingEvents = @()
 }
+function Ensure-RoundingCommentsColumn([string]$file){
+  try {
+    if([string]::IsNullOrWhiteSpace($file)){ return }
+    if(-not (Test-Path $file)){ return }
+    $header = $null
+    try { $header = Get-Content -Path $file -TotalCount 1 -Encoding UTF8 } catch { $header = $null }
+    if($header -and $header -match '(^|,)"?Comments"?(,|$)'){ return }
+    $rows = @()
+    try { $rows = Import-Csv -Path $file } catch { $rows = @() }
+    $columns = @()
+    if($rows -and $rows.Count -gt 0){
+      $columns = @($rows[0].PSObject.Properties.Name)
+    } elseif($header){
+      $columns = @($header -split ',')
+    }
+    if(-not $columns -or $columns.Count -eq 0){
+      $columns = @($script:RoundingEventColumns)
+    } elseif(-not ($columns -contains 'Comments')){
+      $columns = @($columns + 'Comments')
+    }
+    if($rows -and $rows.Count -gt 0){
+      foreach($r in $rows){
+        if(-not $r.PSObject.Properties['Comments']){
+          $r | Add-Member -NotePropertyName Comments -NotePropertyValue '' -Force
+        }
+      }
+      $rows | Select-Object $columns | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8
+    } else {
+      $headerLine = ($columns -join ',')
+      Set-Content -Path $file -Value $headerLine -Encoding UTF8
+    }
+  } catch { }
+}
 function Load-RoundingEvents {
   $script:RoundingEvents = @()
   try {
@@ -2066,6 +2135,7 @@ function Load-RoundingEvents {
     if(-not $base){ return }
     $file = Join-Path $base 'RoundingEvents.csv'
     if(Test-Path $file){
+      Ensure-RoundingCommentsColumn $file
       try { $script:RoundingEvents = Import-Csv $file } catch { $script:RoundingEvents = @() }
     }
   } catch { $script:RoundingEvents = @() }
@@ -2524,6 +2594,7 @@ $btnNearSave.Add_Click({
   if (-not (Test-Path $out)) { New-Item -ItemType Directory -Path $out -Force | Out-Null }
 $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
   $exists = Test-Path $file
+  if($exists){ Ensure-RoundingCommentsColumn $file }
   $todaySet = Get-RoundedToday-Set
   $saved = 0
   foreach ($row in $dgvNearby.Rows) {
@@ -2566,9 +2637,11 @@ if ($pc) {
       MaintenanceType  = if ($pc) { $pc.u_device_rounding } else { $null }
       Department       = $row.Cells['Department'].Value
       RoundingUrl      = $url
+      Comments         = ''
     }
-    if (-not $exists) { $ev | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
-    else { $ev | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
+    $evOut = $ev | Select-Object $script:RoundingEventColumns
+    if (-not $exists) { $evOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
+    else { $evOut | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
     # Update in-memory
     if (-not ($script:RoundingEvents -is [System.Collections.IList])) {
       $script:RoundingEvents = @($script:RoundingEvents)
