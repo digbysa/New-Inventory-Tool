@@ -950,10 +950,10 @@ $tabGrid.Controls.Add($dgv)
 try{
   $dgv.Columns['Role'].FillWeight   = 60
   $dgv.Columns['Type'].FillWeight   = 90
-  $dgv.Columns['Name'].FillWeight   = 170
+  $dgv.Columns['Name'].FillWeight   = 90
   $dgv.Columns['AssetTag'].FillWeight = 120
   $dgv.Columns['Serial'].FillWeight = 120
-  $dgv.Columns['RITM'].FillWeight   = 90
+  $dgv.Columns['RITM'].FillWeight   = 170
   $dgv.Columns['Retire'].FillWeight = 110
 } catch {}
 $cards = New-Object System.Windows.Forms.FlowLayoutPanel
