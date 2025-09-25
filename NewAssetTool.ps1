@@ -45,8 +45,6 @@ $script:LocationRows = @()
 $script:RoundingByAssetTag = @{} 
 $script:CurrentDisplay = $null
 $script:CurrentParent  = $null
-$script:PreviewCandidate = $null
-$script:PreviewIsLinkable = $false
 $script:editing = $false
 # Tolerant header map + fast caches for Room validation
 $script:LocCols = @{}
@@ -357,7 +355,6 @@ function Validate-ParentAndName($displayRec,$parentRec){
     $txtParent.BackColor=[System.Drawing.Color]::White
     $tip.SetToolTip($txtParent,"")
   }
-  Ensure-PrevPropParentLabel
   if($displayRec -and $parentRec -and $displayRec.Type -ne 'Computer'){
     $expected = Compute-ProposedName $displayRec $parentRec
     if($expected -and $displayRec.name -and ($displayRec.name.Trim().ToUpper() -ne $expected.Trim().ToUpper())){
@@ -742,7 +739,6 @@ $($out)","Save") | Out-Null
 $LEFT_COL_PERCENT   = 46
 $RIGHT_COL_PERCENT  = 54
 $GAP                = 6
-$H_ASSOC_PREVIEW    = 74
 $MAX_ASSOC_GRID_ROWS = 4
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Inventory Assoc Finder - OMI"
@@ -967,180 +963,46 @@ $tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windo
 $tlpAssoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tlpAssoc.Margin  = New-Object System.Windows.Forms.Padding($GAP)
 # Toolbar row
-$lblAdd = New-Object System.Windows.Forms.Label
-$lblAdd.Text = "Add Peripheral (AssetTag/Serial):"
-$lblAdd.AutoSize = $true
-$lblAdd.Margin   = '6,8,6,6'
-$txtAdd = New-Object System.Windows.Forms.TextBox
-$txtAdd.Width  = 220
-$txtAdd.Anchor = 'Top,Left'
-$txtAdd.Margin = '0,4,6,4'
+$btnAddPeripheral = New-Object System.Windows.Forms.Button
+$btnAddPeripheral.Text   = 'Add Peripheral'
+$btnAddPeripheral.AutoSize = $true
+$btnAddPeripheral.AutoSizeMode = 'GrowAndShrink'
+$btnAddPeripheral.Margin = '0,4,6,4'
+$btnAddPeripheral.Anchor = 'Right'
 $btnRemove = New-Object System.Windows.Forms.Button
-$btnRemove.Text   = 'Remove Selected'
-$btnRemove.Dock   = 'Right'
-$btnRemove.Margin = '0,4,6,4'
+$btnRemove.Text   = 'Remove Peripheral'
 $btnRemove.AutoSize = $true
 $btnRemove.AutoSizeMode = 'GrowAndShrink'
-$btnAdd = New-Object System.Windows.Forms.Button
-$btnAdd.Text   = 'Link to Computer'
-$btnAdd.Dock   = 'Right'
-$btnAdd.Margin = '0,4,6,4'
-$btnAdd.AutoSize = $true
-$btnAdd.AutoSizeMode = 'GrowAndShrink'
+$btnRemove.Margin = '0,4,0,4'
+$btnRemove.Anchor = 'Right'
 $tlpAssocTop = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpAssocTop.Dock = 'Fill'
 $tlpAssocTop.RowCount = 1
-$tlpAssocTop.ColumnCount = 4
+$tlpAssocTop.ColumnCount = 3
 $tlpAssocTop.Padding = '0,0,0,0'
 $tlpAssocTop.Margin  = '0,0,0,0'
 $tlpAssocTop.RowStyles.Clear()
 $tlpAssocTop.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 $tlpAssocTop.ColumnStyles.Clear()
-$tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle -ArgumentList ([System.Windows.Forms.SizeType]::AutoSize)) )
+$tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 $tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)) )
-$tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle -ArgumentList ([System.Windows.Forms.SizeType]::AutoSize)) )
-$tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle -ArgumentList ([System.Windows.Forms.SizeType]::AutoSize)) )
-$tlpAssocTop.Controls.Add($lblAdd, 0, 0)
-$tlpAssocTop.Controls.Add($txtAdd, 1, 0)
+$tlpAssocTop.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)) )
+$assocSpacer = New-Object System.Windows.Forms.Panel
+$assocSpacer.Dock = 'Fill'
+$assocSpacer.Margin = '0,0,0,0'
+$assocSpacer.Padding = '0,0,0,0'
+$tlpAssocTop.Controls.Add($assocSpacer, 0, 0)
+$tlpAssocTop.Controls.Add($btnAddPeripheral, 1, 0)
 $tlpAssocTop.Controls.Add($btnRemove, 2, 0)
-$tlpAssocTop.Controls.Add($btnAdd, 3, 0)
-if(-not $valPrevSN){ $valPrevSN = New-Object System.Windows.Forms.Label; $valPrevSN.AutoSize=$true }
-# Preview group (3x3 grid)
-# Peripheral Preview (3 cols x 4 rows, inline "Label: value")
-# Peripheral Preview (6 cols x 4 rows) with visible grid lines and equal columns
-# Peripheral Preview (6x4) with separate label & value cells and visible borders
-# Peripheral Preview (6x4) separate label & value cells, AutoSize columns, visible borders
-# === Peripheral Preview (5 x 5) — label/value in separate cells ===
-$grpPrev = New-Object System.Windows.Forms.GroupBox
-$grpPrev.AutoSize=$true
-$grpPrev.AutoSizeMode=[System.Windows.Forms.AutoSizeMode]::GrowAndShrink
-$grpPrev.Dock='Top'
-$grpPrev.Text = 'Peripheral Preview'
-# keep the preview height bound to its content instead of filling remaining space
-$grpPrev.Dock = 'Top'
-$grpPrev.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor `
-    [System.Windows.Forms.AnchorStyles]::Left -bor `
-    [System.Windows.Forms.AnchorStyles]::Right
-# tighten the bottom margin so the next section sits closer
-$grpPrev.Margin = New-Object System.Windows.Forms.Padding(8,8,8,2)
-# Ensure all labels/values exist and use the requested captions
-if(-not $lblPrevType){ $lblPrevType = New-Object System.Windows.Forms.Label }
-$lblPrevType.Text='Type:';            $lblPrevType.AutoSize=$true
-if(-not $valPrevType){ $valPrevType = New-Object System.Windows.Forms.Label }
-$valPrevType.AutoSize=$true
-if(-not $lblPrevName){ $lblPrevName = New-Object System.Windows.Forms.Label }
-$lblPrevName.Text='Name:';            $lblPrevName.AutoSize=$true
-if(-not $valPrevName){ $valPrevName = New-Object System.Windows.Forms.Label }
-$valPrevName.AutoSize=$true
-if(-not $valPrevProposed){ $valPrevProposed = New-Object System.Windows.Forms.Label }
-$valPrevProposed.AutoSize=$true
-if(-not $lblPrevParent){ $lblPrevParent = New-Object System.Windows.Forms.Label }
-$lblPrevParent.Text='Parent:';        $lblPrevParent.AutoSize=$true
-if(-not $valPrevParent){ $valPrevParent = New-Object System.Windows.Forms.Label }
-$valPrevParent.AutoSize=$true
-if(-not $valPrevPropParent){ $valPrevPropParent = New-Object System.Windows.Forms.Label }
-$valPrevPropParent.AutoSize=$true
-if(-not $lblPrevAT){ $lblPrevAT = New-Object System.Windows.Forms.Label }
-$lblPrevAT.Text='Asset Tag:';         $lblPrevAT.AutoSize=$true
-if(-not $valPrevAT){ $valPrevAT = New-Object System.Windows.Forms.Label }
-$valPrevAT.AutoSize=$true
-if(-not $lblPrevSN){ $lblPrevSN = New-Object System.Windows.Forms.Label }
-$lblPrevSN.Text='Serial Number:';     $lblPrevSN.AutoSize=$true
-if(-not $valPrevSN){ $valPrevSN = New-Object System.Windows.Forms.Label }
-$valPrevSN.AutoSize=$true
-if(-not $lblPrevRITM){ $lblPrevRITM = New-Object System.Windows.Forms.Label }
-$lblPrevRITM.Text='RITM:';            $lblPrevRITM.AutoSize=$true
-if(-not $valPrevRITM){ $valPrevRITM = New-Object System.Windows.Forms.Label }
-$valPrevRITM.AutoSize=$true
-if(-not $lblPrevRetire){ $lblPrevRetire = New-Object System.Windows.Forms.Label }
-$lblPrevRetire.Text='Retire:';        $lblPrevRetire.AutoSize=$true
-if(-not $valPrevRetire){ $valPrevRetire = New-Object System.Windows.Forms.Label }
-$valPrevRetire.AutoSize=$true
-# arrow labels for rows 1 and 2
-if(-not $lblArrow1){ $lblArrow1 = New-Object System.Windows.Forms.Label }
-$lblArrow1.Text='------>'; $lblArrow1.AutoSize=$true
-if(-not $lblArrow2){ $lblArrow2 = New-Object System.Windows.Forms.Label }
-$lblArrow2.Text='------>'; $lblArrow2.AutoSize=$true
-# Consistent margins (trim vertical space); give values a small right pad
-$lblMargin = New-Object System.Windows.Forms.Padding(0,0,6,0)
-$valMargin = New-Object System.Windows.Forms.Padding(0,0,10,0)
-$lblPrevType.Margin     = $lblMargin
-$lblPrevName.Margin     = $lblMargin
-$lblPrevParent.Margin   = $lblMargin
-$lblPrevAT.Margin       = $lblMargin
-$lblPrevSN.Margin       = $lblMargin
-$lblPrevRITM.Margin     = $lblMargin
-$lblPrevRetire.Margin   = $lblMargin
-$lblArrow1.Margin       = New-Object System.Windows.Forms.Padding(4,0,4,0)
-$lblArrow2.Margin       = New-Object System.Windows.Forms.Padding(4,0,4,0)
-$valPrevType.Margin       = $valMargin
-$valPrevName.Margin       = $valMargin
-$valPrevProposed.Margin   = $valMargin
-$valPrevParent.Margin     = $valMargin
-$valPrevPropParent.Margin = $valMargin
-$valPrevAT.Margin         = $valMargin
-$valPrevSN.Margin         = $valMargin
-$valPrevRITM.Margin       = $valMargin
-$valPrevRetire.Margin     = $valMargin
-# Build the 5x5 table — AutoSize columns/rows; guidelines OFF
-$tlpPrev = New-Object System.Windows.Forms.TableLayoutPanel
-$tlpPrev.Dock='Top'
-$tlpPrev.AutoSize       = $true
-$tlpPrev.AutoSizeMode   = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
-$tlpPrev.Dock           = 'Top'
-$tlpPrev.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor `
-    [System.Windows.Forms.AnchorStyles]::Left -bor `
-    [System.Windows.Forms.AnchorStyles]::Right
-$tlpPrev.CellBorderStyle= [System.Windows.Forms.TableLayoutPanelCellBorderStyle]::None
-$tlpPrev.Padding        = New-Object System.Windows.Forms.Padding(2)
-$tlpPrev.Margin         = New-Object System.Windows.Forms.Padding(0)
-$tlpPrev.ColumnCount    = 5
-$tlpPrev.RowCount       = 5
-$tlpPrev.ColumnStyles.Clear()
-for($i=0; $i -lt 5; $i++){
-    [void]$tlpPrev.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle -ArgumentList ([System.Windows.Forms.SizeType]::AutoSize)) )
-}
-$tlpPrev.RowStyles.Clear()
-for($i=0; $i -lt 5; $i++){
-    [void]$tlpPrev.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle -ArgumentList ([System.Windows.Forms.SizeType]::AutoSize)) )
-}
-# Row 0: Type: | value
-$tlpPrev.Controls.Add($lblPrevType); $tlpPrev.SetColumn($lblPrevType,0); $tlpPrev.SetRow($lblPrevType,0)
-$tlpPrev.Controls.Add($valPrevType); $tlpPrev.SetColumn($valPrevType,1); $tlpPrev.SetRow($valPrevType,0)
-# Row 1: Name: | value | ----> | New name value
-$tlpPrev.Controls.Add($lblPrevName);     $tlpPrev.SetColumn($lblPrevName,0);     $tlpPrev.SetRow($lblPrevName,1)
-$tlpPrev.Controls.Add($valPrevName);     $tlpPrev.SetColumn($valPrevName,1);     $tlpPrev.SetRow($valPrevName,1)
-$tlpPrev.Controls.Add($lblArrow1);       $tlpPrev.SetColumn($lblArrow1,2);       $tlpPrev.SetRow($lblArrow1,1)
-$tlpPrev.Controls.Add($valPrevProposed); $tlpPrev.SetColumn($valPrevProposed,4); $tlpPrev.SetRow($valPrevProposed,1)
-# Row 2: Parent: | value | ----> | New Parent value
-$tlpPrev.Controls.Add($lblPrevParent);     $tlpPrev.SetColumn($lblPrevParent,0);     $tlpPrev.SetRow($lblPrevParent,2)
-$tlpPrev.Controls.Add($valPrevParent);     $tlpPrev.SetColumn($valPrevParent,1);     $tlpPrev.SetRow($valPrevParent,2)
-$tlpPrev.Controls.Add($lblArrow2);         $tlpPrev.SetColumn($lblArrow2,2);         $tlpPrev.SetRow($lblArrow2,2)
-$tlpPrev.Controls.Add($valPrevPropParent); $tlpPrev.SetColumn($valPrevPropParent,4); $tlpPrev.SetRow($valPrevPropParent,2)
-# Row 3: Asset Tag: | value | (empty) | RITM: | value
-$tlpPrev.Controls.Add($lblPrevAT);    $tlpPrev.SetColumn($lblPrevAT,0);    $tlpPrev.SetRow($lblPrevAT,3)
-$tlpPrev.Controls.Add($valPrevAT);    $tlpPrev.SetColumn($valPrevAT,1);    $tlpPrev.SetRow($valPrevAT,3)
-$tlpPrev.Controls.Add($lblPrevRITM);  $tlpPrev.SetColumn($lblPrevRITM,3);  $tlpPrev.SetRow($lblPrevRITM,3)
-$tlpPrev.Controls.Add($valPrevRITM);  $tlpPrev.SetColumn($valPrevRITM,4);  $tlpPrev.SetRow($valPrevRITM,3)
-# Row 4: Serial Number: | value | (empty) | Retire: | value
-$tlpPrev.Controls.Add($lblPrevSN);       $tlpPrev.SetColumn($lblPrevSN,0);       $tlpPrev.SetRow($lblPrevSN,4)
-$tlpPrev.Controls.Add($valPrevSN);       $tlpPrev.SetColumn($valPrevSN,1);       $tlpPrev.SetRow($valPrevSN,4)
-$tlpPrev.Controls.Add($lblPrevRetire);   $tlpPrev.SetColumn($lblPrevRetire,3);   $tlpPrev.SetRow($lblPrevRetire,4)
-$tlpPrev.Controls.Add($valPrevRetire);   $tlpPrev.SetColumn($valPrevRetire,4);   $tlpPrev.SetRow($valPrevRetire,4)
-$grpPrev.Controls.Clear()
-$grpPrev.Controls.Add($tlpPrev)
-# === /Peripheral Preview ===
 $tlpAssocStrip = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpAssocStrip.Dock = 'Fill'
 $tlpAssocStrip.AutoSize = $true
 $tlpAssocStrip.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $tlpAssocStrip.ColumnCount = 1
-$tlpAssocStrip.RowCount = 2
+$tlpAssocStrip.RowCount = 1
 $tlpAssocStrip.RowStyles.Clear()
 $tlpAssocStrip.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 34)) )
-$tlpAssocStrip.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
 $tlpAssocStrip.Controls.Add($tlpAssocTop,0,0)
-$tlpAssocStrip.Controls.Add($grpPrev,   0,1)
 $tlpAssoc.Controls.Add($tlpAssocStrip,0,0)
 $tlpAssoc.Controls.Add($dgv,0,1)
 $grpAssoc.Controls.Add($tlpAssoc)
@@ -1217,9 +1079,7 @@ function Apply-ResponsiveHeights {
       $assocTarget = [Math]::Max([int]$assocInfo.Target, 0)
     }
     $stripHeight = $tlpAssocStrip.PreferredSize.Height
-    if($stripHeight -le 0){
-      $stripHeight = [Math]::Max($grpPrev.PreferredSize.Height, 0) + 34
-    }
+    if($stripHeight -le 0){ $stripHeight = 34 }
     $assocPadding = $grpAssoc.Padding.Vertical + $grpAssoc.Margin.Vertical + $tlpAssoc.Margin.Vertical
     $minAssoc   = [Math]::Max($assocTarget + $stripHeight + $assocPadding, 220)
     $minRound   = [Math]::Max($grpMaint.PreferredSize.Height, 220)
@@ -1485,37 +1345,69 @@ function Refresh-AssocCards($parentRec){
 }
 function Refresh-AssocViews($parentRec){ Refresh-AssocGrid $parentRec; Refresh-AssocCards $parentRec }
 # ----- Peripheral Preview/Link/Remove + logging -----
-function Update-LinkButton(){ if($script:PreviewIsLinkable){ $btnAdd.Enabled=$true } else { $btnAdd.Enabled=$false } }
-function Ensure-PrevPropParentLabel(){
-  if($valPrevPropParent -and $valPrevParent){
-    if([string]::IsNullOrWhiteSpace($valPrevPropParent.Text)){
-      $valPrevPropParent.Text = $valPrevParent.Text
-    }
+function Normalize-UniversalSearch([string]$raw){
+  if([string]::IsNullOrWhiteSpace($raw)){ return $null }
+  $s = $raw.Trim().ToUpper()
+  $s = $s -replace '\s',''
+  $s = $s -replace '-',''
+  if($s.Length -ge 2 -and $s.StartsWith('C')){
+    $s = $s.Substring(0, $s.Length - 1)
+  }
+  return $s
+}
+function Resolve-PeripheralLookup([string]$query){
+  $normalizedInput = Normalize-UniversalSearch $query
+  if([string]::IsNullOrWhiteSpace($normalizedInput)){
+    return [pscustomobject]@{ NormalizedInput=$null; LinkValue=$null; Candidate=$null; Kind=$null; LookupKey=$null }
+  }
+  $scan = Normalize-Scan $normalizedInput
+  $value = $null; $kind = $null
+  if($scan){
+    $value = $scan.Value
+    $kind  = $scan.Kind
+  }
+  if([string]::IsNullOrWhiteSpace($value)){ $value = $normalizedInput }
+  $key = $null
+  if(-not [string]::IsNullOrWhiteSpace($value)){ $key = $value.Trim().ToUpper() }
+  $cand = $null
+  if($key){
+    if($script:IndexByAsset.ContainsKey($key))      { $cand = $script:IndexByAsset[$key] }
+    elseif($script:IndexBySerial.ContainsKey($key)) { $cand = $script:IndexBySerial[$key] }
+    elseif($script:IndexByName.ContainsKey($key))   { $cand = $script:IndexByName[$key] }
+  }
+  return [pscustomobject]@{
+    NormalizedInput = $normalizedInput
+    LinkValue       = $value
+    Candidate       = $cand
+    Kind            = $kind
+    LookupKey       = $key
   }
 }
-function Preview-Peripheral([string]$query,$parentRec){
-  $valPrevType.Text=''; $valPrevName.Text=''; $valPrevAT.Text=''; $valPrevSN.Text=''; $valPrevParent.Text=''; $valPrevRITM.Text=''; $valPrevRetire.Text=''; $valPrevProposed.Text=''
-  $valPrevPropParent.Text=''
-  $script:PreviewCandidate = $null; $script:PreviewIsLinkable = $false
-  $n = Normalize-Scan $query; if(-not $n){ Update-LinkButton; return }
-  $key=$n.Value.ToUpper()
-  $cand=$null
-  if($script:IndexByAsset.ContainsKey($key)){$cand=$script:IndexByAsset[$key]}
-  elseif($script:IndexBySerial.ContainsKey($key)){$cand=$script:IndexBySerial[$key]}
-  elseif($script:IndexByName.ContainsKey($key)){$cand=$script:IndexByName[$key]}
-  if(-not $cand){ $valPrevType.Text='(not found)'; Update-LinkButton; return }
-  $script:PreviewCandidate = $cand
-  $valPrevType.Text=$cand.Type; $valPrevName.Text=$cand.name; $valPrevAT.Text=$cand.asset_tag; $valPrevSN.Text=$cand.serial_number
-  if([string]::IsNullOrWhiteSpace($cand.u_parent_asset)){ $valPrevParent.Text='(none)' } else { $valPrevParent.Text=$cand.u_parent_asset }
-  Ensure-PrevPropParentLabel
-  if($parentRec){
-    $prop = Compute-ProposedName $cand $parentRec
-    if($prop){ $valPrevProposed.Text = $prop }
+function Get-ProposedParentToken($cand,$parentRec){
+  if(-not $cand){ return $null }
+  if(-not $parentRec){ return $cand.u_parent_asset }
+  if($cand.Type -eq 'Cart'){ return $parentRec.asset_tag }
+  if(($cand.Type -eq 'Mic') -or ($cand.Type -eq 'Scanner')){
+    $targetParent = $parentRec.asset_tag
+    if($parentRec.name -match '^(?i)AO'){
+      $carts = Find-CartsForComputer $parentRec
+      if($carts.Count -gt 0){
+        $cart = $carts[0]
+        if($cart.asset_tag){ $targetParent = $cart.asset_tag }
+        elseif($cart.name){ $targetParent = $cart.name }
+      }
+    }
+    return $targetParent
   }
-  if($cand.Type -eq 'Monitor'){ $valPrevRITM.Text=$cand.RITM; $valPrevRetire.Text = (Fmt-DateLong $cand.Retire) }
-  else { $valPrevRITM.Text=''; $valPrevRetire.Text='' }
-  if($cand.Kind -eq 'Peripheral' -and $parentRec){ $script:PreviewIsLinkable = $true }
-  Update-LinkButton
+  return $parentRec.asset_tag
+}
+function Get-PeripheralLinkPreview($cand,$parentRec){
+  if(-not $cand){ return [pscustomobject]@{ Name=''; Parent='' } }
+  $previewParent = Get-ProposedParentToken $cand $parentRec
+  $previewName = $cand.name
+  $proposedName = Compute-ProposedName $cand $parentRec
+  if(-not [string]::IsNullOrWhiteSpace($proposedName)){ $previewName = $proposedName }
+  return [pscustomobject]@{ Name=$previewName; Parent=$previewParent }
 }
 function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[string]$oldParent,[string]$newParent,[string]$oldName,[string]$newName){
   $out = if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder}
@@ -1534,52 +1426,231 @@ function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[s
   if(Test-Path $file){ $row | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
   else { $row | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
 }
-function Link-Peripheral([string]$query,$parentRec){
-  if(-not $script:PreviewIsLinkable){ return }
-  $n=Normalize-Scan $query; if(-not $n){ return }
-  $key=$n.Value.ToUpper()
-  $cand=$null
-  if($script:IndexByAsset.ContainsKey($key)){$cand=$script:IndexByAsset[$key]}
-  elseif($script:IndexBySerial.ContainsKey($key)){$cand=$script:IndexBySerial[$key]}
-  elseif($script:IndexByName.ContainsKey($key)){$cand=$script:IndexByName[$key]}
-  if(-not $cand){ [System.Windows.Forms.MessageBox]::Show("Peripheral not found.","Link") | Out-Null; return }
-  if($cand.Kind -ne 'Peripheral'){ [System.Windows.Forms.MessageBox]::Show("Selected item is not a peripheral.","Link") | Out-Null; return }
+function Link-Peripheral([string]$query,$parentRec,$lookupResult=$null){
+  if(-not $parentRec){ return $false }
+  if(-not $lookupResult){ $lookupResult = Resolve-PeripheralLookup $query }
+  $cand = $null
+  if($lookupResult){ $cand = $lookupResult.Candidate }
+  if(-not $cand){ [System.Windows.Forms.MessageBox]::Show("Peripheral not found.","Link") | Out-Null; return $false }
+  if($cand.Kind -ne 'Peripheral'){ [System.Windows.Forms.MessageBox]::Show("Selected item is not a peripheral.","Link") | Out-Null; return $false }
   $oldParent = $cand.u_parent_asset
   $oldName = $cand.name
-  if($cand.Type -eq 'Cart'){
-    $cand.u_parent_asset = $parentRec.asset_tag
-    $cand.name = "$($parentRec.name)-CRT"
-  } elseif(($cand.Type -eq 'Mic') -or ($cand.Type -eq 'Scanner')){
-    $targetParentAT = $parentRec.asset_tag
-    if($parentRec.name -match '^(?i)AO'){
-      $carts = Find-CartsForComputer $parentRec
-      if($carts.Count -gt 0){
-        $cart = $carts[0]
-        if($cart.asset_tag){ $targetParentAT = $cart.asset_tag } else { $targetParentAT = $cart.name }
-      }
-    }
-    $cand.u_parent_asset = $targetParentAT
-    if($cand.Type -eq 'Mic'){ $cand.name = "$($parentRec.name)-Mic" }
-    if($cand.Type -eq 'Scanner'){ $cand.name = "$($parentRec.name)-SCN" }
-  } else {
-    $cand.u_parent_asset = $parentRec.asset_tag
-    switch($cand.Type){
-      'Monitor' { $cand.name = $parentRec.name }
-      default   { }
-    }
-  }
+  $targetParent = Get-ProposedParentToken $cand $parentRec
+  $cand.u_parent_asset = $targetParent
+  $newName = Compute-ProposedName $cand $parentRec
+  if(-not [string]::IsNullOrWhiteSpace($newName)){ $cand.name = $newName }
   Build-Indices
   Log-AssocChange 'Link' (Get-DetectedType $cand) $cand.asset_tag $oldParent $cand.u_parent_asset $oldName $cand.name
   Refresh-AssocViews $parentRec
   Update-CartCheckbox-State $parentRec
   Update-ManualRoundButton   $parentRec
-  $txtAdd.Clear()
-  $script:PreviewCandidate = $null
-  $script:PreviewIsLinkable = $false
-  Preview-Peripheral '' $parentRec
-  Update-LinkButton
   Validate-ParentAndName $script:CurrentDisplay $script:CurrentParent
   Update-FixNameButton $script:CurrentDisplay $script:CurrentParent
+  return $true
+}
+function Show-AddPeripheralDialog($parentRec){
+  if(-not $parentRec){ return }
+  $dialog = New-Object System.Windows.Forms.Form
+  $dialog.Text = 'Add Peripheral (AssetTag/Serial)'
+  $dialog.StartPosition = 'CenterParent'
+  $dialog.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+  $dialog.MaximizeBox = $false
+  $dialog.MinimizeBox = $false
+  $dialog.ShowIcon = $false
+  $dialog.AutoSize = $true
+  $dialog.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $dialog.Padding = New-Object System.Windows.Forms.Padding(12)
+
+  $layout = New-Object System.Windows.Forms.TableLayoutPanel
+  $layout.Dock = 'Fill'
+  $layout.AutoSize = $true
+  $layout.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $layout.ColumnCount = 1
+  $layout.RowCount = 3
+  $layout.RowStyles.Clear()
+  $layout.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
+  $layout.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
+  $layout.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
+
+  # Input area
+  $inputPanel = New-Object System.Windows.Forms.TableLayoutPanel
+  $inputPanel.AutoSize = $true
+  $inputPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $inputPanel.ColumnCount = 1
+  $inputPanel.RowCount = 3
+  $inputPanel.Dock = 'Top'
+  $inputPanel.RowStyles.Clear()
+  for($i=0;$i -lt 3;$i++){ [void]$inputPanel.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) ) }
+  $lblSearch = New-Object System.Windows.Forms.Label
+  $lblSearch.Text = 'Universal Search:'
+  $lblSearch.AutoSize = $true
+  $lblSearch.Margin = '0,0,0,2'
+  $txtSearch = New-Object System.Windows.Forms.TextBox
+  $txtSearch.Width = 260
+  $txtSearch.Margin = '0,0,0,4'
+  $lblHint = New-Object System.Windows.Forms.Label
+  $lblHint.Text = 'Press Enter to search.'
+  $lblHint.AutoSize = $true
+  $lblHint.ForeColor = [System.Drawing.Color]::DimGray
+  $lblHint.Margin = '0,0,0,0'
+  $inputPanel.Controls.Add($lblSearch,0,0)
+  $inputPanel.Controls.Add($txtSearch,0,1)
+  $inputPanel.Controls.Add($lblHint,0,2)
+
+  # Preview area
+  $grpPreview = New-Object System.Windows.Forms.GroupBox
+  $grpPreview.Text = 'Peripheral Preview'
+  $grpPreview.AutoSize = $true
+  $grpPreview.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $grpPreview.Dock = 'Top'
+  $grpPreview.Padding = New-Object System.Windows.Forms.Padding(10)
+  $tblPreview = New-Object System.Windows.Forms.TableLayoutPanel
+  $tblPreview.AutoSize = $true
+  $tblPreview.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $tblPreview.ColumnCount = 2
+  $tblPreview.RowCount = 9
+  $tblPreview.Dock = 'Top'
+  $tblPreview.ColumnStyles.Clear()
+  $tblPreview.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)) )
+  $tblPreview.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)) )
+  $tblPreview.RowStyles.Clear()
+  for($i=0;$i -lt 9;$i++){ [void]$tblPreview.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) ) }
+
+  $createLabel = {
+    param($text)
+    $lbl = New-Object System.Windows.Forms.Label
+    $lbl.Text = $text
+    $lbl.AutoSize = $true
+    $lbl.Margin = '0,0,6,4'
+    return $lbl
+  }
+  $createValue = {
+    $lbl = New-Object System.Windows.Forms.Label
+    $lbl.AutoSize = $true
+    $lbl.Margin = '0,0,0,4'
+    return $lbl
+  }
+
+  $lblTypeVal = & $createValue
+  $lblNameVal = & $createValue
+  $lblProposedNameVal = & $createValue
+  $lblParentVal = & $createValue
+  $lblProposedParentVal = & $createValue
+  $lblAssetVal = & $createValue
+  $lblSerialVal = & $createValue
+  $lblRITMVal = & $createValue
+  $lblRetireVal = & $createValue
+
+  $tblPreview.Controls.Add((& $createLabel 'Type:'),0,0)
+  $tblPreview.Controls.Add($lblTypeVal,1,0)
+  $tblPreview.Controls.Add((& $createLabel 'Name:'),0,1)
+  $tblPreview.Controls.Add($lblNameVal,1,1)
+  $tblPreview.Controls.Add((& $createLabel 'Proposed Name:'),0,2)
+  $tblPreview.Controls.Add($lblProposedNameVal,1,2)
+  $tblPreview.Controls.Add((& $createLabel 'Current Parent:'),0,3)
+  $tblPreview.Controls.Add($lblParentVal,1,3)
+  $tblPreview.Controls.Add((& $createLabel 'Proposed Parent:'),0,4)
+  $tblPreview.Controls.Add($lblProposedParentVal,1,4)
+  $tblPreview.Controls.Add((& $createLabel 'Asset Tag:'),0,5)
+  $tblPreview.Controls.Add($lblAssetVal,1,5)
+  $tblPreview.Controls.Add((& $createLabel 'Serial Number:'),0,6)
+  $tblPreview.Controls.Add($lblSerialVal,1,6)
+  $tblPreview.Controls.Add((& $createLabel 'RITM:'),0,7)
+  $tblPreview.Controls.Add($lblRITMVal,1,7)
+  $tblPreview.Controls.Add((& $createLabel 'Retire:'),0,8)
+  $tblPreview.Controls.Add($lblRetireVal,1,8)
+
+  $grpPreview.Controls.Add($tblPreview)
+
+  # Buttons
+  $buttonPanel = New-Object System.Windows.Forms.TableLayoutPanel
+  $buttonPanel.AutoSize = $true
+  $buttonPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $buttonPanel.ColumnCount = 3
+  $buttonPanel.RowCount = 1
+  $buttonPanel.Dock = 'Top'
+  $buttonPanel.ColumnStyles.Clear()
+  $buttonPanel.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
+  $buttonPanel.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)) )
+  $buttonPanel.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)) )
+  $buttonPanel.RowStyles.Clear()
+  $buttonPanel.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
+  $btnDialogAdd = New-Object System.Windows.Forms.Button
+  $btnDialogAdd.Text = 'Add'
+  $btnDialogAdd.Enabled = $false
+  $btnDialogAdd.Margin = '0,8,6,0'
+  $btnDialogCancel = New-Object System.Windows.Forms.Button
+  $btnDialogCancel.Text = 'Cancel'
+  $btnDialogCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+  $btnDialogCancel.Margin = '0,8,0,0'
+  $spacer = New-Object System.Windows.Forms.Panel
+  $spacer.Dock = 'Fill'
+  $buttonPanel.Controls.Add($spacer,0,0)
+  $buttonPanel.Controls.Add($btnDialogAdd,1,0)
+  $buttonPanel.Controls.Add($btnDialogCancel,2,0)
+  $dialog.CancelButton = $btnDialogCancel
+
+  $layout.Controls.Add($inputPanel,0,0)
+  $layout.Controls.Add($grpPreview,0,1)
+  $layout.Controls.Add($buttonPanel,0,2)
+  $dialog.Controls.Add($layout)
+
+  $valueLabels = @($lblTypeVal,$lblNameVal,$lblProposedNameVal,$lblParentVal,$lblProposedParentVal,$lblAssetVal,$lblSerialVal,$lblRITMVal,$lblRetireVal)
+  $lookupResult = $null
+  $clearPreview = {
+    foreach($lbl in $valueLabels){ $lbl.Text = '' }
+    $btnDialogAdd.Enabled = $false
+  }
+  $applyPreview = {
+    param($result)
+    $lookupResult = $result
+    & $clearPreview
+    if(-not $result){ return }
+    $cand = $result.Candidate
+    if(-not $cand){
+      if($result.NormalizedInput){ $lblTypeVal.Text = '(not found)' }
+      return
+    }
+    $lblTypeVal.Text = if($cand.Type){ $cand.Type } else { $cand.Kind }
+    $lblNameVal.Text = $cand.name
+    $lblAssetVal.Text = $cand.asset_tag
+    $lblSerialVal.Text = $cand.serial_number
+    if([string]::IsNullOrWhiteSpace($cand.u_parent_asset)){ $lblParentVal.Text = '(none)' } else { $lblParentVal.Text = $cand.u_parent_asset }
+    $preview = Get-PeripheralLinkPreview $cand $parentRec
+    if($preview){
+      if($preview.Name){ $lblProposedNameVal.Text = $preview.Name }
+      if($preview.Parent){ $lblProposedParentVal.Text = $preview.Parent }
+    }
+    if([string]::IsNullOrWhiteSpace($lblProposedParentVal.Text) -and -not [string]::IsNullOrWhiteSpace($lblParentVal.Text)){
+      $lblProposedParentVal.Text = $lblParentVal.Text
+    }
+    if($cand.Type -eq 'Monitor'){
+      $lblRITMVal.Text = $cand.RITM
+      $lblRetireVal.Text = Fmt-DateLong $cand.Retire
+    }
+    if($cand.Kind -eq 'Peripheral'){ $btnDialogAdd.Enabled = $true }
+  }
+
+  $txtSearch.Add_TextChanged({
+    $lookupResult = $null
+    & $clearPreview
+  })
+  $txtSearch.Add_KeyDown({
+    if($_.KeyCode -eq 'Enter'){
+      $_.SuppressKeyPress = $true
+      $result = Resolve-PeripheralLookup $txtSearch.Text
+      & $applyPreview $result
+    }
+  })
+  $btnDialogAdd.Add_Click({
+    if(-not $lookupResult){ return }
+    if(Link-Peripheral $txtSearch.Text $parentRec $lookupResult){
+      $dialog.DialogResult = [System.Windows.Forms.DialogResult]::OK
+      $dialog.Close()
+    }
+  })
+  $dialog.Add_Shown({ $txtSearch.Focus() })
+  try { [void]$dialog.ShowDialog($form) } finally { try { $dialog.Dispose() } catch {} }
 }
 function Remove-Selected-Associations($parentRec){
   if($dgv.SelectedRows.Count -eq 0){ return }
@@ -1602,7 +1673,6 @@ function Remove-Selected-Associations($parentRec){
   Refresh-AssocViews $parentRec
   Update-CartCheckbox-State $parentRec
   Update-ManualRoundButton $parentRec
-  Preview-Peripheral $txtAdd.Text $parentRec
   Validate-ParentAndName $script:CurrentDisplay $script:CurrentParent
   Update-FixNameButton $script:CurrentDisplay $script:CurrentParent
 }
@@ -1638,7 +1708,6 @@ function Fix-DisplayName(){
   $txtHost.Text = $disp.name
   Validate-ParentAndName $disp $parent
   Update-FixNameButton $disp $parent
-  Update-LinkButton
   $statusLabel.Text = ("Renamed to '" + $expected + "'.")
 }
 # ---- Populate Summary/UI ----
@@ -1667,7 +1736,7 @@ function Populate-UI($displayRec,$parentRec){
   if($parentRec){ Refresh-AssocViews $parentRec }
   Update-CartCheckbox-State $parentRec
   Update-ManualRoundButton   $parentRec
-  Preview-Peripheral $txtAdd.Text $parentRec
+  if($btnAddPeripheral){ $btnAddPeripheral.Enabled = [bool]$parentRec }
   Validate-ParentAndName $displayRec $parentRec
   Update-FixNameButton $displayRec $parentRec
 }
@@ -1789,12 +1858,10 @@ function Clear-UI(){
   }
   try { $dgv.Rows.Clear() } catch {}
   try { $cards.Controls.Clear() } catch {}
-  $txtAdd.Text = ''
-  foreach($l in @($valPrevType,$valPrevName,$valPrevAT,$valPrevSN,$valPrevParent,$valPrevRITM,$valPrevRetire,$valPrevProposed)){ $l.Text='' }
-  $btnAdd.Enabled = $false; $script:PreviewCandidate = $null; $script:PreviewIsLinkable = $false
   Update-ManualRoundButton $null; Update-CartCheckbox-State $null
   foreach($cb in @($chkCable,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked=$false }
   $btnFixName.Enabled = $false
+  if($btnAddPeripheral){ $btnAddPeripheral.Enabled = $false }
   $statusLabel.Text = "Ready - scan or enter a device."
   Size-AssocForRows(1) | Out-Null
 }
@@ -1803,15 +1870,16 @@ $btnLookup.Add_Click({ Do-Lookup })
 $txtScan.Add_KeyDown({ if($_.KeyCode -eq 'Enter'){ Do-Lookup; $_.SuppressKeyPress=$true } })
 $txtScan.Add_TextChanged({ if([string]::IsNullOrWhiteSpace($txtScan.Text)){ Clear-UI } })
 $btnEditLoc.Add_Click({ Toggle-EditLocation })
-$txtAdd.Add_TextChanged({
+$btnAddPeripheral.Add_Click({
   $pc = $script:CurrentParent
-  Preview-Peripheral $txtAdd.Text $pc
-})
-$btnAdd.Add_Click({
-  $pc = $script:CurrentParent
-  if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
- Link-Peripheral $txtAdd.Text $pc }
+  if(-not $pc){ return }
+  try{
+    if(-not $chkShowExcluded.Checked){
+      $mt = ('' + $pc.u_device_rounding).Trim()
+      if($mt -match '^(?i)Excluded$'){ return }
+    }
+  } catch {}
+  Show-AddPeripheralDialog $pc
 })
 $btnRemove.Add_Click({
   $pc = $script:CurrentParent
