@@ -1001,8 +1001,8 @@ $grpAssoc.Controls.Add($tlpAssoc)
 $grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Fill'
 $grpMaint.Margin = New-Object System.Windows.Forms.Padding($GAP)
 $grpMaint.Padding = New-Object System.Windows.Forms.Padding($GAP)
-$lblChkStatus=New-Object System.Windows.Forms.Label; $lblChkStatus.Text="Check Status:"; $lblChkStatus.AutoSize=$true; $lblChkStatus.Location='12,28'
-$cmbChkStatus=New-Object System.Windows.Forms.ComboBox; $cmbChkStatus.Location='120,25'; $cmbChkStatus.Size='380,24'; $cmbChkStatus.DropDownStyle='DropDownList'
+$lblChkStatus=New-Object System.Windows.Forms.Label; $lblChkStatus.Text="Check Status:"; $lblChkStatus.AutoSize=$true; $lblChkStatus.Location='330,28'
+$cmbChkStatus=New-Object System.Windows.Forms.ComboBox; $cmbChkStatus.Location='420,25'; $cmbChkStatus.Size='220,24'; $cmbChkStatus.DropDownStyle='DropDownList'
 $cmbChkStatus.Items.AddRange(@(
   "Complete",
   "Inaccessible - Asset not found",
@@ -1018,18 +1018,28 @@ $cmbChkStatus.Items.AddRange(@(
   "Pending Repair"
 )); $cmbChkStatus.SelectedIndex=0
 $lblTime=New-Object System.Windows.Forms.Label; $lblTime.Text="Rounding Time (min):"; $lblTime.AutoSize=$true; $lblTime.Location='12,60'
-$lblMaintType=New-Object System.Windows.Forms.Label; $lblMaintType.Text='Maintenance Type:'; $lblMaintType.AutoSize=$true; $lblMaintType.Location='260,60'
-$cmbMaintType=New-Object System.Windows.Forms.ComboBox; $cmbMaintType.Location='370,58'; $cmbMaintType.Size='200,22'; $cmbMaintType.DropDownStyle='DropDownList'
+$lblMaintType=New-Object System.Windows.Forms.Label; $lblMaintType.Text='Maintenance Type:'; $lblMaintType.AutoSize=$true; $lblMaintType.Location='12,28'
+$cmbMaintType=New-Object System.Windows.Forms.ComboBox; $cmbMaintType.Location='120,25'; $cmbMaintType.Size='200,24'; $cmbMaintType.DropDownStyle='DropDownList'
 $cmbMaintType.Items.AddRange(@('Excluded','General Rounding','Mobile Cart','Critical Clinical'))
+$cmbMaintType.TabIndex = 0
+$cmbChkStatus.TabIndex = 1
 $numTime=New-Object System.Windows.Forms.NumericUpDown; $numTime.Location='160,58'; $numTime.Size='80,24'; $numTime.Minimum=0; $numTime.Maximum=120; $numTime.Value=3
+$numTime.TabIndex = 2
 $chkCable=New-Object System.Windows.Forms.CheckBox; $chkCable.Text="Validate Cable Management"; $chkCable.Location='12,96'; $chkCable.AutoSize=$true
-$chkLabels=New-Object System.Windows.Forms.CheckBox; $chkLabels.Text="Ensure monitor appropriately labelled"; $chkLabels.Location='12,124'; $chkLabels.AutoSize=$true
+$chkCable.TabIndex = 3
 $chkCart=New-Object System.Windows.Forms.CheckBox; $chkCart.Text="Check Physical Cart Is Working"; $chkCart.Location='320,96'; $chkCart.AutoSize=$true
+$chkCart.TabIndex = 4
+$chkLabels=New-Object System.Windows.Forms.CheckBox; $chkLabels.Text="Ensure monitor appropriately labelled"; $chkLabels.Location='12,124'; $chkLabels.AutoSize=$true
+$chkLabels.TabIndex = 5
 $chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate peripherals are connected and working"; $chkPeriph.Location='320,124'; $chkPeriph.AutoSize=$true
+$chkPeriph.TabIndex = 6
 $btnCheckComplete=New-Object System.Windows.Forms.Button; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Location='12,160'; $btnCheckComplete.Size='180,30'
+$btnCheckComplete.TabIndex = 7
 $btnSave=New-Object System.Windows.Forms.Button; $btnSave.Text="Save Event"; $btnSave.Location='204,160'; $btnSave.Size='180,30'
+$btnSave.TabIndex = 8
 $btnManualRound=New-Object System.Windows.Forms.Button; $btnManualRound.Text="Manual Round"; $btnManualRound.Location='396,160'; $btnManualRound.Size='180,30'; $btnManualRound.Enabled=$false
-$grpMaint.Controls.AddRange(@($lblChkStatus,$cmbChkStatus,$lblTime,$numTime,$lblMaintType,$cmbMaintType,$chkCable,$chkLabels,$chkCart,$chkPeriph,$btnCheckComplete,$btnSave,$btnManualRound))
+$btnManualRound.TabIndex = 9
+$grpMaint.Controls.AddRange(@($lblMaintType,$cmbMaintType,$lblChkStatus,$cmbChkStatus,$lblTime,$numTime,$chkCable,$chkCart,$chkLabels,$chkPeriph,$btnCheckComplete,$btnSave,$btnManualRound))
 $grpMaint.Controls.Add($lblMaintType); $grpMaint.Controls.Add($cmbMaintType)
 # Compose columns
 $tlpRight.Controls.Add($grpAssoc,0,0)
