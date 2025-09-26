@@ -1240,43 +1240,56 @@ function Set-ComboSelectionCaseInsensitive([System.Windows.Forms.ComboBox]$combo
 }
 function Update-MaintenanceTypeSelection([object]$displayRec,[object]$parentRec){
   $selection = 'General Rounding'
-  $nameForCheck = ''
+  $displayName = ''
   try {
-    if($displayRec -and $displayRec.name){ $nameForCheck = [string]$displayRec.name }
+    if($displayRec -and $displayRec.name){ $displayName = [string]$displayRec.name }
   } catch {}
-  if([string]::IsNullOrWhiteSpace($nameForCheck)){
-    $nameSource = Resolve-ComputerRecord $displayRec
-    if(-not $nameSource){ $nameSource = Resolve-ComputerRecord $parentRec }
-    try {
-      if($nameSource -and $nameSource.name){ $nameForCheck = [string]$nameSource.name }
-    } catch {}
-  }
-  if(-not [string]::IsNullOrWhiteSpace($nameForCheck) -and ($nameForCheck.Trim() -match '^(?i)AO')){
-    $selection = 'Mobile Cart'
-  } else {
-    $source = $null
-    $displayIsComputer = $false
-    try {
-      if($displayRec){
-        $displayIsComputer = $true
+
+  $displayIsComputerOrTangent = $false
+  try {
+    if($displayRec){
+      $type = ''
+      $kind = ''
+      try { if($displayRec.PSObject.Properties['Type']){ $type = '' + $displayRec.Type } } catch {}
+      try { if($displayRec.PSObject.Properties['Kind']){ $kind = '' + $displayRec.Kind } } catch {}
+      if($type -eq 'Computer' -or $kind -eq 'Computer'){
+        $displayIsComputerOrTangent = $true
       }
-    } catch {}
-    if(-not $displayIsComputer){
-      $source = Resolve-ComputerRecord $parentRec
+      elseif(-not [string]::IsNullOrWhiteSpace($displayName) -and ($displayName.Trim() -match '^(?i)AO')){
+        $displayIsComputerOrTangent = $true
+      }
     }
-    if(-not $source){
+  } catch {}
+
+  $source = $null
+  if($displayIsComputerOrTangent){
+    $source = Resolve-ComputerRecord $displayRec
+  } else {
+    $source = Resolve-ComputerRecord $parentRec
+  }
+  if(-not $source){
+    # Fall back to whichever record we did not already try.
+    if($displayIsComputerOrTangent){
+      $source = Resolve-ComputerRecord $parentRec
+    } else {
       $source = Resolve-ComputerRecord $displayRec
     }
-    $mt = ''
-    try {
-      if($source -and $source.PSObject.Properties['u_device_rounding']){
-        $mt = ('' + $source.u_device_rounding).Trim()
-      }
-    } catch {}
-    if(-not [string]::IsNullOrWhiteSpace($mt)){
-      $selection = $mt
-    }
   }
+
+  $mt = ''
+  try {
+    if($source -and $source.PSObject.Properties['u_device_rounding']){
+      $mt = ('' + $source.u_device_rounding).Trim()
+    }
+  } catch {}
+
+  if(-not [string]::IsNullOrWhiteSpace($mt)){
+    $selection = $mt
+  } elseif(-not [string]::IsNullOrWhiteSpace($displayName) -and ($displayName.Trim() -match '^(?i)AO')){
+    # Preserve previous Tangent fallback when no data is available in the CSV.
+    $selection = 'Mobile Cart'
+  }
+
   Set-ComboSelectionCaseInsensitive $cmbMaintType $selection
 }
 function Get-RoundingUrlForParent($pc){
