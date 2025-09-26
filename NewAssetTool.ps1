@@ -2565,12 +2565,7 @@ $btnClearScopes = New-Object System.Windows.Forms.Button
 $btnClearScopes.Text = "Clear List"
 $btnClearScopes.AutoSize = $true
 $btnClearScopes.Location = '700,6'
-$btnClearNearFilters = New-Object System.Windows.Forms.Button
-$btnClearNearFilters.Text = 'Clear Filters'
-$btnClearNearFilters.AutoSize = $true
-$btnClearNearFilters.Location = '810,6'
-$btnClearNearFilters.Add_Click({ Clear-NearbyFilters })
-$nearToolbar.Controls.AddRange(@($lblScopes,$chkViewAll,$btnClearScopes,$btnClearNearFilters))
+$nearToolbar.Controls.AddRange(@($lblScopes,$chkViewAll,$btnClearScopes))
 # --- Multi-Status (apply one status to selected rows) ---
 $btnSetStatus = New-Object System.Windows.Forms.Button
 $btnSetStatus.Text = 'Multi-Status'
@@ -2743,16 +2738,6 @@ try {
     param($sender, $e)
     $col = $sender.Columns[$e.ColumnIndex]
     if (-not $col) { return }
-    if ($col.Name -like '__*') { return }
-    try {
-      $rect = $sender.GetCellDisplayRectangle($e.ColumnIndex, -1, $true)
-      $pt = $sender.PointToClient([System.Windows.Forms.Control]::MousePosition)
-      $iconWidth = 18
-      if ($pt.X -ge ($rect.Right - $iconWidth) -and $pt.X -le $rect.Right -and $pt.Y -ge $rect.Top -and $pt.Y -le $rect.Bottom) {
-        Show-NearbyFilterDialog $col.Name | Out-Null
-        return
-      }
-    } catch {}
     $name = $col.Name
     $dir = if ($script:NearbySortDir[$name] -eq 'Asc') { 'Desc' } else { 'Asc' }
     $script:NearbySortDir[$name] = $dir
