@@ -2229,12 +2229,6 @@ if (-not $script:NEAR_STATUSES) {
     "Pending Repair"
   )
 }
-# Track active column filters for Nearby grid
-if (-not $script:NearbyFilters) {
-  $script:NearbyFilters = @{}
-}
-$script:NearbyFilterInputs = $null
-$script:SuppressNearbyFilterEvents = $false
 # In-memory cache of rounding events
 if (-not (Get-Variable -Scope Script -Name RoundingEvents -ErrorAction SilentlyContinue)) {
   $script:RoundingEvents = @()
@@ -2285,172 +2279,14 @@ function Load-RoundingEvents {
   } catch { $script:RoundingEvents = @() }
 }
 Load-RoundingEvents
-function Get-ActiveNearbyFilters {
-  if (-not $script:NearbyFilters) { return @() }
-  $active = @()
-  foreach ($key in $script:NearbyFilters.Keys) {
-    $raw = $script:NearbyFilters[$key]
-    if ($null -eq $raw) { continue }
-    $text = [string]$raw
-    if ([string]::IsNullOrWhiteSpace($text)) { continue }
-    $trimmed = $text.Trim()
-    if ([string]::IsNullOrWhiteSpace($trimmed)) { continue }
-    $active += [pscustomobject]@{ Key = $key; Value = $trimmed }
-  }
-  return $active
-}
-function Test-NearbyNumericFilter([string]$filter, $value) {
-  $text = if ($filter) { $filter.Trim() } else { '' }
-  if ([string]::IsNullOrWhiteSpace($text)) { return $true }
-  $hasNum = $false
-  $numVal = 0
-  if ($null -ne $value) {
-    if ($value -is [int]) {
-      $numVal = [int]$value
-      $hasNum = $true
-    } elseif ($value -is [long]) {
-      $numVal = [int][long]$value
-      $hasNum = $true
-    } else {
-      $str = [string]$value
-      $hasNum = [int]::TryParse($str, [ref]$numVal)
-    }
-  }
-  if ($text -match '^\((blank|empty|none)\)$') {
-    return (-not $hasNum)
-  }
-  if ($text -match '^\s*(-?\d+)\s*-\s*(-?\d+)\s*$') {
-    if (-not $hasNum) { return $false }
-    $min = [int]$matches[1]
-    $max = [int]$matches[2]
-    if ($min -gt $max) { $tmp = $min; $min = $max; $max = $tmp }
-    return ($numVal -ge $min -and $numVal -le $max)
-  }
-  if ($text -match '^\s*(<=|>=|=|<|>)?\s*(-?\d+)\s*$') {
-    if (-not $hasNum) { return $false }
-    $op = if ($matches[1]) { $matches[1] } else { '=' }
-    $target = [int]$matches[2]
-    switch ($op) {
-      '<'  { return ($numVal -lt $target) }
-      '<=' { return ($numVal -le $target) }
-      '>'  { return ($numVal -gt $target) }
-      '>=' { return ($numVal -ge $target) }
-      '='  { return ($numVal -eq $target) }
-      default { return ($numVal -eq $target) }
-    }
-  }
-  $valueStr = if ($null -ne $value) { [string]$value } else { '' }
-  return ($valueStr.IndexOf($text, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
-}
-function Test-NearbyFilters([hashtable]$values, [object[]]$filters = $null) {
-  if (-not $filters) { $filters = @(Get-ActiveNearbyFilters) }
-  if (-not $filters -or $filters.Count -eq 0) { return $true }
-  foreach ($filter in $filters) {
-    $key = [string]$filter.Key
-    $needle = [string]$filter.Value
-    $current = $null
-    if ($values.ContainsKey($key)) { $current = $values[$key] }
-    if ($key -eq 'DaysAgo') {
-      if (-not (Test-NearbyNumericFilter $needle $current)) { return $false }
-      continue
-    }
-    $trimNeedle = if ($needle) { $needle.Trim() } else { '' }
-    if ($trimNeedle -match '^\((blank|empty|none)\)$') {
-      if (-not [string]::IsNullOrWhiteSpace([string]$current)) { return $false }
-      continue
-    }
-    $hay = if ($null -ne $current) { [string]$current } else { '' }
-    if ($hay.IndexOf($trimNeedle, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) { return $false }
-  }
-  return $true
-}
+# Filtering removed from Nearby grid; keep stub to refresh visibility/count labels.
 function Apply-NearbyFilters {
   if (-not $dgvNearby) { Update-ScopeLabel; return }
-  $filters = @(Get-ActiveNearbyFilters)
   foreach ($row in $dgvNearby.Rows) {
     if ($row.IsNewRow) { continue }
-    if (-not $filters -or $filters.Count -eq 0) {
-      $row.Visible = $true
-      continue
-    }
-    $vals = @{
-      Host        = $row.Cells['Host'].Value
-      Asset       = $row.Cells['Asset'].Value
-      Location    = $row.Cells['Location'].Value
-      Building    = $row.Cells['Building'].Value
-      Floor       = $row.Cells['Floor'].Value
-      Room        = $row.Cells['Room'].Value
-      Department  = $row.Cells['Department'].Value
-      LastRounded = $row.Cells['LastRounded'].Value
-      DaysAgo     = $row.Cells['DaysAgo'].Value
-      Status      = $row.Cells['Status'].Value
-    }
-    $row.Visible = Test-NearbyFilters $vals $filters
+    $row.Visible = $true
   }
   Update-ScopeLabel
-}
-function Trigger-NearbyFilterRefresh {
-  Apply-NearbyFilters
-}
-function Clear-NearbyFilters {
-  $script:SuppressNearbyFilterEvents = $true
-  try {
-    if ($script:NearbyFilters) { $script:NearbyFilters.Clear() }
-    if ($script:NearbyFilterInputs) {
-      foreach ($tb in $script:NearbyFilterInputs) {
-        try {
-          if ($tb) { $tb.Text = '' }
-        } catch {}
-      }
-    }
-  } finally {
-    $script:SuppressNearbyFilterEvents = $false
-  }
-  Trigger-NearbyFilterRefresh
-}
-function Add-NearFilterControl {
-  param(
-    [System.Windows.Forms.FlowLayoutPanel]$panel,
-    [string]$key,
-    [string]$labelText,
-    [int]$width = 120
-  )
-  if (-not $panel) { return }
-  $lbl = New-Object System.Windows.Forms.Label
-  $lbl.Text = $labelText
-  $lbl.AutoSize = $true
-  $lbl.Margin = [System.Windows.Forms.Padding]::new(4,8,4,4)
-  $panel.Controls.Add($lbl)
-  $tb = New-Object System.Windows.Forms.TextBox
-  $tb.Width = [math]::Max($width, 60)
-  $tb.Tag = $key
-  $tb.Margin = [System.Windows.Forms.Padding]::new(0,4,12,4)
-  if (-not $script:NearbyFilters) { $script:NearbyFilters = @{} }
-  if ($script:NearbyFilters.ContainsKey($key) -and $script:NearbyFilters[$key]) {
-    $tb.Text = [string]$script:NearbyFilters[$key]
-  } else {
-    $script:NearbyFilters[$key] = $tb.Text
-  }
-  $tb.Add_TextChanged({
-    param($sender,$eventArgs)
-    if ($script:SuppressNearbyFilterEvents) { return }
-    try {
-      $k = [string]$sender.Tag
-      if (-not $script:NearbyFilters) { $script:NearbyFilters = @{} }
-      $script:NearbyFilters[$k] = $sender.Text
-    } catch {}
-    Trigger-NearbyFilterRefresh
-  })
-  if (-not $script:NearbyFilterInputs -or -not ($script:NearbyFilterInputs -is [System.Collections.IList])) {
-    $script:NearbyFilterInputs = [System.Collections.Generic.List[System.Windows.Forms.TextBox]]::new()
-  }
-  [void]$script:NearbyFilterInputs.Add($tb)
-  $panel.Controls.Add($tb)
-  if ($key -eq 'DaysAgo' -and $tip) {
-    try { $tip.SetToolTip($tb, 'Use >, <, >=, <=, =, or ranges like 3-10. Enter (blank) to find empty values.') } catch {}
-  } elseif ($key -eq 'Status' -and $tip) {
-    try { $tip.SetToolTip($tb, 'Filters match text anywhere in the status value (case-insensitive).') } catch {}
-  }
 }
 function ScopeKey([string]$city,[string]$loc,[string]$b,[string]$f){
   $nl = if ($loc) { (Normalize-Field $loc) } else { "" }
@@ -2635,32 +2471,6 @@ $btnSetStatus.Add_Click({
     [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)","Multi-Status",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
   }
 })
-$nearFilterPanel = New-Object System.Windows.Forms.FlowLayoutPanel
-$nearFilterPanel.Dock = 'Top'
-$nearFilterPanel.Height = 76
-$nearFilterPanel.WrapContents = $true
-$nearFilterPanel.AutoScroll = $true
-$nearFilterPanel.FlowDirection = [System.Windows.Forms.FlowDirection]::LeftToRight
-$nearFilterPanel.Padding = [System.Windows.Forms.Padding]::new(8,4,8,4)
-$nearFilterPanel.Margin = [System.Windows.Forms.Padding]::new(0)
-if (-not $script:NearbyFilters) { $script:NearbyFilters = @{} }
-$script:NearbyFilterInputs = [System.Collections.Generic.List[System.Windows.Forms.TextBox]]::new()
-Add-NearFilterControl $nearFilterPanel 'Host' 'Host:' 140
-Add-NearFilterControl $nearFilterPanel 'Asset' 'Asset:' 110
-Add-NearFilterControl $nearFilterPanel 'Location' 'Location:' 140
-Add-NearFilterControl $nearFilterPanel 'Building' 'Building:' 110
-Add-NearFilterControl $nearFilterPanel 'Floor' 'Floor:' 80
-Add-NearFilterControl $nearFilterPanel 'Room' 'Room:' 90
-Add-NearFilterControl $nearFilterPanel 'Department' 'Department:' 160
-Add-NearFilterControl $nearFilterPanel 'LastRounded' 'Last Rounded:' 130
-Add-NearFilterControl $nearFilterPanel 'DaysAgo' 'Days Ago:' 100
-Add-NearFilterControl $nearFilterPanel 'Status' 'Status:' 140
-$btnClearNearFilters = New-Object System.Windows.Forms.Button
-$btnClearNearFilters.Text = 'Clear Filters'
-$btnClearNearFilters.AutoSize = $true
-$btnClearNearFilters.Margin = [System.Windows.Forms.Padding]::new(0,4,0,4)
-$btnClearNearFilters.Add_Click({ Clear-NearbyFilters })
-$nearFilterPanel.Controls.Add($btnClearNearFilters)
 $dgvNearby = New-Object System.Windows.Forms.DataGridView
 $dgvNearby.Dock='Fill'
 $dgvNearby.AllowUserToAddRows=$false
@@ -2794,7 +2604,6 @@ $nearPage = New-Object System.Windows.Forms.Panel
 $nearPage.Dock = 'Fill'
 $nearPage.Controls.Add($dgvNearby)
 $nearPage.Controls.Add($nearBottom)
-$nearPage.Controls.Add($nearFilterPanel)
 $nearPage.Controls.Add($nearToolbar)
 $tabPageNear.Controls.Add($nearPage)
 $tabTop.TabPages.AddRange(@($tabPageMain,$tabPageNear))
