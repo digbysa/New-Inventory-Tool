@@ -2229,6 +2229,9 @@ if (-not (Get-Variable -Scope Script -Name NearbyActiveFilterMenu -ErrorAction S
 }
 $script:NearbyFilterGlyphWidth = 18
 $script:NearbyFilterGlyphMargin = 6
+if (-not (Get-Variable -Scope Script -Name NearbyPacificTimeZone -ErrorAction SilentlyContinue)) {
+  $script:NearbyPacificTimeZone = $null
+}
 if (-not $script:NEAR_STATUSES) {
   # Full set minus "Complete"
   $script:NEAR_STATUSES = @(
@@ -2473,6 +2476,382 @@ function Format-NearbyDisplayValue([string]$columnName, $value) {
   }
 }
 
+function Get-NearbyPacificTimeZone {
+  if ($script:NearbyPacificTimeZone) { return $script:NearbyPacificTimeZone }
+  $ids = @('Pacific Standard Time','America/Vancouver')
+  foreach ($id in $ids) {
+    try {
+      $tz = [System.TimeZoneInfo]::FindSystemTimeZoneById($id)
+      if ($tz) {
+        $script:NearbyPacificTimeZone = $tz
+        return $tz
+      }
+    } catch {}
+  }
+  try { $script:NearbyPacificTimeZone = [System.TimeZoneInfo]::Local } catch { $script:NearbyPacificTimeZone = $null }
+  return $script:NearbyPacificTimeZone
+}
+
+function Get-NearbyPacificNow {
+  $tz = Get-NearbyPacificTimeZone
+  if ($tz) {
+    try { return [System.TimeZoneInfo]::ConvertTimeFromUtc([datetime]::UtcNow, $tz) } catch {}
+  }
+  return (Get-Date)
+}
+
+function Get-NearbyDatePresetRange([string]$preset) {
+  if ([string]::IsNullOrWhiteSpace($preset)) { return $null }
+  $now = Get-NearbyPacificNow
+  $today = $now.Date
+  $start = $today
+  $end = $today
+  switch ($preset) {
+    'Today' { $start = $today; $end = $today }
+    'Yesterday' { $start = $today.AddDays(-1); $end = $today.AddDays(-1) }
+    'Last7' { $start = $today.AddDays(-6); $end = $today }
+    'ThisMonth' {
+      $start = Get-Date -Year $today.Year -Month $today.Month -Day 1
+      $end = $start.AddMonths(1).AddDays(-1)
+    }
+    default { return $null }
+  }
+  return [pscustomobject]@{ Start = $start; End = $end }
+}
+
+function Test-NearbyTextCondition($value, [string]$operator, [string]$operand) {
+  if ([string]::IsNullOrWhiteSpace($operator)) { return $true }
+  $candidate = ''
+  if ($null -ne $value) {
+    try { $candidate = [string]$value } catch { $candidate = '' }
+  }
+  $candidate = $candidate.Trim()
+  $opValue = if ($operand) { $operand } else { '' }
+  $opValue = $opValue.Trim()
+  $candidateLower = $candidate.ToLowerInvariant()
+  $operandLower = $opValue.ToLowerInvariant()
+  switch ($operator) {
+    'Contains' { return ($candidateLower.IndexOf($operandLower, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) }
+    'StartsWith' { return $candidateLower.StartsWith($operandLower) }
+    'EndsWith' { return $candidateLower.EndsWith($operandLower) }
+    'Equals' { return $candidateLower.Equals($operandLower) }
+    'NotContains' { return ($candidateLower.IndexOf($operandLower, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) }
+    default { return $true }
+  }
+}
+
+function Test-NearbyNumberCondition($value, [string]$operator, $operand1, $operand2) {
+  if ([string]::IsNullOrWhiteSpace($operator)) { return $true }
+  $num = 0.0
+  if (-not (TryParse-NearbyNumber $value ([ref]$num))) { return $false }
+  switch ($operator) {
+    'Eq' { return ($num -eq [double]$operand1) }
+    'Ne' { return ($num -ne [double]$operand1) }
+    'Gt' { return ($num -gt [double]$operand1) }
+    'Ge' { return ($num -ge [double]$operand1) }
+    'Lt' { return ($num -lt [double]$operand1) }
+    'Le' { return ($num -le [double]$operand1) }
+    'Between' {
+      if ($null -eq $operand1 -or $null -eq $operand2) { return $false }
+      $min = [double]$operand1
+      $max = [double]$operand2
+      return ($num -ge $min -and $num -le $max)
+    }
+    default { return $true }
+  }
+}
+
+function Test-NearbyDateCondition($value, [string]$operator, $operand1, $operand2, [string]$preset) {
+  if ([string]::IsNullOrWhiteSpace($operator)) { return $true }
+  $dt = [datetime]::MinValue
+  if (-not (TryParse-NearbyDate $value ([ref]$dt))) { return $false }
+  $dateOnly = $dt.Date
+  switch ($operator) {
+    'On' {
+      if (-not $operand1) { return $false }
+      $target = ([datetime]$operand1).Date
+      return ($dateOnly -eq $target)
+    }
+    'Before' {
+      if (-not $operand1) { return $false }
+      $target = ([datetime]$operand1).Date
+      return ($dateOnly -lt $target)
+    }
+    'After' {
+      if (-not $operand1) { return $false }
+      $target = ([datetime]$operand1).Date
+      return ($dateOnly -gt $target)
+    }
+    'Between' {
+      if (-not $operand1 -or -not $operand2) { return $false }
+      $start = ([datetime]$operand1).Date
+      $end = ([datetime]$operand2).Date
+      return ($dateOnly -ge $start -and $dateOnly -le $end)
+    }
+    'Preset' {
+      if ([string]::IsNullOrWhiteSpace($preset)) { return $false }
+      $range = Get-NearbyDatePresetRange $preset
+      if (-not $range) { return $false }
+      return ($dateOnly -ge $range.Start -and $dateOnly -le $range.End)
+    }
+    default { return $true }
+  }
+}
+
+function Test-NearbyFilterStateActive($state) {
+  if (-not $state) { return $false }
+  $op = ''
+  try { $op = [string]$state.Operator } catch { $op = '' }
+  $preset = ''
+  try { $preset = [string]$state.Preset } catch { $preset = '' }
+  if (-not [string]::IsNullOrWhiteSpace($op)) { return $true }
+  if (-not [string]::IsNullOrWhiteSpace($preset)) { return $true }
+  $keys = $null
+  try { $keys = $state.SelectedKeys } catch { $keys = $null }
+  if ($null -ne $keys) { return $true }
+  return $false
+}
+
+function Test-NearbyFilterMatch([string]$columnName, $state, $value) {
+  if (-not $state) { return $true }
+  $operator = ''
+  try { $operator = [string]$state.Operator } catch { $operator = '' }
+  $preset = ''
+  try { $preset = [string]$state.Preset } catch { $preset = '' }
+  $type = Get-NearbyColumnType $columnName
+  if (-not [string]::IsNullOrWhiteSpace($operator)) {
+    switch ($type) {
+      'Number' { return Test-NearbyNumberCondition $value $operator $state.Operand1 $state.Operand2 }
+      'DateTime' { return Test-NearbyDateCondition $value $operator $state.Operand1 $state.Operand2 $preset }
+      'Boolean' { return Test-NearbyTextCondition $value $operator $state.Operand1 }
+      default { return Test-NearbyTextCondition $value $operator $state.Operand1 }
+    }
+  }
+  if (-not [string]::IsNullOrWhiteSpace($preset) -and $type -eq 'DateTime') {
+    return Test-NearbyDateCondition $value 'Preset' $state.Operand1 $state.Operand2 $preset
+  }
+  $keys = $null
+  try { $keys = $state.SelectedKeys } catch { $keys = $null }
+  if ($null -eq $keys) { return $true }
+  $key = Get-NearbyValueKey $columnName $value
+  if ($keys -is [System.Collections.Generic.HashSet[string]]) {
+    return $keys.Contains($key)
+  }
+  if ($keys -and ($keys.GetType().GetMethod('Contains'))) {
+    try { return $keys.Contains($key) } catch {}
+  }
+  foreach ($k in $keys) {
+    if ($k -eq $key) { return $true }
+  }
+  return $false
+}
+
+function Update-NearbyPresetButtonStyles($context) {
+  if (-not $context) { return }
+  $buttons = $null
+  try { $buttons = $context.PresetButtons } catch { $buttons = $null }
+  if (-not $buttons) { return }
+  foreach ($entry in $buttons.GetEnumerator()) {
+    $btn = $entry.Value
+    if (-not $btn) { continue }
+    $code = $entry.Key
+    $isSelected = $false
+    try {
+      if ($context.Operator -eq 'Preset' -and $context.Preset -eq $code) { $isSelected = $true }
+    } catch {}
+    try {
+      if ($isSelected) {
+        $btn.BackColor = [System.Drawing.Color]::LightSteelBlue
+      } else {
+        $btn.BackColor = [System.Drawing.SystemColors]::Control
+      }
+    } catch {}
+  }
+}
+
+function Commit-NearbyConditionFromControls($context) {
+  if (-not $context) { return $true }
+  $type = $context.Type
+  switch ($type) {
+    'Text' {
+      $combo = $context.OperatorControl
+      if (-not $combo) {
+        $context.Operator = $null
+        $context.Operand1 = $null
+        $context.Operand2 = $null
+        $context.Preset = $null
+        return $true
+      }
+      $selected = ''
+      try { $selected = [string]$combo.SelectedValue } catch { $selected = '' }
+      if ([string]::IsNullOrWhiteSpace($selected)) {
+        $context.Operator = $null
+        $context.Operand1 = $null
+        $context.Operand2 = $null
+        $context.Preset = $null
+        return $true
+      }
+      $input = ''
+      if ($context.OperatorValueControl) {
+        try { $input = [string]$context.OperatorValueControl.Text } catch { $input = '' }
+      }
+      $trimmed = if ($input) { $input.Trim() } else { '' }
+      if ([string]::IsNullOrWhiteSpace($trimmed)) {
+        [System.Windows.Forms.MessageBox]::Show('Enter a value for the selected condition.','Nearby Filter',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        return $false
+      }
+      switch ($selected) {
+        'Contains' { $context.Operator = 'Contains' }
+        'StartsWith' { $context.Operator = 'StartsWith' }
+        'EndsWith' { $context.Operator = 'EndsWith' }
+        'Equals' { $context.Operator = 'Equals' }
+        'Does Not Contain' { $context.Operator = 'NotContains' }
+        default { $context.Operator = $null }
+      }
+      if (-not $context.Operator) {
+        $context.Operand1 = $null
+        $context.Operand2 = $null
+        $context.Preset = $null
+        return $true
+      }
+      $context.Operand1 = $trimmed
+      $context.Operand2 = $null
+      $context.Preset = $null
+      return $true
+    }
+    'Number' {
+      $combo = $context.OperatorControl
+      if (-not $combo) {
+        $context.Operator = $null
+        $context.Operand1 = $null
+        $context.Operand2 = $null
+        $context.Preset = $null
+        return $true
+      }
+      $selected = ''
+      try { $selected = [string]$combo.SelectedValue } catch { $selected = '' }
+      if ([string]::IsNullOrWhiteSpace($selected)) {
+        $context.Operator = $null
+        $context.Operand1 = $null
+        $context.Operand2 = $null
+        $context.Preset = $null
+        return $true
+      }
+      $text1 = ''
+      if ($context.OperatorValueControl) {
+        try { $text1 = [string]$context.OperatorValueControl.Text } catch { $text1 = '' }
+      }
+      $trim1 = if ($text1) { $text1.Trim() } else { '' }
+      $num1 = 0.0
+      if (-not (TryParse-NearbyNumber $trim1 ([ref]$num1))) {
+        [System.Windows.Forms.MessageBox]::Show('Enter a numeric value for the selected condition.','Nearby Filter',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        return $false
+      }
+      $opCode = ''
+      switch ($selected) {
+        '=' { $opCode = 'Eq' }
+        '≠' { $opCode = 'Ne' }
+        '>' { $opCode = 'Gt' }
+        '≥' { $opCode = 'Ge' }
+        '<' { $opCode = 'Lt' }
+        '≤' { $opCode = 'Le' }
+        'Between' { $opCode = 'Between' }
+      }
+      if (-not $opCode) {
+        $context.Operator = $null
+        $context.Operand1 = $null
+        $context.Operand2 = $null
+        $context.Preset = $null
+        return $true
+      }
+      $context.Operator = $opCode
+      $context.Operand1 = [double]$num1
+      if ($opCode -eq 'Between') {
+        $text2 = ''
+        if ($context.OperatorSecondValueControl) {
+          try { $text2 = [string]$context.OperatorSecondValueControl.Text } catch { $text2 = '' }
+        }
+        $trim2 = if ($text2) { $text2.Trim() } else { '' }
+        $num2 = 0.0
+        if (-not (TryParse-NearbyNumber $trim2 ([ref]$num2))) {
+          [System.Windows.Forms.MessageBox]::Show('Enter an end value for the Between condition.','Nearby Filter',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+          return $false
+        }
+        if ($num2 -lt $num1) {
+          [System.Windows.Forms.MessageBox]::Show('The end value must be greater than or equal to the start value.','Nearby Filter',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+          return $false
+        }
+        $context.Operand2 = [double]$num2
+      } else {
+        $context.Operand2 = $null
+      }
+      $context.Preset = $null
+      return $true
+    }
+    'DateTime' {
+      $combo = $context.OperatorControl
+      if (-not $combo) {
+        $context.Operator = $null
+        $context.Operand1 = $null
+        $context.Operand2 = $null
+        # keep preset state as-is
+        return $true
+      }
+      $selected = ''
+      try { $selected = [string]$combo.SelectedValue } catch { $selected = '' }
+      if ([string]::IsNullOrWhiteSpace($selected)) {
+        $context.Operator = $null
+        $context.Operand1 = $null
+        $context.Operand2 = $null
+        $context.Preset = $null
+        return $true
+      }
+      $dt1 = $null
+      if ($context.DatePicker1) {
+        try { $dt1 = $context.DatePicker1.Value.Date } catch { $dt1 = (Get-Date).Date }
+      }
+      $opCode = ''
+      switch ($selected) {
+        'On' { $opCode = 'On' }
+        'Before' { $opCode = 'Before' }
+        'After' { $opCode = 'After' }
+        'Between' { $opCode = 'Between' }
+      }
+      if (-not $opCode) {
+        $context.Operator = $null
+        $context.Operand1 = $null
+        $context.Operand2 = $null
+        $context.Preset = $null
+        return $true
+      }
+      $context.Operator = $opCode
+      $context.Operand1 = $dt1
+      if ($opCode -eq 'Between') {
+        $dt2 = $dt1
+        if ($context.DatePicker2) {
+          try { $dt2 = $context.DatePicker2.Value.Date } catch { $dt2 = $dt1 }
+        }
+        if ($dt2 -lt $dt1) {
+          [System.Windows.Forms.MessageBox]::Show('The end date must be on or after the start date.','Nearby Filter',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+          return $false
+        }
+        $context.Operand2 = $dt2
+      } else {
+        $context.Operand2 = $null
+      }
+      $context.Preset = $null
+      return $true
+    }
+    default {
+      $context.Operator = $null
+      $context.Operand1 = $null
+      $context.Operand2 = $null
+      $context.Preset = $null
+      return $true
+    }
+  }
+}
+
 function Get-NearbyUniqueValuesForColumn([string]$columnName) {
   $results = @()
   if (-not $dgvNearby) { return $results }
@@ -2547,11 +2926,7 @@ function Is-NearbyColumnFiltered([string]$columnName) {
   if (-not $script:NearbyColumnFilters) { return $false }
   if (-not $script:NearbyColumnFilters.ContainsKey($columnName)) { return $false }
   $state = $script:NearbyColumnFilters[$columnName]
-  if (-not $state) { return $false }
-  $keys = $null
-  try { $keys = $state.SelectedKeys } catch { $keys = $null }
-  if ($null -eq $keys) { return $false }
-  return $true
+  return (Test-NearbyFilterStateActive $state)
 }
 
 function Sync-NearbyFilterState {
@@ -2560,19 +2935,36 @@ function Sync-NearbyFilterState {
   $remove = @()
   foreach ($key in @($script:NearbyColumnFilters.Keys)) {
     $state = $script:NearbyColumnFilters[$key]
-    if (-not $state -or -not $state.SelectedKeys) { $remove += $key; continue }
+    if (-not $state) { $remove += $key; continue }
+    $keys = $null
+    try { $keys = $state.SelectedKeys } catch { $keys = $null }
+    $op = ''
+    try { $op = [string]$state.Operator } catch { $op = '' }
+    $preset = ''
+    try { $preset = [string]$state.Preset } catch { $preset = '' }
+    $hasCondition = (-not [string]::IsNullOrWhiteSpace($op)) -or (-not [string]::IsNullOrWhiteSpace($preset))
+    if (-not $hasCondition -and -not $keys) { $remove += $key; continue }
     $items = @(Get-NearbyUniqueValuesForColumn $key)
-    if ($items.Count -eq 0) { $remove += $key; continue }
-    $valid = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
-    foreach ($it in $items) { if ($it.Key) { [void]$valid.Add($it.Key) } else { [void]$valid.Add('__BLANK__') } }
-    $updated = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
-    foreach ($sel in $state.SelectedKeys) {
-      if ($valid.Contains($sel)) { [void]$updated.Add($sel) }
+    if ($items.Count -eq 0) {
+      if (-not $hasCondition) { $remove += $key }
+      continue
     }
-    if ($updated.Count -ge $items.Count) {
-      $remove += $key
-    } else {
-      $state.SelectedKeys = $updated
+    if ($keys) {
+      $valid = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+      foreach ($it in $items) { if ($it.Key) { [void]$valid.Add($it.Key) } else { [void]$valid.Add('__BLANK__') } }
+      $updated = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+      foreach ($sel in $keys) {
+        if ($valid.Contains($sel)) { [void]$updated.Add($sel) }
+      }
+      if ($updated.Count -ge $items.Count) {
+        if ($hasCondition) {
+          $state.SelectedKeys = $null
+        } else {
+          $remove += $key
+        }
+      } else {
+        $state.SelectedKeys = $updated
+      }
     }
   }
   foreach ($r in $remove) {
@@ -2586,12 +2978,8 @@ function Apply-NearbyFilters {
   if ($script:NearbyColumnFilters) {
     foreach ($k in $script:NearbyColumnFilters.Keys) {
       $state = $script:NearbyColumnFilters[$k]
-      if (-not $state) { continue }
-      $keys = $null
-      try { $keys = $state.SelectedKeys } catch { $keys = $null }
-      if ($null -ne $keys) {
-        $active[$k] = $keys
-      }
+      if (-not (Test-NearbyFilterStateActive $state)) { continue }
+      $active[$k] = $state
     }
   }
   foreach ($row in $dgvNearby.Rows) {
@@ -2601,9 +2989,8 @@ function Apply-NearbyFilters {
       if (-not $visible) { break }
       $cellValue = $null
       try { $cellValue = $row.Cells[$colName].Value } catch { $cellValue = $null }
-      $key = Get-NearbyValueKey $colName $cellValue
-      $allowed = $active[$colName]
-      if (-not $allowed.Contains($key)) {
+      $state = $active[$colName]
+      if (-not (Test-NearbyFilterMatch $colName $state $cellValue)) {
         $visible = $false
         break
       }
@@ -2634,7 +3021,13 @@ function Refresh-NearbyFilterList($context) {
   $list.BeginUpdate()
   try {
     $list.Items.Clear()
-    $filterActive = ($context.CheckedSet -ne $null)
+    $multiActive = ($context.CheckedSet -ne $null)
+    $filterActive = $multiActive
+    if (-not $filterActive) {
+      $op = ''
+      try { $op = [string]$context.Operator } catch { $op = '' }
+      if (-not [string]::IsNullOrWhiteSpace($op)) { $filterActive = $true }
+    }
     $visibleCount = 0
     $checkedCount = 0
     foreach ($item in $context.Items) {
@@ -2643,7 +3036,7 @@ function Refresh-NearbyFilterList($context) {
         continue
       }
       $visibleCount++
-      $isChecked = if ($filterActive) {
+      $isChecked = if ($multiActive) {
         $context.CheckedSet.Contains($item.Key)
       } else {
         $true
@@ -2661,7 +3054,7 @@ function Refresh-NearbyFilterList($context) {
     $context.VisibleItemCount = $visibleCount
     $context.VisibleCheckedCount = $checkedCount
     $allSelected = $false
-    if (-not $filterActive) {
+    if (-not $multiActive) {
       $allSelected = $true
     } elseif ($visibleCount -eq 0) {
       $allSelected = ($context.CheckedSet.Count -ge $context.TotalCount)
@@ -2685,25 +3078,43 @@ function Update-NearbyFilterSelection($context) {
   if (-not $context) { return }
   $selection = $context.CheckedSet
   $total = $context.TotalCount
+  $operator = $null
+  try { $operator = [string]$context.Operator } catch { $operator = $null }
+  $preset = $null
+  try { $preset = [string]$context.Preset } catch { $preset = $null }
+  $hasCondition = -not [string]::IsNullOrWhiteSpace($operator)
+  if ($hasCondition -and $operator -eq 'Preset' -and [string]::IsNullOrWhiteSpace($preset)) {
+    $hasCondition = $false
+  }
   if (-not $script:NearbyColumnFilters) { $script:NearbyColumnFilters = @{} }
-  if ($null -eq $selection) {
-    if ($script:NearbyColumnFilters.ContainsKey($context.Column)) {
-      try { $script:NearbyColumnFilters.Remove($context.Column) } catch {}
-    }
-  } elseif ($total -le 0 -or $selection.Count -ge $total) {
-    if ($script:NearbyColumnFilters.ContainsKey($context.Column)) {
-      try { $script:NearbyColumnFilters.Remove($context.Column) } catch {}
-    }
+  if ($selection -ne $null -and $total -gt 0 -and $selection.Count -ge $total) {
+    $selection = $null
     $context.CheckedSet = $null
+  }
+  if ($selection -eq $null -and -not $hasCondition) {
+    if ($script:NearbyColumnFilters.ContainsKey($context.Column)) {
+      try { $script:NearbyColumnFilters.Remove($context.Column) } catch {}
+    }
   } else {
-    $store = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
-    foreach ($k in $selection) { [void]$store.Add($k) }
-    $script:NearbyColumnFilters[$context.Column] = [pscustomobject]@{ SelectedKeys = $store }
+    $store = $null
+    if ($selection -ne $null) {
+      $store = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+      foreach ($k in $selection) { [void]$store.Add($k) }
+    }
+    $state = [pscustomobject]@{
+      SelectedKeys = $store
+      Operator = if ($hasCondition) { $operator } else { $null }
+      Operand1 = if ($hasCondition) { $context.Operand1 } else { $null }
+      Operand2 = if ($hasCondition) { $context.Operand2 } else { $null }
+      Preset    = if ($hasCondition -and $operator -eq 'Preset') { $context.Preset } else { $null }
+    }
+    $script:NearbyColumnFilters[$context.Column] = $state
   }
   Apply-NearbyFilters
   if ($context.ClearItem) {
-    $context.ClearItem.Enabled = ($null -ne $selection)
+    $context.ClearItem.Enabled = (($null -ne $selection) -or $hasCondition)
   }
+  Update-NearbyPresetButtonStyles $context
 }
 
 function Apply-NearbyColumnSort([string]$columnName, [string]$direction, [bool]$suppressPersist = $false) {
@@ -2749,6 +3160,50 @@ function Show-NearbyFilterMenu([string]$columnName) {
     $checkedSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($k in $existingState.SelectedKeys) { [void]$checkedSet.Add($k) }
   }
+  $typeName = Get-NearbyColumnType $columnName
+  $existingOperator = ''
+  $existingPreset = ''
+  $existingOperand1 = $null
+  $existingOperand2 = $null
+  if ($existingState) {
+    if ($existingState.PSObject.Properties['Operator']) {
+      try { $existingOperator = [string]$existingState.Operator } catch { $existingOperator = '' }
+    }
+    if ($existingState.PSObject.Properties['Preset']) {
+      try { $existingPreset = [string]$existingState.Preset } catch { $existingPreset = '' }
+    }
+    if ($existingState.PSObject.Properties['Operand1']) {
+      $existingOperand1 = $existingState.Operand1
+    }
+    if ($existingState.PSObject.Properties['Operand2']) {
+      $existingOperand2 = $existingState.Operand2
+    }
+  }
+  if ([string]::IsNullOrWhiteSpace($existingOperator) -and -not [string]::IsNullOrWhiteSpace($existingPreset)) {
+    $existingOperator = 'Preset'
+  }
+  switch ($typeName) {
+    'Text' {
+      if ($existingOperand1 -ne $null) { try { $existingOperand1 = [string]$existingOperand1 } catch { $existingOperand1 = [string]$existingOperand1 } }
+      $existingOperand2 = $null
+    }
+    'Number' {
+      if ($existingOperand1 -ne $null) { try { $existingOperand1 = [double]$existingOperand1 } catch {} }
+      if ($existingOperand2 -ne $null) { try { $existingOperand2 = [double]$existingOperand2 } catch {} }
+    }
+    'DateTime' {
+      if ($existingOperand1) { try { $existingOperand1 = ([datetime]$existingOperand1).Date } catch {} }
+      if ($existingOperand2) { try { $existingOperand2 = ([datetime]$existingOperand2).Date } catch {} }
+    }
+    default {
+      $existingOperand1 = $existingOperand1
+      $existingOperand2 = $existingOperand2
+    }
+  }
+  if ($typeName -ne 'DateTime') {
+    $existingPreset = ''
+    if ($existingOperator -eq 'Preset') { $existingOperator = '' }
+  }
   $menu = New-Object System.Windows.Forms.ContextMenuStrip
   $menu.ShowImageMargin = $false
   $menu.AutoClose = $true
@@ -2767,7 +3222,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
 
   $clearFilter = New-Object System.Windows.Forms.ToolStripMenuItem
   $clearFilter.Text = 'Clear Filter'
-  $clearFilter.Enabled = ($checkedSet -ne $null)
+  $clearFilter.Enabled = ($existingState -and (Test-NearbyFilterStateActive $existingState))
   $clearFilter.Add_Click({ Clear-NearbyColumnFilter $columnName })
   [void]$menu.Items.Add($clearFilter)
 
@@ -2799,8 +3254,26 @@ function Show-NearbyFilterMenu([string]$columnName) {
   $listHost.Margin = [System.Windows.Forms.Padding]::new(2,2,2,2)
   [void]$menu.Items.Add($listHost)
 
+  $initialOperator = if ([string]::IsNullOrWhiteSpace($existingOperator)) { $null } else { $existingOperator }
+  $initialPreset = if ($initialOperator -eq 'Preset') { $existingPreset } else { '' }
+  if ($typeName -eq 'Text') {
+    $validText = @('Contains','StartsWith','EndsWith','Equals','NotContains')
+    if ($initialOperator -and -not ($validText -contains $initialOperator)) { $initialOperator = $null }
+  } elseif ($typeName -eq 'Number') {
+    $validNumber = @('Eq','Ne','Gt','Ge','Lt','Le','Between')
+    if ($initialOperator -and -not ($validNumber -contains $initialOperator)) { $initialOperator = $null }
+  } elseif ($typeName -eq 'DateTime') {
+    $validDate = @('On','Before','After','Between','Preset')
+    if ($initialOperator -and -not ($validDate -contains $initialOperator)) { $initialOperator = $null }
+    if ($initialOperator -ne 'Preset') { $initialPreset = '' }
+  } else {
+    $initialOperator = $null
+    $initialPreset = ''
+  }
+  if ($initialOperator -ne 'Preset') { $initialPreset = '' }
   $context = [pscustomobject]@{
     Column = $columnName
+    Type = $typeName
     Items = $items
     CheckedSet = $checkedSet
     ListBox = $list
@@ -2812,12 +3285,394 @@ function Show-NearbyFilterMenu([string]$columnName) {
     VisibleItemCount = 0
     VisibleCheckedCount = 0
     IgnoreSelectAllEvent = $false
+    Operator = $initialOperator
+    Operand1 = $existingOperand1
+    Operand2 = $existingOperand2
+    Preset = $initialPreset
+    OperatorControl = $null
+    OperatorValueControl = $null
+    OperatorSecondValueControl = $null
+    OperatorSecondLabel = $null
+    DatePicker1 = $null
+    DatePicker2 = $null
+    PresetButtons = @{}
+  }
+
+  if ($context.Type -ne 'DateTime') {
+    $context.Preset = $null
   }
 
   $list.Tag = $context
   $searchBox.Tag = $context
   $selectAll.Tag = $context
   $menu.Tag = $context
+
+  switch ($context.Type) {
+    'Text' {
+      [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+      $panel = New-Object System.Windows.Forms.FlowLayoutPanel
+      $panel.FlowDirection = 'TopDown'
+      $panel.WrapContents = $false
+      $panel.AutoSize = $true
+      $panel.AutoSizeMode = 'GrowAndShrink'
+      $panel.Margin = [System.Windows.Forms.Padding]::new(4,2,4,4)
+
+      $lbl = New-Object System.Windows.Forms.Label
+      $lbl.Text = 'Condition'
+      $lbl.AutoSize = $true
+      $panel.Controls.Add($lbl)
+
+      $combo = New-Object System.Windows.Forms.ComboBox
+      $combo.DropDownStyle = 'DropDownList'
+      $combo.Width = 200
+      $combo.DisplayMember = 'Display'
+      $combo.ValueMember = 'Value'
+      $textOptions = @(
+        [pscustomobject]@{ Display='(No Condition)'; Value='' },
+        [pscustomobject]@{ Display='Contains'; Value='Contains' },
+        [pscustomobject]@{ Display='Starts With'; Value='StartsWith' },
+        [pscustomobject]@{ Display='Ends With'; Value='EndsWith' },
+        [pscustomobject]@{ Display='Equals'; Value='Equals' },
+        [pscustomobject]@{ Display='Does Not Contain'; Value='Does Not Contain' }
+      )
+      [void]$combo.Items.AddRange($textOptions)
+      $panel.Controls.Add($combo)
+
+      $valueBox = New-Object System.Windows.Forms.TextBox
+      $valueBox.Width = 200
+      $valueBox.Margin = [System.Windows.Forms.Padding]::new(0,2,0,2)
+      $panel.Controls.Add($valueBox)
+
+      $applyButton = New-Object System.Windows.Forms.Button
+      $applyButton.Text = 'Apply Condition'
+      $applyButton.AutoSize = $true
+      $panel.Controls.Add($applyButton)
+
+      $context.OperatorControl = $combo
+      $context.OperatorValueControl = $valueBox
+
+      $combo.Tag = $context
+      $valueBox.Tag = $context
+      $applyButton.Tag = $context
+
+      $applyButton.Add_Click({
+        param($sender,$args)
+        $ctx = $sender.Tag
+        if (-not $ctx) { return }
+        if (Commit-NearbyConditionFromControls $ctx) {
+          Update-NearbyFilterSelection $ctx
+        }
+      })
+
+      $selectedValue = ''
+      switch ($context.Operator) {
+        'Contains' { $selectedValue = 'Contains' }
+        'StartsWith' { $selectedValue = 'StartsWith' }
+        'EndsWith' { $selectedValue = 'EndsWith' }
+        'Equals' { $selectedValue = 'Equals' }
+        'NotContains' { $selectedValue = 'Does Not Contain' }
+      }
+      if ($selectedValue) {
+        try { $combo.SelectedValue = $selectedValue } catch { try { $combo.SelectedIndex = 0 } catch {} }
+      } else {
+        try { $combo.SelectedIndex = 0 } catch {}
+      }
+      if ($context.Operand1) {
+        try { $valueBox.Text = [string]$context.Operand1 } catch {}
+      }
+
+      $panelHost = New-Object System.Windows.Forms.ToolStripControlHost($panel)
+      $panelHost.Margin = [System.Windows.Forms.Padding]::new(4,2,4,4)
+      [void]$menu.Items.Add($panelHost)
+    }
+    'Number' {
+      [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+      $panel = New-Object System.Windows.Forms.FlowLayoutPanel
+      $panel.FlowDirection = 'TopDown'
+      $panel.WrapContents = $false
+      $panel.AutoSize = $true
+      $panel.AutoSizeMode = 'GrowAndShrink'
+      $panel.Margin = [System.Windows.Forms.Padding]::new(4,2,4,4)
+
+      $lbl = New-Object System.Windows.Forms.Label
+      $lbl.Text = 'Condition'
+      $lbl.AutoSize = $true
+      $panel.Controls.Add($lbl)
+
+      $combo = New-Object System.Windows.Forms.ComboBox
+      $combo.DropDownStyle = 'DropDownList'
+      $combo.Width = 200
+      $combo.DisplayMember = 'Display'
+      $combo.ValueMember = 'Value'
+      $numberOptions = @(
+        [pscustomobject]@{ Display='(No Condition)'; Value='' },
+        [pscustomobject]@{ Display='= Equals'; Value='=' },
+        [pscustomobject]@{ Display='≠ Not Equal'; Value='≠' },
+        [pscustomobject]@{ Display='> Greater Than'; Value='>' },
+        [pscustomobject]@{ Display='≥ Greater Than or Equal'; Value='≥' },
+        [pscustomobject]@{ Display='< Less Than'; Value='<' },
+        [pscustomobject]@{ Display='≤ Less Than or Equal'; Value='≤' },
+        [pscustomobject]@{ Display='Between'; Value='Between' }
+      )
+      [void]$combo.Items.AddRange($numberOptions)
+      $panel.Controls.Add($combo)
+
+      $valuePanel = New-Object System.Windows.Forms.FlowLayoutPanel
+      $valuePanel.FlowDirection = 'LeftToRight'
+      $valuePanel.WrapContents = $false
+      $valuePanel.AutoSize = $true
+      $valuePanel.Margin = [System.Windows.Forms.Padding]::new(0,2,0,2)
+
+      $txtStart = New-Object System.Windows.Forms.TextBox
+      $txtStart.Width = 90
+      $valuePanel.Controls.Add($txtStart)
+
+      $lblAnd = New-Object System.Windows.Forms.Label
+      $lblAnd.Text = 'and'
+      $lblAnd.AutoSize = $true
+      $lblAnd.Margin = [System.Windows.Forms.Padding]::new(6,6,6,0)
+      $lblAnd.Visible = $false
+      $valuePanel.Controls.Add($lblAnd)
+
+      $txtEnd = New-Object System.Windows.Forms.TextBox
+      $txtEnd.Width = 90
+      $txtEnd.Visible = $false
+      $valuePanel.Controls.Add($txtEnd)
+
+      $panel.Controls.Add($valuePanel)
+
+      $applyButton = New-Object System.Windows.Forms.Button
+      $applyButton.Text = 'Apply Condition'
+      $applyButton.AutoSize = $true
+      $panel.Controls.Add($applyButton)
+
+      $context.OperatorControl = $combo
+      $context.OperatorValueControl = $txtStart
+      $context.OperatorSecondValueControl = $txtEnd
+      $context.OperatorSecondLabel = $lblAnd
+
+      $combo.Tag = $context
+      $txtStart.Tag = $context
+      $txtEnd.Tag = $context
+      $applyButton.Tag = $context
+
+      $combo.Add_SelectedIndexChanged({
+        param($sender,$args)
+        $ctx = $sender.Tag
+        if (-not $ctx) { return }
+        $val = ''
+        try { $val = [string]$sender.SelectedValue } catch { $val = '' }
+        $show = ($val -eq 'Between')
+        if ($ctx.OperatorSecondValueControl) {
+          $ctx.OperatorSecondValueControl.Visible = $show
+          $ctx.OperatorSecondValueControl.Enabled = $show
+        }
+        if ($ctx.OperatorSecondLabel) { $ctx.OperatorSecondLabel.Visible = $show }
+      })
+
+      $applyButton.Add_Click({
+        param($sender,$args)
+        $ctx = $sender.Tag
+        if (-not $ctx) { return }
+        if (Commit-NearbyConditionFromControls $ctx) {
+          Update-NearbyFilterSelection $ctx
+        }
+      })
+
+      try { $combo.SelectedIndex = 0 } catch {}
+      switch ($context.Operator) {
+        'Eq' { try { $combo.SelectedValue = '=' } catch {} }
+        'Ne' { try { $combo.SelectedValue = '≠' } catch {} }
+        'Gt' { try { $combo.SelectedValue = '>' } catch {} }
+        'Ge' { try { $combo.SelectedValue = '≥' } catch {} }
+        'Lt' { try { $combo.SelectedValue = '<' } catch {} }
+        'Le' { try { $combo.SelectedValue = '≤' } catch {} }
+        'Between' { try { $combo.SelectedValue = 'Between' } catch {} }
+      }
+      if ($context.Operand1 -ne $null) {
+        try { $txtStart.Text = ([double]$context.Operand1).ToString('g', [System.Globalization.CultureInfo]::CurrentCulture) } catch {}
+      }
+      if ($context.Operand2 -ne $null) {
+        try { $txtEnd.Text = ([double]$context.Operand2).ToString('g', [System.Globalization.CultureInfo]::CurrentCulture) } catch {}
+      }
+      $showSecond = ($context.Operator -eq 'Between')
+      $lblAnd.Visible = $showSecond
+      $txtEnd.Visible = $showSecond
+      $txtEnd.Enabled = $showSecond
+
+      $panelHost = New-Object System.Windows.Forms.ToolStripControlHost($panel)
+      $panelHost.Margin = [System.Windows.Forms.Padding]::new(4,2,4,4)
+      [void]$menu.Items.Add($panelHost)
+    }
+    'DateTime' {
+      [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+      $panel = New-Object System.Windows.Forms.FlowLayoutPanel
+      $panel.FlowDirection = 'TopDown'
+      $panel.WrapContents = $false
+      $panel.AutoSize = $true
+      $panel.AutoSizeMode = 'GrowAndShrink'
+      $panel.Margin = [System.Windows.Forms.Padding]::new(4,2,4,4)
+
+      $lbl = New-Object System.Windows.Forms.Label
+      $lbl.Text = 'Condition'
+      $lbl.AutoSize = $true
+      $panel.Controls.Add($lbl)
+
+      $combo = New-Object System.Windows.Forms.ComboBox
+      $combo.DropDownStyle = 'DropDownList'
+      $combo.Width = 200
+      $combo.DisplayMember = 'Display'
+      $combo.ValueMember = 'Value'
+      $dateOptions = @(
+        [pscustomobject]@{ Display='(No Condition)'; Value='' },
+        [pscustomobject]@{ Display='On'; Value='On' },
+        [pscustomobject]@{ Display='Before'; Value='Before' },
+        [pscustomobject]@{ Display='After'; Value='After' },
+        [pscustomobject]@{ Display='Between'; Value='Between' }
+      )
+      [void]$combo.Items.AddRange($dateOptions)
+      $panel.Controls.Add($combo)
+
+      $datePanel = New-Object System.Windows.Forms.FlowLayoutPanel
+      $datePanel.FlowDirection = 'LeftToRight'
+      $datePanel.WrapContents = $false
+      $datePanel.AutoSize = $true
+      $datePanel.Margin = [System.Windows.Forms.Padding]::new(0,2,0,2)
+
+      $dtStart = New-Object System.Windows.Forms.DateTimePicker
+      $dtStart.Format = [System.Windows.Forms.DateTimePickerFormat]::Short
+      $datePanel.Controls.Add($dtStart)
+
+      $lblAnd = New-Object System.Windows.Forms.Label
+      $lblAnd.Text = 'and'
+      $lblAnd.AutoSize = $true
+      $lblAnd.Margin = [System.Windows.Forms.Padding]::new(6,6,6,0)
+      $lblAnd.Visible = $false
+      $datePanel.Controls.Add($lblAnd)
+
+      $dtEnd = New-Object System.Windows.Forms.DateTimePicker
+      $dtEnd.Format = [System.Windows.Forms.DateTimePickerFormat]::Short
+      $dtEnd.Visible = $false
+      $datePanel.Controls.Add($dtEnd)
+
+      $panel.Controls.Add($datePanel)
+
+      $applyButton = New-Object System.Windows.Forms.Button
+      $applyButton.Text = 'Apply Condition'
+      $applyButton.AutoSize = $true
+      $panel.Controls.Add($applyButton)
+
+      $presetLabel = New-Object System.Windows.Forms.Label
+      $presetLabel.Text = 'Quick Presets:'
+      $presetLabel.AutoSize = $true
+      $presetLabel.Margin = [System.Windows.Forms.Padding]::new(0,6,0,2)
+      $panel.Controls.Add($presetLabel)
+
+      $presetPanel = New-Object System.Windows.Forms.FlowLayoutPanel
+      $presetPanel.FlowDirection = 'LeftToRight'
+      $presetPanel.WrapContents = $false
+      $presetPanel.AutoSize = $true
+      $panel.Controls.Add($presetPanel)
+
+      $context.OperatorControl = $combo
+      $context.DatePicker1 = $dtStart
+      $context.DatePicker2 = $dtEnd
+
+      $combo.Tag = $context
+      $dtStart.Tag = $context
+      $dtEnd.Tag = $context
+      $applyButton.Tag = $context
+
+      $combo.Add_SelectedIndexChanged({
+        param($sender,$args)
+        $ctx = $sender.Tag
+        if (-not $ctx) { return }
+        $val = ''
+        try { $val = [string]$sender.SelectedValue } catch { $val = '' }
+        $show = ($val -eq 'Between')
+        if ($ctx.DatePicker2) {
+          $ctx.DatePicker2.Visible = $show
+          $ctx.DatePicker2.Enabled = $show
+        }
+        if ($ctx.OperatorSecondLabel) { $ctx.OperatorSecondLabel.Visible = $show }
+        if ($ctx -and $val) {
+          if ($val -ne '') {
+            $ctx.Preset = $null
+            Update-NearbyPresetButtonStyles $ctx
+          }
+        }
+      })
+
+      $applyButton.Add_Click({
+        param($sender,$args)
+        $ctx = $sender.Tag
+        if (-not $ctx) { return }
+        if (Commit-NearbyConditionFromControls $ctx) {
+          Update-NearbyFilterSelection $ctx
+        }
+      })
+
+      $presetCodes = @(
+        @{ Text='Today'; Code='Today' },
+        @{ Text='Yesterday'; Code='Yesterday' },
+        @{ Text='Last 7 Days'; Code='Last7' },
+        @{ Text='This Month'; Code='ThisMonth' }
+      )
+      foreach ($preset in $presetCodes) {
+        $btn = New-Object System.Windows.Forms.Button
+        $btn.Text = $preset.Text
+        $btn.AutoSize = $true
+        $btn.Tag = [pscustomobject]@{ Context=$context; Code=$preset.Code }
+        $btn.Margin = [System.Windows.Forms.Padding]::new(2,2,2,2)
+        $btn.Add_Click({
+          param($sender,$args)
+          $info = $sender.Tag
+          if (-not $info) { return }
+          $ctx = $info.Context
+          if (-not $ctx) { return }
+          $ctx.Operator = 'Preset'
+          $ctx.Preset = $info.Code
+          $ctx.Operand1 = $null
+          $ctx.Operand2 = $null
+          if ($ctx.OperatorControl) { try { $ctx.OperatorControl.SelectedIndex = 0 } catch {} }
+          Update-NearbyPresetButtonStyles $ctx
+          Update-NearbyFilterSelection $ctx
+        })
+        $presetPanel.Controls.Add($btn)
+        $context.PresetButtons[$preset.Code] = $btn
+      }
+
+      $context.OperatorSecondLabel = $lblAnd
+
+      $nowDate = (Get-NearbyPacificNow).Date
+      try { $dtStart.Value = if ($context.Operand1) { [datetime]$context.Operand1 } else { $nowDate } } catch {}
+      try { $dtEnd.Value = if ($context.Operand2) { [datetime]$context.Operand2 } else { $nowDate } } catch {}
+
+      try { $combo.SelectedIndex = 0 } catch {}
+      switch ($context.Operator) {
+        'On' { try { $combo.SelectedValue = 'On' } catch {} }
+        'Before' { try { $combo.SelectedValue = 'Before' } catch {} }
+        'After' { try { $combo.SelectedValue = 'After' } catch {} }
+        'Between' { try { $combo.SelectedValue = 'Between' } catch {} }
+        default {
+          if ($context.Operator -eq 'Preset') {
+            try { $combo.SelectedIndex = 0 } catch {}
+          }
+        }
+      }
+      $showSecond = ($context.Operator -eq 'Between')
+      $lblAnd.Visible = $showSecond
+      $dtEnd.Visible = $showSecond
+      $dtEnd.Enabled = $showSecond
+
+      $panelHost = New-Object System.Windows.Forms.ToolStripControlHost($panel)
+      $panelHost.Margin = [System.Windows.Forms.Padding]::new(4,2,4,4)
+      [void]$menu.Items.Add($panelHost)
+
+      Update-NearbyPresetButtonStyles $context
+    }
+    default {}
+  }
 
   $searchBox.Add_TextChanged({
     param($sender,$args)
