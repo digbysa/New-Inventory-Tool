@@ -2227,6 +2227,18 @@ if (-not (Get-Variable -Scope Script -Name NearbySortState -ErrorAction Silently
 if (-not (Get-Variable -Scope Script -Name NearbyActiveFilterMenu -ErrorAction SilentlyContinue)) {
   $script:NearbyActiveFilterMenu = $null
 }
+if (-not (Get-Variable -Scope Script -Name NearbyClearFiltersButton -ErrorAction SilentlyContinue)) {
+  $script:NearbyClearFiltersButton = $null
+}
+if (-not (Get-Variable -Scope Script -Name NearbyFilterChipPanel -ErrorAction SilentlyContinue)) {
+  $script:NearbyFilterChipPanel = $null
+}
+if (-not (Get-Variable -Scope Script -Name NearbyActiveFiltersLabel -ErrorAction SilentlyContinue)) {
+  $script:NearbyActiveFiltersLabel = $null
+}
+if (-not (Get-Variable -Scope Script -Name NearbyFilterChipToolTip -ErrorAction SilentlyContinue)) {
+  $script:NearbyFilterChipToolTip = $null
+}
 $script:NearbyFilterGlyphWidth = 18
 $script:NearbyFilterGlyphMargin = 6
 if (-not (Get-Variable -Scope Script -Name NearbyPacificTimeZone -ErrorAction SilentlyContinue)) {
@@ -2922,6 +2934,266 @@ function Update-NearbyFilterIndicators {
   try { $dgvNearby.Invalidate() } catch {}
 }
 
+function Get-NearbyColumnHeaderText([string]$columnName) {
+  if ($dgvNearby) {
+    try {
+      $column = $dgvNearby.Columns[$columnName]
+      if ($column) {
+        if ($column.HeaderCell -and $column.HeaderCell.Tag -and $column.HeaderCell.Tag.BaseHeader) {
+          $base = [string]$column.HeaderCell.Tag.BaseHeader
+          if (-not [string]::IsNullOrWhiteSpace($base)) { return $base }
+        }
+        if ($column.HeaderText) { return [string]$column.HeaderText }
+      }
+    } catch {}
+  }
+  return $columnName
+}
+
+function Format-NearbyFilterOperand($value, [string]$type) {
+  switch ($type) {
+    'Number' {
+      if ($null -eq $value) { return '' }
+      try { return ([double]$value).ToString('g', [System.Globalization.CultureInfo]::CurrentCulture) } catch { return ('' + $value) }
+    }
+    'DateTime' {
+      if ($null -eq $value) { return '' }
+      try { return ([datetime]$value).ToString('d', [System.Globalization.CultureInfo]::CurrentCulture) } catch { return ('' + $value) }
+    }
+    default {
+      if ($null -eq $value) { return '' }
+      return ('' + $value)
+    }
+  }
+}
+
+function Get-NearbyPresetDescription([string]$preset) {
+  switch ($preset) {
+    'Today' { return 'Preset: Today' }
+    'Yesterday' { return 'Preset: Yesterday' }
+    'Last7' { return 'Preset: Last 7 Days' }
+    'ThisMonth' { return 'Preset: This Month' }
+    default {
+      if ([string]::IsNullOrWhiteSpace($preset)) { return $null }
+      return ('Preset: {0}' -f $preset)
+    }
+  }
+}
+
+function Get-NearbyFilterDescription([string]$columnName, $state) {
+  if (-not $state) { return $null }
+  $type = Get-NearbyColumnType $columnName
+  $operator = ''
+  try { $operator = [string]$state.Operator } catch { $operator = '' }
+  $preset = ''
+  try { $preset = [string]$state.Preset } catch { $preset = '' }
+  if ($operator -eq 'Preset' -and -not [string]::IsNullOrWhiteSpace($preset)) {
+    return Get-NearbyPresetDescription $preset
+  }
+  if (-not [string]::IsNullOrWhiteSpace($operator)) {
+    switch ($type) {
+      'Number' {
+        $val1 = Format-NearbyFilterOperand $state.Operand1 'Number'
+        $val2 = Format-NearbyFilterOperand $state.Operand2 'Number'
+        if ([string]::IsNullOrWhiteSpace($val1) -and $operator -ne 'Between') { return $null }
+        switch ($operator) {
+          'Eq' { return "= $val1" }
+          'Ne' { return "≠ $val1" }
+          'Gt' { return "> $val1" }
+          'Ge' { return "≥ $val1" }
+          'Lt' { return "< $val1" }
+          'Le' { return "≤ $val1" }
+          'Between' {
+            if ([string]::IsNullOrWhiteSpace($val1) -or [string]::IsNullOrWhiteSpace($val2)) { return $null }
+            return "Between $val1 – $val2"
+          }
+          default { return $null }
+        }
+      }
+      'DateTime' {
+        $val1 = Format-NearbyFilterOperand $state.Operand1 'DateTime'
+        $val2 = Format-NearbyFilterOperand $state.Operand2 'DateTime'
+        switch ($operator) {
+          'On' { if ([string]::IsNullOrWhiteSpace($val1)) { return $null } else { return "On $val1" } }
+          'Before' { if ([string]::IsNullOrWhiteSpace($val1)) { return $null } else { return "Before $val1" } }
+          'After' { if ([string]::IsNullOrWhiteSpace($val1)) { return $null } else { return "After $val1" } }
+          'Between' {
+            if ([string]::IsNullOrWhiteSpace($val1) -or [string]::IsNullOrWhiteSpace($val2)) { return $null }
+            return "Between $val1 – $val2"
+          }
+          'Preset' {
+            if (-not [string]::IsNullOrWhiteSpace($preset)) { return Get-NearbyPresetDescription $preset }
+            return $null
+          }
+          default { return $null }
+        }
+      }
+      default {
+        $operand = ''
+        if ($state.PSObject.Properties['Operand1']) {
+          try { $operand = [string]$state.Operand1 } catch { $operand = '' }
+        }
+        $quoted = '"{0}"' -f (($operand -replace '"','""'))
+        switch ($operator) {
+          'Contains' { return "Contains $quoted" }
+          'StartsWith' { return "Starts with $quoted" }
+          'EndsWith' { return "Ends with $quoted" }
+          'Equals' { return "Equals $quoted" }
+          'NotContains' { return "Does not contain $quoted" }
+          default { return $null }
+        }
+      }
+    }
+  }
+  if (-not [string]::IsNullOrWhiteSpace($preset)) {
+    return Get-NearbyPresetDescription $preset
+  }
+  $keys = $null
+  try { $keys = $state.SelectedKeys } catch { $keys = $null }
+  if ($null -eq $keys) { return $null }
+  $items = @(Get-NearbyUniqueValuesForColumn $columnName)
+  $displayMap = @{}
+  foreach ($item in $items) { $displayMap[$item.Key] = $item.Display }
+  $values = @()
+  foreach ($raw in $keys) {
+    $key = $raw
+    if ($null -eq $key -or [string]::IsNullOrWhiteSpace($key)) { $key = '__BLANK__' }
+    $display = $null
+    if ($key -eq '__BLANK__') {
+      $display = '(Blanks)'
+    } elseif ($displayMap.ContainsKey($key)) {
+      $display = $displayMap[$key]
+    } else {
+      $display = ('' + $key)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($display)) { $values += $display } else { $values += '(Blanks)' }
+  }
+  if ($values.Count -eq 0) { return $null }
+  $sorted = $values | Sort-Object
+  if ($sorted.Count -le 3) {
+    $listText = [string]::Join(', ', $sorted)
+    return "Select($listText)"
+  } else {
+    $firstThree = $sorted | Select-Object -First 3
+    $listText = [string]::Join(', ', $firstThree)
+    $remaining = $sorted.Count - $firstThree.Count
+    return "Select($listText, +$remaining more)"
+  }
+}
+
+function Get-NearbyActiveFilters {
+  $results = @()
+  if (-not $script:NearbyColumnFilters) { return $results }
+  $orderedColumns = @()
+  if ($dgvNearby) {
+    foreach ($col in $dgvNearby.Columns) {
+      if ($col -and -not [string]::IsNullOrWhiteSpace($col.Name) -and -not $col.Name.StartsWith('__')) {
+        $orderedColumns += $col.Name
+      }
+    }
+  } else {
+    $orderedColumns = @($script:NearbyColumnFilters.Keys)
+  }
+  foreach ($name in $orderedColumns) {
+    if (-not $script:NearbyColumnFilters.ContainsKey($name)) { continue }
+    $state = $script:NearbyColumnFilters[$name]
+    if (-not (Test-NearbyFilterStateActive $state)) { continue }
+    $description = Get-NearbyFilterDescription $name $state
+    if ([string]::IsNullOrWhiteSpace($description)) { continue }
+    $header = Get-NearbyColumnHeaderText $name
+    $results += [pscustomobject]@{ Column = $name; Header = $header; Description = $description }
+  }
+  return $results
+}
+
+function New-NearbyFilterChip([string]$columnName, [string]$header, [string]$description) {
+  $chip = New-Object System.Windows.Forms.FlowLayoutPanel
+  $chip.FlowDirection = 'LeftToRight'
+  $chip.WrapContents = $false
+  $chip.AutoSize = $true
+  $chip.AutoSizeMode = 'GrowAndShrink'
+  $chip.Padding = [System.Windows.Forms.Padding]::new(8,3,4,3)
+  $chip.Margin = [System.Windows.Forms.Padding]::new(0,2,6,2)
+  $chip.BackColor = [System.Drawing.Color]::FromArgb(232, 240, 254)
+  $chip.Tag = $columnName
+
+  $label = New-Object System.Windows.Forms.Label
+  $label.AutoSize = $true
+  $label.Margin = [System.Windows.Forms.Padding]::new(0,2,4,0)
+  $label.Text = "{0}: {1}" -f $header, $description
+  $chip.Controls.Add($label)
+
+  $button = New-Object System.Windows.Forms.Button
+  $button.Text = '×'
+  $button.AutoSize = $true
+  $button.AutoSizeMode = 'GrowAndShrink'
+  $button.FlatStyle = 'Flat'
+  try { $button.FlatAppearance.BorderSize = 0 } catch {}
+  try { $button.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(210,225,250) } catch {}
+  try { $button.FlatAppearance.MouseDownBackColor = [System.Drawing.Color]::FromArgb(190,210,240) } catch {}
+  $button.Margin = [System.Windows.Forms.Padding]::new(0,0,0,0)
+  $button.Padding = [System.Windows.Forms.Padding]::new(2,0,2,0)
+  $button.Tag = $columnName
+  $button.TabStop = $false
+  try { $button.Font = New-Object System.Drawing.Font($button.Font.FontFamily, $button.Font.Size, [System.Drawing.FontStyle]::Bold) } catch {}
+  try { $button.Cursor = [System.Windows.Forms.Cursors]::Hand } catch {}
+  $button.Add_Click({
+    param($sender,$args)
+    $colName = [string]$sender.Tag
+    if (-not [string]::IsNullOrWhiteSpace($colName)) { Clear-NearbyColumnFilter $colName }
+  })
+  $chip.Controls.Add($button)
+
+  $fullText = "{0}: {1}" -f $header, $description
+  if ($script:NearbyFilterChipToolTip) {
+    try {
+      $script:NearbyFilterChipToolTip.SetToolTip($chip, $fullText)
+      $script:NearbyFilterChipToolTip.SetToolTip($label, $fullText)
+      $script:NearbyFilterChipToolTip.SetToolTip($button, "Remove filter for $header")
+    } catch {}
+  }
+  return $chip
+}
+
+function Update-NearbyActiveFilterUI {
+  $panel = $script:NearbyFilterChipPanel
+  $button = $script:NearbyClearFiltersButton
+  if (-not $panel) {
+    if ($button) { $button.Enabled = $false }
+    return
+  }
+  $active = @(Get-NearbyActiveFilters)
+  $panel.SuspendLayout()
+  foreach ($ctrl in @($panel.Controls)) {
+    $panel.Controls.Remove($ctrl)
+    try { $ctrl.Dispose() } catch {}
+  }
+  if ($active.Count -eq 0) {
+    $none = New-Object System.Windows.Forms.Label
+    $none.AutoSize = $true
+    $none.Margin = [System.Windows.Forms.Padding]::new(0,2,0,0)
+    $none.ForeColor = [System.Drawing.Color]::Gray
+    $none.Text = 'None'
+    $panel.Controls.Add($none)
+    if ($script:NearbyFilterChipToolTip) {
+      try { $script:NearbyFilterChipToolTip.SetToolTip($none, 'No active column filters') } catch {}
+    }
+  } else {
+    foreach ($info in $active) {
+      $chip = New-NearbyFilterChip $info.Column $info.Header $info.Description
+      $panel.Controls.Add($chip)
+    }
+  }
+  $panel.ResumeLayout($true)
+  if ($button) { $button.Enabled = ($active.Count -gt 0) }
+}
+
+function Clear-AllNearbyColumnFilters {
+  if (-not $script:NearbyColumnFilters) { $script:NearbyColumnFilters = @{} }
+  try { $script:NearbyColumnFilters.Clear() } catch { $script:NearbyColumnFilters = @{} }
+  Apply-NearbyFilters
+}
+
 function Is-NearbyColumnFiltered([string]$columnName) {
   if (-not $script:NearbyColumnFilters) { return $false }
   if (-not $script:NearbyColumnFilters.ContainsKey($columnName)) { return $false }
@@ -2973,7 +3245,12 @@ function Sync-NearbyFilterState {
 }
 
 function Apply-NearbyFilters {
-  if (-not $dgvNearby) { Update-ScopeLabel; return }
+  if (-not $dgvNearby) {
+    Update-ScopeLabel
+    Update-NearbyFilterIndicators
+    Update-NearbyActiveFilterUI
+    return
+  }
   $active = @{}
   if ($script:NearbyColumnFilters) {
     foreach ($k in $script:NearbyColumnFilters.Keys) {
@@ -2994,15 +3271,16 @@ function Apply-NearbyFilters {
         $visible = $false
         break
       }
-    }
-    $row.Visible = $visible
+  }
+  $row.Visible = $visible
   }
   Update-ScopeLabel
   Update-NearbyFilterIndicators
+  Update-NearbyActiveFilterUI
 }
 
 function Clear-NearbyColumnFilter([string]$columnName) {
-  if (-not $script:NearbyColumnFilters) { return }
+  if (-not $script:NearbyColumnFilters) { $script:NearbyColumnFilters = @{} }
   if ($script:NearbyColumnFilters.ContainsKey($columnName)) {
     try { $script:NearbyColumnFilters.Remove($columnName) } catch {}
   }
@@ -3755,8 +4033,8 @@ function Get-NearbyHeaderGlyphRect([System.Drawing.Rectangle]$cellBounds) {
 
 function Draw-NearbyFilterGlyph($graphics, [System.Drawing.Rectangle]$rect, [bool]$isActive) {
   if (-not $graphics) { return }
-  $color = if ($isActive) { [System.Drawing.Color]::SteelBlue } else { [System.Drawing.Color]::Gray }
-  $penColor = if ($isActive) { [System.Drawing.Color]::SteelBlue } else { [System.Drawing.Color]::DarkGray }
+  $color = if ($isActive) { [System.Drawing.Color]::CornflowerBlue } else { [System.Drawing.Color]::Gainsboro }
+  $penColor = if ($isActive) { [System.Drawing.Color]::RoyalBlue } else { [System.Drawing.Color]::DarkGray }
   $points = @(
     New-Object System.Drawing.Point($rect.Left, $rect.Top),
     New-Object System.Drawing.Point($rect.Right, $rect.Top),
@@ -3862,7 +4140,7 @@ if($assetTag -and $script:RoundingEvents){
 # ---- Build Nearby UI ----
 $nearToolbar = New-Object System.Windows.Forms.Panel
 $nearToolbar.Dock = 'Top'
-$nearToolbar.Height = 68
+$nearToolbar.Height = 98
 $lblScopes = New-Object System.Windows.Forms.Label
 $lblScopes.AutoSize = $true
 $lblScopes.Text = "Nearby scopes: 0"
@@ -3883,6 +4161,38 @@ $chkShowExcluded.Location = '280,32'
 $chkShowExcluded.Checked = $false
 $chkShowExcluded.Add_CheckedChanged({ Rebuild-Nearby })
 $chkTodayRounded.Add_CheckedChanged({ Rebuild-Nearby })
+
+$btnNearbyClearFilters = New-Object System.Windows.Forms.Button
+$btnNearbyClearFilters.Text = 'Clear All Filters'
+$btnNearbyClearFilters.AutoSize = $true
+$btnNearbyClearFilters.Location = '380,32'
+$btnNearbyClearFilters.Enabled = $false
+$btnNearbyClearFilters.Add_Click({ Clear-AllNearbyColumnFilters })
+$script:NearbyClearFiltersButton = $btnNearbyClearFilters
+
+$lblActiveFilters = New-Object System.Windows.Forms.Label
+$lblActiveFilters.AutoSize = $true
+$lblActiveFilters.Text = 'Active filters:'
+$lblActiveFilters.Location = '8,60'
+$script:NearbyActiveFiltersLabel = $lblActiveFilters
+
+$panelActiveFilters = New-Object System.Windows.Forms.FlowLayoutPanel
+$panelActiveFilters.Location = New-Object System.Drawing.Point(120,56)
+$panelActiveFilters.Size = New-Object System.Drawing.Size(600,30)
+$panelActiveFilters.AutoScroll = $true
+$panelActiveFilters.WrapContents = $false
+$panelActiveFilters.FlowDirection = 'LeftToRight'
+$panelActiveFilters.Margin = [System.Windows.Forms.Padding]::Empty
+$panelActiveFilters.Padding = [System.Windows.Forms.Padding]::Empty
+$panelActiveFilters.AutoSize = $false
+$panelActiveFilters.Anchor = ([System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right)
+$panelActiveFilters.BackColor = $nearToolbar.BackColor
+$script:NearbyFilterChipPanel = $panelActiveFilters
+
+if (-not $script:NearbyFilterChipToolTip) {
+  $script:NearbyFilterChipToolTip = New-Object System.Windows.Forms.ToolTip
+  try { $script:NearbyFilterChipToolTip.ShowAlways = $true } catch {}
+}
 
 $lblSort = New-Object System.Windows.Forms.Label
 $lblSort.AutoSize = $true
@@ -3906,7 +4216,17 @@ $btnClearScopes = New-Object System.Windows.Forms.Button
 $btnClearScopes.Text = "Clear List"
 $btnClearScopes.AutoSize = $true
 $btnClearScopes.Location = '700,6'
-$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$btnClearScopes))
+$nearToolbar.Controls.AddRange(@(
+  $lblScopes,
+  $btnNearbyShowAll,
+  $chkTodayRounded,
+  $chkShowExcluded,
+  $btnNearbyClearFilters,
+  $btnClearScopes,
+  $lblActiveFilters,
+  $panelActiveFilters
+))
+$null = Update-NearbyActiveFilterUI
 $btnNearbyShowAll.Add_Click({
   try {
     if (-not $script:NearbyShowAllChanges) {
@@ -4198,6 +4518,12 @@ $nearPage.Controls.Add($nearBottom)
 $nearPage.Controls.Add($nearToolbar)
 $tabPageNear.Controls.Add($nearPage)
 $tabTop.TabPages.AddRange(@($tabPageMain,$tabPageNear))
+$tabTop.Add_SelectedIndexChanged({
+  if ($tabTop.SelectedTab -ne $tabPageNear) { return }
+  Sync-NearbyFilterState
+  Apply-NearbySort
+  Apply-NearbyFilters
+})
 # Put the TabControl on the form (above status strip)
 $form.Controls.Add($tabTop)
 $form.Controls.SetChildIndex($tabTop, 0)  # ensure it's above the status strip
