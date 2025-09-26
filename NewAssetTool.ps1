@@ -2212,6 +2212,9 @@ $form.Add_KeyDown({ if($_.Control -and $_.KeyCode -eq 'S'){ Save-AllCSVs; $_.Han
 if (-not $script:ActiveNearbyScopes) {
   $script:ActiveNearbyScopes = New-Object System.Collections.Generic.HashSet[string]
 }
+if (-not (Get-Variable -Scope Script -Name NearbyShowAllChanges -ErrorAction SilentlyContinue)) {
+  $script:NearbyShowAllChanges = New-Object System.Collections.Generic.List[string]
+}
 if (-not $script:NEAR_STATUSES) {
   # Full set minus "Complete"
   $script:NEAR_STATUSES = @(
@@ -2331,6 +2334,21 @@ function Get-RoundedToday-Set {
   }
   return $set
 }
+function Get-ExcludedDevices-Set {
+  $set = New-Object 'System.Collections.Generic.HashSet[string]'
+  if(-not $script:Computers){ return $set }
+  foreach ($pc in $script:Computers) {
+    try {
+      $status = ('' + $pc.u_device_rounding).Trim()
+      if ($status -match '^(?i)Excluded$') {
+        $assetTag = ('' + $pc.asset_tag)
+        $normalized = $assetTag.Trim().ToUpper()
+        if ($normalized) { [void]$set.Add($normalized) }
+      }
+    } catch {}
+  }
+  return $set
+}
 function Get-LatestRoundForAsset([string]$assetTag,[Nullable[datetime]]$fallback){
   $best = $null
 if($assetTag -and $script:RoundingEvents){
@@ -2359,23 +2377,27 @@ if($assetTag -and $script:RoundingEvents){
 # ---- Build Nearby UI ----
 $nearToolbar = New-Object System.Windows.Forms.Panel
 $nearToolbar.Dock = 'Top'
-$nearToolbar.Height = 40
+$nearToolbar.Height = 68
 $lblScopes = New-Object System.Windows.Forms.Label
 $lblScopes.AutoSize = $true
 $lblScopes.Text = "Nearby scopes: 0"
 $lblScopes.Location = '8,10'
-$chkViewAll = New-Object System.Windows.Forms.CheckBox
-$chkViewAll.Text = "View all (include today's rounded)"
-$chkViewAll.AutoSize = $true
-$chkViewAll.Location = '170,8'
-$chkViewAll.Checked = $false
-
+$btnNearbyShowAll = New-Object System.Windows.Forms.Button
+$btnNearbyShowAll.Text = 'Show All'
+$btnNearbyShowAll.AutoSize = $true
+$btnNearbyShowAll.Location = '8,32'
+$chkTodayRounded = New-Object System.Windows.Forms.CheckBox
+$chkTodayRounded.Text = "Today's Rounded"
+$chkTodayRounded.AutoSize = $true
+$chkTodayRounded.Location = '120,32'
+$chkTodayRounded.Checked = $false
 $chkShowExcluded = New-Object System.Windows.Forms.CheckBox
-$chkShowExcluded.Text = "Show Excluded"
+$chkShowExcluded.Text = "Excluded"
 $chkShowExcluded.AutoSize = $true
-$chkShowExcluded.Location = '390,8'
+$chkShowExcluded.Location = '280,32'
 $chkShowExcluded.Checked = $false
 $chkShowExcluded.Add_CheckedChanged({ Rebuild-Nearby })
+$chkTodayRounded.Add_CheckedChanged({ Rebuild-Nearby })
 
 $lblSort = New-Object System.Windows.Forms.Label
 $lblSort.AutoSize = $true
@@ -2399,7 +2421,39 @@ $btnClearScopes = New-Object System.Windows.Forms.Button
 $btnClearScopes.Text = "Clear List"
 $btnClearScopes.AutoSize = $true
 $btnClearScopes.Location = '700,6'
-$nearToolbar.Controls.AddRange(@($lblScopes,$chkViewAll,$btnClearScopes))
+$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$btnClearScopes))
+$btnNearbyShowAll.Add_Click({
+  try {
+    if (-not $script:NearbyShowAllChanges) {
+      $script:NearbyShowAllChanges = New-Object System.Collections.Generic.List[string]
+    }
+    if ($btnNearbyShowAll.Text -eq 'Show All') {
+      $script:NearbyShowAllChanges.Clear()
+      if (-not $chkTodayRounded.Checked) {
+        $chkTodayRounded.Checked = $true
+        [void]$script:NearbyShowAllChanges.Add('Today')
+      }
+      if (-not $chkShowExcluded.Checked) {
+        $chkShowExcluded.Checked = $true
+        [void]$script:NearbyShowAllChanges.Add('Excluded')
+      }
+      $btnNearbyShowAll.Text = 'Hide Again'
+    } else {
+      foreach ($entry in @($script:NearbyShowAllChanges)) {
+        switch ($entry) {
+          'Today' {
+            if ($chkTodayRounded.Checked) { $chkTodayRounded.Checked = $false }
+          }
+          'Excluded' {
+            if ($chkShowExcluded.Checked) { $chkShowExcluded.Checked = $false }
+          }
+        }
+      }
+      $script:NearbyShowAllChanges.Clear()
+      $btnNearbyShowAll.Text = 'Show All'
+    }
+  } catch {}
+})
 # --- Multi-Status (apply one status to selected rows) ---
 $btnSetStatus = New-Object System.Windows.Forms.Button
 $btnSetStatus.Text = 'Multi-Status'
@@ -2651,6 +2705,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   try { Write-Host ("Rebuild-Nearby: Active scopes=" + ($(if($script:ActiveNearbyScopes){$script:ActiveNearbyScopes.Count}else{0}))) } catch {}
   Load-RoundingEvents
   $todaySet = Get-RoundedToday-Set
+  $excludedSet = Get-ExcludedDevices-Set
   $dgvNearby.Rows.Clear()
   $seen = New-Object System.Collections.Generic.HashSet[string]
   foreach ($pc in $script:Computers) {
@@ -2668,7 +2723,14 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     }
     $isToday = $false
     if ($atKey -and $todaySet.Contains($atKey)) { $isToday = $true }
-    if (-not $chkViewAll.Checked -and $isToday) { continue }
+    $isExcluded = $false
+    try {
+      $roundingFlag = ('' + $pc.u_device_rounding).Trim()
+      if ($roundingFlag -match '^(?i)Excluded$') { $isExcluded = $true }
+    } catch {}
+    if (-not $isExcluded -and $atKey -and $excludedSet.Contains($atKey)) { $isExcluded = $true }
+    if (-not $chkTodayRounded.Checked -and $isToday) { continue }
+    if (-not $chkShowExcluded.Checked -and $isExcluded) { continue }
     $rowIdx = $dgvNearby.Rows.Add()
     $r = $dgvNearby.Rows[$rowIdx]
     $r.Cells['Host'].Value      = $pc.name
@@ -2757,7 +2819,6 @@ $dgvNearby.Add_CellDoubleClick({
   }
 })
 # React to toolbar changes
-$chkViewAll.Add_CheckedChanged({ Rebuild-Nearby })
 $cmbSort.Add_SelectedIndexChanged({})
 $btnClearScopes.Add_Click({
   $script:ActiveNearbyScopes.Clear()
