@@ -2215,6 +2215,20 @@ if (-not $script:ActiveNearbyScopes) {
 if (-not (Get-Variable -Scope Script -Name NearbyShowAllChanges -ErrorAction SilentlyContinue)) {
   $script:NearbyShowAllChanges = New-Object System.Collections.Generic.List[string]
 }
+if (-not $script:NearbyColumnFilters) {
+  $script:NearbyColumnFilters = @{}
+}
+if (-not $script:NearbyColumnTypes) {
+  $script:NearbyColumnTypes = @{}
+}
+if (-not (Get-Variable -Scope Script -Name NearbySortState -ErrorAction SilentlyContinue)) {
+  $script:NearbySortState = $null
+}
+if (-not (Get-Variable -Scope Script -Name NearbyActiveFilterMenu -ErrorAction SilentlyContinue)) {
+  $script:NearbyActiveFilterMenu = $null
+}
+$script:NearbyFilterGlyphWidth = 18
+$script:NearbyFilterGlyphMargin = 6
 if (-not $script:NEAR_STATUSES) {
   # Full set minus "Complete"
   $script:NEAR_STATUSES = @(
@@ -2282,14 +2296,630 @@ function Load-RoundingEvents {
   } catch { $script:RoundingEvents = @() }
 }
 Load-RoundingEvents
-# Filtering removed from Nearby grid; keep stub to refresh visibility/count labels.
+function Close-NearbyActiveFilterMenu {
+  if ($script:NearbyActiveFilterMenu) {
+    try { $script:NearbyActiveFilterMenu.Close() } catch {}
+    $script:NearbyActiveFilterMenu = $null
+  }
+}
+
+function Get-NearbyColumnType([string]$columnName) {
+  if (-not $script:NearbyColumnTypes) { $script:NearbyColumnTypes = @{} }
+  if ($script:NearbyColumnTypes.ContainsKey($columnName)) {
+    $type = $script:NearbyColumnTypes[$columnName]
+    if ($type) { return $type }
+  }
+  return 'Text'
+}
+
+function Test-NearbyBooleanValue($value, [ref]$result) {
+  $result.Value = $false
+  if ($null -eq $value) { return $false }
+  if ($value -is [bool]) { $result.Value = [bool]$value; return $true }
+  $text = ''
+  try { $text = [string]$value } catch { $text = '' }
+  if ([string]::IsNullOrWhiteSpace($text)) { return $false }
+  $normalized = $text.Trim().ToLowerInvariant()
+  switch ($normalized) {
+    'true' { $result.Value = $true; return $true }
+    'false' { $result.Value = $false; return $true }
+    'yes' { $result.Value = $true; return $true }
+    'no' { $result.Value = $false; return $true }
+    'y' { $result.Value = $true; return $true }
+    'n' { $result.Value = $false; return $true }
+    '1' { $result.Value = $true; return $true }
+    '0' { $result.Value = $false; return $true }
+  }
+  return $false
+}
+
+function TryParse-NearbyNumber($value, [ref]$number) {
+  $number.Value = 0
+  if ($null -eq $value) { return $false }
+  if ($value -is [int] -or $value -is [long] -or $value -is [float] -or $value -is [double] -or $value -is [decimal]) {
+    $number.Value = [double]$value
+    return $true
+  }
+  $text = ''
+  try { $text = [string]$value } catch { $text = '' }
+  if ([string]::IsNullOrWhiteSpace($text)) { return $false }
+  $trimmed = $text.Trim()
+  $styles = [System.Globalization.NumberStyles]::Float -bor [System.Globalization.NumberStyles]::AllowThousands
+  $ciCurrent = [System.Globalization.CultureInfo]::CurrentCulture
+  $ciInvariant = [System.Globalization.CultureInfo]::InvariantCulture
+  $parsed = [double]::TryParse($trimmed, $styles, $ciCurrent, [ref]$number.Value)
+  if (-not $parsed) {
+    $parsed = [double]::TryParse($trimmed, $styles, $ciInvariant, [ref]$number.Value)
+  }
+  return $parsed
+}
+
+function TryParse-NearbyDate($value, [ref]$result) {
+  $result.Value = [datetime]::MinValue
+  if ($null -eq $value) { return $false }
+  if ($value -is [datetime]) { $result.Value = [datetime]$value; return $true }
+  $text = ''
+  try { $text = [string]$value } catch { $text = '' }
+  if ([string]::IsNullOrWhiteSpace($text)) { return $false }
+  $trimmed = $text.Trim()
+  $parsed = [datetime]::TryParse($trimmed, [ref]$result.Value)
+  return $parsed
+}
+
+function Detect-NearbyColumnTypes {
+  if (-not $dgvNearby) { return }
+  if (-not $script:NearbyColumnTypes) { $script:NearbyColumnTypes = @{} }
+  foreach ($col in $dgvNearby.Columns) {
+    if (-not $col) { continue }
+    if ($col.Name -like '__*') { continue }
+    $hasValue = $false
+    $allBool = $true
+    $allNumber = $true
+    $allDate = $true
+    foreach ($row in $dgvNearby.Rows) {
+      if (-not $row -or $row.IsNewRow) { continue }
+      $val = $null
+      try { $val = $row.Cells[$col.Name].Value } catch { $val = $null }
+      if ($null -eq $val) { continue }
+      $text = ''
+      try { $text = [string]$val } catch { $text = '' }
+      if ([string]::IsNullOrWhiteSpace($text)) { continue }
+      $hasValue = $true
+      $boolValue = $false
+      if ($allBool) {
+        if (-not (Test-NearbyBooleanValue $val ([ref]$boolValue))) { $allBool = $false }
+      }
+      $numValue = 0
+      if ($allNumber) {
+        if (-not (TryParse-NearbyNumber $val ([ref]$numValue))) { $allNumber = $false }
+      }
+      $dateValue = [datetime]::MinValue
+      if ($allDate) {
+        if (-not (TryParse-NearbyDate $val ([ref]$dateValue))) { $allDate = $false }
+      }
+      if (-not $allBool -and -not $allNumber -and -not $allDate) { break }
+    }
+    $type = 'Text'
+    if ($hasValue) {
+      if ($allBool) { $type = 'Boolean' }
+      elseif ($allNumber) { $type = 'Number' }
+      elseif ($allDate) { $type = 'DateTime' }
+    }
+    $script:NearbyColumnTypes[$col.Name] = $type
+  }
+}
+
+function Get-NearbyValueKey([string]$columnName, $value) {
+  if ($null -eq $value) { return '__BLANK__' }
+  $text = ''
+  try { $text = [string]$value } catch { $text = '' }
+  if ([string]::IsNullOrWhiteSpace($text)) { return '__BLANK__' }
+  $type = Get-NearbyColumnType $columnName
+  switch ($type) {
+    'Boolean' {
+      $boolVal = $false
+      if (Test-NearbyBooleanValue $value ([ref]$boolVal)) {
+        return (if ($boolVal) { 'TRUE' } else { 'FALSE' })
+      }
+      return $text.Trim()
+    }
+    'Number' {
+      $numVal = 0
+      if (TryParse-NearbyNumber $value ([ref]$numVal)) {
+        return $numVal.ToString([System.Globalization.CultureInfo]::InvariantCulture)
+      }
+      return $text.Trim()
+    }
+    'DateTime' {
+      $dtVal = [datetime]::MinValue
+      if (TryParse-NearbyDate $value ([ref]$dtVal)) {
+        return $dtVal.ToString('o')
+      }
+      return $text.Trim()
+    }
+    default { return $text.Trim() }
+  }
+}
+
+function Format-NearbyDisplayValue([string]$columnName, $value) {
+  if ($null -eq $value) { return '(Blanks)' }
+  $text = ''
+  try { $text = [string]$value } catch { $text = '' }
+  if ([string]::IsNullOrWhiteSpace($text)) { return '(Blanks)' }
+  $type = Get-NearbyColumnType $columnName
+  switch ($type) {
+    'Boolean' {
+      $boolVal = $false
+      if (Test-NearbyBooleanValue $value ([ref]$boolVal)) {
+        return (if ($boolVal) { 'True' } else { 'False' })
+      }
+      return $text.Trim()
+    }
+    'Number' {
+      $numVal = 0
+      if (TryParse-NearbyNumber $value ([ref]$numVal)) {
+        return $numVal.ToString('g', [System.Globalization.CultureInfo]::CurrentCulture)
+      }
+      return $text.Trim()
+    }
+    'DateTime' {
+      $dtVal = [datetime]::MinValue
+      if (TryParse-NearbyDate $value ([ref]$dtVal)) {
+        try { return $dtVal.ToString([System.Globalization.CultureInfo]::CurrentCulture) } catch { return $dtVal.ToString('g') }
+      }
+      return $text.Trim()
+    }
+    default { return $text.Trim() }
+  }
+}
+
+function Get-NearbyUniqueValuesForColumn([string]$columnName) {
+  $results = @()
+  if (-not $dgvNearby) { return $results }
+  $map = @{}
+  foreach ($row in $dgvNearby.Rows) {
+    if (-not $row -or $row.IsNewRow) { continue }
+    $value = $null
+    try { $value = $row.Cells[$columnName].Value } catch { $value = $null }
+    $key = Get-NearbyValueKey $columnName $value
+    if (-not $map.ContainsKey($key)) {
+      $sortKey = $null
+      $type = Get-NearbyColumnType $columnName
+      switch ($type) {
+        'Boolean' {
+          $boolVal = $false
+          if (Test-NearbyBooleanValue $value ([ref]$boolVal)) { $sortKey = if ($boolVal) { 1 } else { 0 } }
+        }
+        'Number' {
+          $numVal = 0
+          if (TryParse-NearbyNumber $value ([ref]$numVal)) { $sortKey = $numVal }
+        }
+        'DateTime' {
+          $dtVal = [datetime]::MinValue
+          if (TryParse-NearbyDate $value ([ref]$dtVal)) { $sortKey = $dtVal }
+        }
+        default { $sortKey = [string](Format-NearbyDisplayValue $columnName $value) }
+      }
+      $map[$key] = [pscustomobject]@{
+        Key = $key
+        Display = (Format-NearbyDisplayValue $columnName $value)
+        Count = 0
+        SortKey = $sortKey
+      }
+    }
+    $entry = $map[$key]
+    $entry.Count++
+  }
+  $items = @()
+  foreach ($entry in $map.Values) { $items += $entry }
+  $typeName = Get-NearbyColumnType $columnName
+  switch ($typeName) {
+    'Boolean' {
+      $items = $items | Sort-Object @{ Expression = {
+        if ($_.Key -eq '__BLANK__') { -1 } else { if ($null -ne $_.SortKey) { $_.SortKey } else { 2 } }
+      } }, @{ Expression = { $_.Display } }
+    }
+    'Number' {
+      $items = $items | Sort-Object @{ Expression = {
+        if ($_.Key -eq '__BLANK__') { [double]::NegativeInfinity } elseif ($null -ne $_.SortKey) { [double]$_.SortKey } else { [double]::PositiveInfinity }
+      } }
+    }
+    'DateTime' {
+      $items = $items | Sort-Object @{ Expression = {
+        if ($_.Key -eq '__BLANK__') { Get-Date '1900-01-01' } elseif ($_.SortKey -is [datetime]) { $_.SortKey } else { Get-Date '9999-12-31' }
+      } }
+    }
+    default {
+      $items = $items | Sort-Object @{ Expression = {
+        if ($_.Key -eq '__BLANK__') { '' } else { [string]$_.Display }
+      } }, @{ Expression = { $_.Display } }
+    }
+  }
+  return $items
+}
+
+function Update-NearbyFilterIndicators {
+  if (-not $dgvNearby) { return }
+  try { $dgvNearby.Invalidate() } catch {}
+}
+
+function Is-NearbyColumnFiltered([string]$columnName) {
+  if (-not $script:NearbyColumnFilters) { return $false }
+  if (-not $script:NearbyColumnFilters.ContainsKey($columnName)) { return $false }
+  $state = $script:NearbyColumnFilters[$columnName]
+  if (-not $state) { return $false }
+  $keys = $null
+  try { $keys = $state.SelectedKeys } catch { $keys = $null }
+  if ($null -eq $keys) { return $false }
+  return $true
+}
+
+function Sync-NearbyFilterState {
+  if (-not $dgvNearby) { return }
+  if (-not $script:NearbyColumnFilters) { return }
+  $remove = @()
+  foreach ($key in @($script:NearbyColumnFilters.Keys)) {
+    $state = $script:NearbyColumnFilters[$key]
+    if (-not $state -or -not $state.SelectedKeys) { $remove += $key; continue }
+    $items = @(Get-NearbyUniqueValuesForColumn $key)
+    if ($items.Count -eq 0) { $remove += $key; continue }
+    $valid = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($it in $items) { if ($it.Key) { [void]$valid.Add($it.Key) } else { [void]$valid.Add('__BLANK__') } }
+    $updated = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($sel in $state.SelectedKeys) {
+      if ($valid.Contains($sel)) { [void]$updated.Add($sel) }
+    }
+    if ($updated.Count -ge $items.Count) {
+      $remove += $key
+    } else {
+      $state.SelectedKeys = $updated
+    }
+  }
+  foreach ($r in $remove) {
+    try { $script:NearbyColumnFilters.Remove($r) } catch {}
+  }
+}
+
 function Apply-NearbyFilters {
   if (-not $dgvNearby) { Update-ScopeLabel; return }
+  $active = @{}
+  if ($script:NearbyColumnFilters) {
+    foreach ($k in $script:NearbyColumnFilters.Keys) {
+      $state = $script:NearbyColumnFilters[$k]
+      if (-not $state) { continue }
+      $keys = $null
+      try { $keys = $state.SelectedKeys } catch { $keys = $null }
+      if ($null -ne $keys) {
+        $active[$k] = $keys
+      }
+    }
+  }
   foreach ($row in $dgvNearby.Rows) {
-    if ($row.IsNewRow) { continue }
-    $row.Visible = $true
+    if (-not $row -or $row.IsNewRow) { continue }
+    $visible = $true
+    foreach ($colName in $active.Keys) {
+      if (-not $visible) { break }
+      $cellValue = $null
+      try { $cellValue = $row.Cells[$colName].Value } catch { $cellValue = $null }
+      $key = Get-NearbyValueKey $colName $cellValue
+      $allowed = $active[$colName]
+      if (-not $allowed.Contains($key)) {
+        $visible = $false
+        break
+      }
+    }
+    $row.Visible = $visible
   }
   Update-ScopeLabel
+  Update-NearbyFilterIndicators
+}
+
+function Clear-NearbyColumnFilter([string]$columnName) {
+  if (-not $script:NearbyColumnFilters) { return }
+  if ($script:NearbyColumnFilters.ContainsKey($columnName)) {
+    try { $script:NearbyColumnFilters.Remove($columnName) } catch {}
+  }
+  Apply-NearbyFilters
+}
+
+function Refresh-NearbyFilterList($context) {
+  if (-not $context) { return }
+  $list = $context.ListBox
+  if (-not $list) { return }
+  $searchText = ''
+  if ($context.SearchBox) {
+    try { $searchText = [string]$context.SearchBox.Text } catch { $searchText = '' }
+  }
+  $needle = if ($searchText) { $searchText.Trim() } else { '' }
+  $list.BeginUpdate()
+  try {
+    $list.Items.Clear()
+    $filterActive = ($context.CheckedSet -ne $null)
+    $visibleCount = 0
+    $checkedCount = 0
+    foreach ($item in $context.Items) {
+      $display = [string]$item.Display
+      if ($needle -and $display -and ($display.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -lt 0)) {
+        continue
+      }
+      $visibleCount++
+      $isChecked = if ($filterActive) {
+        $context.CheckedSet.Contains($item.Key)
+      } else {
+        $true
+      }
+      if ($isChecked) { $checkedCount++ }
+      $textWithCount = if ($item.Key -eq '__BLANK__' -and $item.Display -eq '(Blanks)') {
+        "(Blanks) ($($item.Count))"
+      } else {
+        "{0} ({1})" -f $item.Display, $item.Count
+      }
+      # store tuple as object so we can retrieve key later
+      $entry = [pscustomobject]@{ Display=$textWithCount; Key=$item.Key; Raw=$item }
+      [void]$list.Items.Add($entry, $isChecked)
+    }
+    $context.VisibleItemCount = $visibleCount
+    $context.VisibleCheckedCount = $checkedCount
+    $allSelected = $false
+    if (-not $filterActive) {
+      $allSelected = $true
+    } elseif ($visibleCount -eq 0) {
+      $allSelected = ($context.CheckedSet.Count -ge $context.TotalCount)
+    } else {
+      $allSelected = ($checkedCount -eq $visibleCount)
+    }
+    if ($context.SelectAll) {
+      $context.IgnoreSelectAllEvent = $true
+      try { $context.SelectAll.Checked = $allSelected } catch {}
+      $context.IgnoreSelectAllEvent = $false
+    }
+    if ($context.ClearItem) {
+      $context.ClearItem.Enabled = $filterActive
+    }
+  } finally {
+    $list.EndUpdate()
+  }
+}
+
+function Update-NearbyFilterSelection($context) {
+  if (-not $context) { return }
+  $selection = $context.CheckedSet
+  $total = $context.TotalCount
+  if (-not $script:NearbyColumnFilters) { $script:NearbyColumnFilters = @{} }
+  if ($null -eq $selection) {
+    if ($script:NearbyColumnFilters.ContainsKey($context.Column)) {
+      try { $script:NearbyColumnFilters.Remove($context.Column) } catch {}
+    }
+  } elseif ($total -le 0 -or $selection.Count -ge $total) {
+    if ($script:NearbyColumnFilters.ContainsKey($context.Column)) {
+      try { $script:NearbyColumnFilters.Remove($context.Column) } catch {}
+    }
+    $context.CheckedSet = $null
+  } else {
+    $store = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($k in $selection) { [void]$store.Add($k) }
+    $script:NearbyColumnFilters[$context.Column] = [pscustomobject]@{ SelectedKeys = $store }
+  }
+  Apply-NearbyFilters
+  if ($context.ClearItem) {
+    $context.ClearItem.Enabled = ($null -ne $selection)
+  }
+}
+
+function Apply-NearbyColumnSort([string]$columnName, [string]$direction, [bool]$suppressPersist = $false) {
+  if (-not $dgvNearby) { return }
+  $column = $dgvNearby.Columns[$columnName]
+  if (-not $column) { return }
+  Close-NearbyActiveFilterMenu
+  $listDirection = if ($direction -and $direction.ToString().ToLowerInvariant() -eq 'desc') {
+    [System.ComponentModel.ListSortDirection]::Descending
+  } else {
+    [System.ComponentModel.ListSortDirection]::Ascending
+  }
+  try { $dgvNearby.Sort($column, $listDirection) } catch {}
+  foreach ($c in $dgvNearby.Columns) {
+    if ($c) { try { $c.HeaderCell.SortGlyphDirection = [System.Windows.Forms.SortOrder]::None } catch {} }
+  }
+  try {
+    $column.HeaderCell.SortGlyphDirection = if ($listDirection -eq [System.ComponentModel.ListSortDirection]::Descending) {
+      [System.Windows.Forms.SortOrder]::Descending
+    } else {
+      [System.Windows.Forms.SortOrder]::Ascending
+    }
+  } catch {}
+  if (-not $suppressPersist) {
+    $script:NearbySortState = @{ Column = $columnName; Direction = if ($listDirection -eq [System.ComponentModel.ListSortDirection]::Descending) { 'Desc' } else { 'Asc' } }
+  }
+  Update-NearbyFilterIndicators
+}
+
+function Show-NearbyFilterMenu([string]$columnName) {
+  if (-not $dgvNearby) { return }
+  $column = $dgvNearby.Columns[$columnName]
+  if (-not $column) { return }
+  Close-NearbyActiveFilterMenu
+  $items = @(Get-NearbyUniqueValuesForColumn $columnName)
+  $totalCount = if ($items) { $items.Count } else { 0 }
+  $existingState = $null
+  if ($script:NearbyColumnFilters -and $script:NearbyColumnFilters.ContainsKey($columnName)) {
+    $existingState = $script:NearbyColumnFilters[$columnName]
+  }
+  $checkedSet = $null
+  if ($existingState -and $existingState.SelectedKeys -and $existingState.SelectedKeys.Count -gt 0) {
+    $checkedSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($k in $existingState.SelectedKeys) { [void]$checkedSet.Add($k) }
+  }
+  $menu = New-Object System.Windows.Forms.ContextMenuStrip
+  $menu.ShowImageMargin = $false
+  $menu.AutoClose = $true
+
+  $sortAsc = New-Object System.Windows.Forms.ToolStripMenuItem
+  $sortAsc.Text = 'Sort Ascending'
+  $sortAsc.Add_Click({ Apply-NearbyColumnSort $columnName 'Asc' })
+  [void]$menu.Items.Add($sortAsc)
+
+  $sortDesc = New-Object System.Windows.Forms.ToolStripMenuItem
+  $sortDesc.Text = 'Sort Descending'
+  $sortDesc.Add_Click({ Apply-NearbyColumnSort $columnName 'Desc' })
+  [void]$menu.Items.Add($sortDesc)
+
+  [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+
+  $clearFilter = New-Object System.Windows.Forms.ToolStripMenuItem
+  $clearFilter.Text = 'Clear Filter'
+  $clearFilter.Enabled = ($checkedSet -ne $null)
+  $clearFilter.Add_Click({ Clear-NearbyColumnFilter $columnName })
+  [void]$menu.Items.Add($clearFilter)
+
+  [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+
+  $searchBox = New-Object System.Windows.Forms.TextBox
+  $searchBox.Width = 180
+  $searchHost = New-Object System.Windows.Forms.ToolStripControlHost($searchBox)
+  $searchHost.Margin = [System.Windows.Forms.Padding]::new(4,4,4,2)
+  [void]$menu.Items.Add($searchHost)
+
+  $selectAll = New-Object System.Windows.Forms.CheckBox
+  $selectAll.Text = 'Select All'
+  $selectAll.AutoSize = $true
+  $selectAll.Margin = [System.Windows.Forms.Padding]::new(2,2,2,2)
+  if ($checkedSet -eq $null) { $selectAll.Checked = $true }
+  $selectHost = New-Object System.Windows.Forms.ToolStripControlHost($selectAll)
+  [void]$menu.Items.Add($selectHost)
+
+  $list = New-Object System.Windows.Forms.CheckedListBox
+  $list.Width = 220
+  $list.Height = 220
+  $list.CheckOnClick = $true
+  $list.BorderStyle = 'FixedSingle'
+  $list.IntegralHeight = $false
+  $list.DisplayMember = 'Display'
+  $list.ValueMember = 'Key'
+  $listHost = New-Object System.Windows.Forms.ToolStripControlHost($list)
+  $listHost.Margin = [System.Windows.Forms.Padding]::new(2,2,2,2)
+  [void]$menu.Items.Add($listHost)
+
+  $context = [pscustomobject]@{
+    Column = $columnName
+    Items = $items
+    CheckedSet = $checkedSet
+    ListBox = $list
+    SearchBox = $searchBox
+    SelectAll = $selectAll
+    ClearItem = $clearFilter
+    Menu = $menu
+    TotalCount = if ($totalCount -gt 0) { $totalCount } else { 0 }
+    VisibleItemCount = 0
+    VisibleCheckedCount = 0
+    IgnoreSelectAllEvent = $false
+  }
+
+  $list.Tag = $context
+  $searchBox.Tag = $context
+  $selectAll.Tag = $context
+  $menu.Tag = $context
+
+  $searchBox.Add_TextChanged({
+    param($sender,$args)
+    $ctx = $sender.Tag
+    Refresh-NearbyFilterList $ctx
+  })
+
+  $selectAll.Add_CheckedChanged({
+    param($sender,$args)
+    $ctx = $sender.Tag
+    if (-not $ctx -or $ctx.IgnoreSelectAllEvent) { return }
+    if ($sender.Checked) {
+      $ctx.CheckedSet = $null
+    } else {
+      $ctx.CheckedSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    }
+    $control = $ctx.ListBox
+    if ($control) {
+      $localCtx = $ctx
+      $null = $control.BeginInvoke([System.Windows.Forms.MethodInvoker]{
+        Refresh-NearbyFilterList $localCtx
+        Update-NearbyFilterSelection $localCtx
+      })
+    } else {
+      Update-NearbyFilterSelection $ctx
+    }
+  })
+
+  $list.Add_ItemCheck({
+    param($sender,$args)
+    $ctx = $sender.Tag
+    if (-not $ctx) { return }
+    $item = $sender.Items[$args.Index]
+    $key = $item.Key
+    if (-not $ctx.CheckedSet) {
+      $ctx.CheckedSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+      foreach ($entry in $ctx.Items) { [void]$ctx.CheckedSet.Add($entry.Key) }
+    }
+    if ($args.NewValue -eq [System.Windows.Forms.CheckState]::Checked) {
+      [void]$ctx.CheckedSet.Add($key)
+    } else {
+      $ctx.CheckedSet.Remove($key) | Out-Null
+    }
+    if ($ctx.CheckedSet.Count -ge $ctx.TotalCount) {
+      $ctx.CheckedSet = $null
+    }
+    $localCtx = $ctx
+    $null = $sender.BeginInvoke([System.Windows.Forms.MethodInvoker]{
+      Refresh-NearbyFilterList $localCtx
+      Update-NearbyFilterSelection $localCtx
+    })
+  })
+
+  $menu.Add_Closed({
+    Close-NearbyActiveFilterMenu
+  })
+
+  Refresh-NearbyFilterList $context
+
+  $rect = $dgvNearby.GetCellDisplayRectangle($column.Index, -1, $true)
+  $x = $rect.Right - $script:NearbyFilterGlyphWidth
+  if ($x -lt $rect.Left) { $x = $rect.Left }
+  $anchor = New-Object System.Drawing.Point($x, $rect.Bottom)
+  $screenPoint = $dgvNearby.PointToScreen($anchor)
+  $menu.Show($screenPoint)
+  $script:NearbyActiveFilterMenu = $menu
+  try { $searchBox.Focus() } catch {}
+  return $menu
+}
+
+function Get-NearbyHeaderGlyphRect([System.Drawing.Rectangle]$cellBounds) {
+  $width = $script:NearbyFilterGlyphWidth
+  $margin = $script:NearbyFilterGlyphMargin
+  $x = $cellBounds.Right - $width - $margin
+  if ($x -lt $cellBounds.Left) { $x = $cellBounds.Left }
+  $height = [Math]::Min(12, [Math]::Max(8, $cellBounds.Height - 6))
+  $y = $cellBounds.Top + [Math]::Max(2, [Math]::Floor(($cellBounds.Height - $height) / 2))
+  return New-Object System.Drawing.Rectangle($x, $y, $width, $height)
+}
+
+function Draw-NearbyFilterGlyph($graphics, [System.Drawing.Rectangle]$rect, [bool]$isActive) {
+  if (-not $graphics) { return }
+  $color = if ($isActive) { [System.Drawing.Color]::SteelBlue } else { [System.Drawing.Color]::Gray }
+  $penColor = if ($isActive) { [System.Drawing.Color]::SteelBlue } else { [System.Drawing.Color]::DarkGray }
+  $points = @(
+    New-Object System.Drawing.Point($rect.Left, $rect.Top),
+    New-Object System.Drawing.Point($rect.Right, $rect.Top),
+    New-Object System.Drawing.Point([Math]::Floor(($rect.Left + $rect.Right) / 2), $rect.Top + [Math]::Floor($rect.Height / 2))
+  )
+  $bottomWidth = [Math]::Max(4, [Math]::Floor($rect.Width / 2))
+  $bottomLeft = [Math]::Floor(($rect.Left + $rect.Right - $bottomWidth) / 2)
+  $points += New-Object System.Drawing.Point($bottomLeft + $bottomWidth, $rect.Bottom)
+  $points += New-Object System.Drawing.Point($bottomLeft, $rect.Bottom)
+  $brush = New-Object System.Drawing.SolidBrush($color)
+  $pen = New-Object System.Drawing.Pen($penColor)
+  try {
+    $graphics.FillPolygon($brush, $points)
+    $graphics.DrawPolygon($pen, $points)
+  } finally {
+    $brush.Dispose()
+    $pen.Dispose()
+  }
 }
 function ScopeKey([string]$city,[string]$loc,[string]$b,[string]$f){
   $nl = if ($loc) { (Normalize-Field $loc) } else { "" }
@@ -2540,6 +3170,8 @@ try { $dgvNearby.GetType().GetProperty('DoubleBuffered', [System.Reflection.Bind
 function New-NearCol([string]$name,[string]$header,[int]$width,[bool]$ro=$true){
   $col = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
   $col.Name=$name; $col.HeaderText=$header; $col.Width=[math]::Max($width,60); $col.MinimumWidth=60; $col.ReadOnly=$ro
+  try { $col.HeaderCell.Style.Padding = [System.Windows.Forms.Padding]::new(0,0,($script:NearbyFilterGlyphWidth + $script:NearbyFilterGlyphMargin),0) } catch {}
+  try { $col.HeaderCell.Tag = [pscustomobject]@{ BaseHeader = $header } } catch {}
   return $col
 }
 # Visible columns
@@ -2560,53 +3192,103 @@ $colStatus.Width = 220
 $colStatus.MinimumWidth = 160
 $colStatus.DataSource = $script:NEAR_STATUSES
 $colStatus.ReadOnly = $false
+try { $colStatus.HeaderCell.Style.Padding = [System.Windows.Forms.Padding]::new(0,0,($script:NearbyFilterGlyphWidth + $script:NearbyFilterGlyphMargin),0) } catch {}
+try { $colStatus.HeaderCell.Tag = [pscustomobject]@{ BaseHeader = 'Status' } } catch {}
 $dgvNearby.Columns.Add($colStatus) | Out-Null
 # Hidden helper columns
 # --- Enable header-click sorting on the unbound grid ---
 try {
-  # Programmatic sort allows us to control compare logic
   foreach ($col in $dgvNearby.Columns) {
     if ($col -and -not $col.Name.StartsWith('__')) { $col.SortMode = [System.Windows.Forms.DataGridViewColumnSortMode]::Programmatic }
   }
-  # Custom comparer so we can sort dates numerically via LRRAW while showing LR
   $dgvNearby.add_SortCompare({
     param($sender, $e)
     try {
       $colName = $e.Column.Name
+      $type = Get-NearbyColumnType $colName
       $v1 = $e.CellValue1
       $v2 = $e.CellValue2
-      # Prefer raw date for Last Rounded
-      if ($colName -eq 'LR') {
+      if ($colName -eq 'LastRounded') {
         $r1 = $sender.Rows[$e.RowIndex1].Cells['LRRAW'].Value
         $r2 = $sender.Rows[$e.RowIndex2].Cells['LRRAW'].Value
         if ($r1 -and $r2) {
-          $t1 = [datetime]::Parse($r1); $t2 = [datetime]::Parse($r2)
+          $t1 = [datetime]::Parse($r1)
+          $t2 = [datetime]::Parse($r2)
           $e.SortResult = [System.DateTime]::Compare($t1, $t2)
           $e.Handled = $true
           return
         }
       }
-      # Default string compare (case-insensitive)
-      $s1 = if ($v1) { [string]$v1 } else { "" }
-      $s2 = if ($v2) { [string]$v2 } else { "" }
-      $e.SortResult = [string]::Compare($s1, $s2, $true)  # ignore case
+      switch ($type) {
+        'Number' {
+          $n1 = 0; $n2 = 0
+          $ok1 = TryParse-NearbyNumber $v1 ([ref]$n1)
+          $ok2 = TryParse-NearbyNumber $v2 ([ref]$n2)
+          if (-not $ok1 -and -not $ok2) { $e.SortResult = 0 }
+          elseif (-not $ok1) { $e.SortResult = -1 }
+          elseif (-not $ok2) { $e.SortResult = 1 }
+          else { $e.SortResult = $n1.CompareTo($n2) }
+        }
+        'DateTime' {
+          $d1 = [datetime]::MinValue; $d2 = [datetime]::MinValue
+          $ok1 = TryParse-NearbyDate $v1 ([ref]$d1)
+          $ok2 = TryParse-NearbyDate $v2 ([ref]$d2)
+          if (-not $ok1 -and -not $ok2) { $e.SortResult = 0 }
+          elseif (-not $ok1) { $e.SortResult = -1 }
+          elseif (-not $ok2) { $e.SortResult = 1 }
+          else { $e.SortResult = [System.DateTime]::Compare($d1, $d2) }
+        }
+        'Boolean' {
+          $b1 = $false; $b2 = $false
+          $ok1 = Test-NearbyBooleanValue $v1 ([ref]$b1)
+          $ok2 = Test-NearbyBooleanValue $v2 ([ref]$b2)
+          if (-not $ok1 -and -not $ok2) { $e.SortResult = 0 }
+          elseif (-not $ok1) { $e.SortResult = -1 }
+          elseif (-not $ok2) { $e.SortResult = 1 }
+          else { $e.SortResult = $b1.CompareTo($b2) }
+        }
+        default {
+          $s1 = if ($v1) { [string]$v1 } else { "" }
+          $s2 = if ($v2) { [string]$v2 } else { "" }
+          $e.SortResult = [string]::Compare($s1, $s2, $true)
+        }
+      }
       $e.Handled = $true
     } catch {
-      $e.SortResult = 0; $e.Handled = $true
+      $e.SortResult = 0
+      $e.Handled = $true
     }
   })
-  if (-not $script:NearbySortDir) { $script:NearbySortDir = @{} }
   $dgvNearby.add_ColumnHeaderMouseClick({
     param($sender, $e)
     $col = $sender.Columns[$e.ColumnIndex]
-    if (-not $col) { return }
-    $name = $col.Name
-    $dir = if ($script:NearbySortDir[$name] -eq 'Asc') { 'Desc' } else { 'Asc' }
-    $script:NearbySortDir[$name] = $dir
-    $lsd = if ($dir -eq 'Asc') { [System.ComponentModel.ListSortDirection]::Ascending } else { [System.ComponentModel.ListSortDirection]::Descending }
-    $sender.Sort($col, $lsd)
-    $col.HeaderCell.SortGlyphDirection = if ($dir -eq 'Asc') { [System.Windows.Forms.SortOrder]::Ascending } else { [System.Windows.Forms.SortOrder]::Descending }
+    if (-not $col -or $col.Name -like '__*') { return }
+    $rect = $sender.GetCellDisplayRectangle($e.ColumnIndex, -1, $true)
+    $pt = $sender.PointToClient([System.Windows.Forms.Control]::MousePosition)
+    $glyph = Get-NearbyHeaderGlyphRect $rect
+    if ($pt.X -ge $glyph.Left -and $pt.X -le $glyph.Right -and $pt.Y -ge $glyph.Top -and $pt.Y -le $glyph.Bottom) {
+      Show-NearbyFilterMenu $col.Name | Out-Null
+      return
+    }
+    $current = $null
+    if ($script:NearbySortState -and $script:NearbySortState.Column -eq $col.Name) { $current = $script:NearbySortState.Direction }
+    $next = if ($current -and $current.ToString().ToLowerInvariant() -eq 'asc') { 'Desc' } else { 'Asc' }
+    Apply-NearbyColumnSort $col.Name $next
   })
+  $dgvNearby.add_CellPainting({
+    param($sender,$e)
+    if ($e.RowIndex -ne -1 -or $e.ColumnIndex -lt 0) { return }
+    $col = $sender.Columns[$e.ColumnIndex]
+    if (-not $col -or $col.Name -like '__*') { return }
+    $e.PaintBackground($e.CellBounds, $true)
+    $e.PaintContent($e.CellBounds)
+    $glyphRect = Get-NearbyHeaderGlyphRect $e.CellBounds
+    $isActive = Is-NearbyColumnFiltered $col.Name
+    Draw-NearbyFilterGlyph $e.Graphics $glyphRect $isActive
+    $e.Handled = $true
+  })
+  $dgvNearby.add_Scroll({ Close-NearbyActiveFilterMenu })
+  $dgvNearby.add_ColumnWidthChanged({ Close-NearbyActiveFilterMenu; Update-NearbyFilterIndicators })
 } catch {}
 $colHiddenAT = New-NearCol 'AT_KEY' '__ATKEY' 10 $true; $colHiddenAT.Visible=$false; $dgvNearby.Columns.Add($colHiddenAT) | Out-Null
 $colHiddenToday = New-NearCol 'TODAY' '__TODAY' 10 $true; $colHiddenToday.Visible=$false; $dgvNearby.Columns.Add($colHiddenToday) | Out-Null
@@ -2702,6 +3384,7 @@ function Get-RoundingStatusColor([Nullable[DateTime]]$dt){
 function Rebuild-Nearby {
 try { $dgvNearby.SuspendLayout() } catch {}
 try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
+  Close-NearbyActiveFilterMenu
   try { Write-Host ("Rebuild-Nearby: Active scopes=" + ($(if($script:ActiveNearbyScopes){$script:ActiveNearbyScopes.Count}else{0}))) } catch {}
   Load-RoundingEvents
   $todaySet = Get-RoundedToday-Set
@@ -2756,46 +3439,20 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
       $r.DefaultCellStyle.ForeColor = [System.Drawing.Color]::Gray
     }
   }
+  Detect-NearbyColumnTypes
+  Sync-NearbyFilterState
   # Apply sort and filters
   Apply-NearbySort
   Apply-NearbyFilters
 try { $dgvNearby.ResumeLayout() } catch {}
 try { $form.Cursor = [System.Windows.Forms.Cursors]::Default } catch {}}
 function Apply-NearbySort {
-  $items = @()
-  foreach ($row in $dgvNearby.Rows) {
-    if ($row.IsNewRow) { continue }
-    $items += [pscustomobject]@{
-      Row=$row
-      Host=[string]$row.Cells['Host'].Value
-      Room=[string]$row.Cells['Room'].Value
-      LR = $(try { if ($row.Cells['LRRAW'].Value) { [datetime]::Parse($row.Cells['LRRAW'].Value) } else { $null } } catch { $null })
-    }
-  }
-  $sorted = $items
-  switch ($cmbSort.SelectedItem) {
-    'Host Name (A→Z)' { $sorted = $items | Sort-Object Host }
-    'Host Name (Z→A)' { $sorted = $items | Sort-Object Host -Descending }
-    'Room (A→Z)'      { $sorted = $items | Sort-Object Room }
-    'Room (Z→A)'      { $sorted = $items | Sort-Object Room -Descending }
-    'Last Rounded (oldest first)' {
-      $sorted = $items | Sort-Object @{Expression={ if ($_.LR) { $_.LR } else { Get-Date "1900-01-01" } }}
-    }
-    'Last Rounded (newest first)' {
-      $sorted = $items | Sort-Object @{Expression={ if ($_.LR) { $_.LR } else { Get-Date "1900-01-01" } }} -Descending
-    }
-    default { $sorted = $items | Sort-Object @{Expression={ if ($_.LR) { $_.LR } else { Get-Date "1900-01-01" } }} }
-  }
-  # Reorder rows in the grid
-  $idx = 0
-  foreach ($it in $sorted) {
-    if ($it.Row -and $it.Row.PSObject.Properties['DisplayIndex']) {
-      try {
-        $it.Row.DisplayIndex = $idx
-      } catch {}
-      $idx++
-    }
-  }
+  if (-not $dgvNearby) { return }
+  if (-not $script:NearbySortState) { return }
+  $col = $script:NearbySortState.Column
+  if ([string]::IsNullOrWhiteSpace($col)) { return }
+  $dir = if ($script:NearbySortState.Direction) { $script:NearbySortState.Direction } else { 'Asc' }
+  Apply-NearbyColumnSort $col $dir $true
 }
 # Double-click: open on Main and switch
 $dgvNearby.Add_CellDoubleClick({
