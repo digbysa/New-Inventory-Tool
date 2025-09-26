@@ -3354,6 +3354,35 @@ function Refresh-NearbyFilterList($context) {
   }
 }
 
+function Set-NearbySelectAllState($context, [bool]$selectAllChecked) {
+  if (-not $context) { return }
+  if ($selectAllChecked) {
+    $context.CheckedSet = $null
+  } else {
+    $context.CheckedSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+  }
+  $list = $context.ListBox
+  if ($list) {
+    $desiredState = if ($selectAllChecked) {
+      [System.Windows.Forms.CheckState]::Checked
+    } else {
+      [System.Windows.Forms.CheckState]::Unchecked
+    }
+    $context.IsUpdating = $true
+    try {
+      for ($i = 0; $i -lt $list.Items.Count; $i++) {
+        try {
+          $list.SetItemCheckState($i, $desiredState)
+        } catch {}
+      }
+    } finally {
+      $context.IsUpdating = $false
+    }
+  }
+  Refresh-NearbyFilterList $context
+  Update-NearbyFilterSelection $context
+}
+
 function Update-NearbyFilterSelection($context) {
   if (-not $context) { return }
   $selection = $context.CheckedSet
@@ -3641,6 +3670,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
         $ctx = $sender.Tag
         if (-not $ctx) { return }
         if (Commit-NearbyConditionFromControls $ctx) {
+          Refresh-NearbyFilterList $ctx
           Update-NearbyFilterSelection $ctx
         }
       })
@@ -3756,6 +3786,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
         $ctx = $sender.Tag
         if (-not $ctx) { return }
         if (Commit-NearbyConditionFromControls $ctx) {
+          Refresh-NearbyFilterList $ctx
           Update-NearbyFilterSelection $ctx
         }
       })
@@ -3889,6 +3920,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
         $ctx = $sender.Tag
         if (-not $ctx) { return }
         if (Commit-NearbyConditionFromControls $ctx) {
+          Refresh-NearbyFilterList $ctx
           Update-NearbyFilterSelection $ctx
         }
       })
@@ -3965,21 +3997,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
     param($sender,$args)
     $ctx = $sender.Tag
     if (-not $ctx -or $ctx.IgnoreSelectAllEvent) { return }
-    if ($sender.Checked) {
-      $ctx.CheckedSet = $null
-    } else {
-      $ctx.CheckedSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
-    }
-    $control = $ctx.ListBox
-    if ($control) {
-      $localCtx = $ctx
-      $null = $control.BeginInvoke([System.Windows.Forms.MethodInvoker]{
-        Refresh-NearbyFilterList $localCtx
-        Update-NearbyFilterSelection $localCtx
-      })
-    } else {
-      Update-NearbyFilterSelection $ctx
-    }
+    Set-NearbySelectAllState $ctx $sender.Checked
   })
 
   $list.Add_ItemCheck({
