@@ -4037,12 +4037,15 @@ function Draw-NearbyFilterGlyph($graphics, [System.Drawing.Rectangle]$rect, [boo
   $penColor = if ($isActive) { [System.Drawing.Color]::RoyalBlue } else { [System.Drawing.Color]::DarkGray }
   $bottomWidth = [Math]::Max(4, [Math]::Floor($rect.Width / 2))
   $bottomLeft = [Math]::Floor(($rect.Left + $rect.Right - $bottomWidth) / 2)
+  $bottomRight = $bottomLeft + $bottomWidth
+  $midX = [Math]::Floor(($rect.Left + $rect.Right) / 2)
+  $midY = $rect.Top + [Math]::Floor($rect.Height / 2)
   $points = [System.Drawing.Point[]]@(
-    (New-Object System.Drawing.Point -ArgumentList @($rect.Left, $rect.Top))
-    (New-Object System.Drawing.Point -ArgumentList @($rect.Right, $rect.Top))
-    (New-Object System.Drawing.Point -ArgumentList @([Math]::Floor(($rect.Left + $rect.Right) / 2), $rect.Top + [Math]::Floor($rect.Height / 2)))
-    (New-Object System.Drawing.Point -ArgumentList @($bottomLeft + $bottomWidth, $rect.Bottom))
-    (New-Object System.Drawing.Point -ArgumentList @($bottomLeft, $rect.Bottom))
+    [System.Drawing.Point]::new($rect.Left, $rect.Top),
+    [System.Drawing.Point]::new($rect.Right, $rect.Top),
+    [System.Drawing.Point]::new($midX, $midY),
+    [System.Drawing.Point]::new($bottomRight, $rect.Bottom),
+    [System.Drawing.Point]::new($bottomLeft, $rect.Bottom)
   )
   $brush = New-Object System.Drawing.SolidBrush($color)
   $pen = New-Object System.Drawing.Pen($penColor)
