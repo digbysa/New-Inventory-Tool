@@ -1977,7 +1977,10 @@ function Do-Lookup(){
 function Clear-UI(){
   $script:CurrentDisplay = $null; $script:CurrentParent  = $null
   foreach($tb in @($txtType,$txtHost,$txtAT,$txtSN,$txtParent,$txtRITM,$txtRetire,$txtRound,$txtCity,$txtLocation,$txtBldg,$txtFloor,$txtRoom,$txtDept,$txtDepartment,$txtComments)){
-    $tb.Text = ''; $tb.BackColor = [System.Drawing.Color]::White
+    if($tb -is [System.Windows.Forms.Control]){
+      $tb.Text = ''
+      $tb.BackColor = [System.Drawing.Color]::White
+    }
   }
   foreach($combo in @($cmbDept,$cmbDepartment,$ddlDept,$ddlDepartment)){
     try {
