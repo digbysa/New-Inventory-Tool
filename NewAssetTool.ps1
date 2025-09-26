@@ -1050,8 +1050,16 @@ $lblComments.TabIndex = 10
 $txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Location='12,222'; $txtComments.Size='564,72'; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='None'; $txtComments.Anchor='Top,Left,Right'; $txtComments.TabIndex=11
 $txtComments.WordWrap = $true
 $grpMaint.Controls.AddRange(@($lblMaintType,$cmbMaintType,$lblChkStatus,$cmbChkStatus,$lblTime,$numTime,$chkCable,$chkCart,$chkLabels,$chkPeriph,$btnCheckComplete,$btnSave,$btnManualRound,$lblComments,$txtComments))
-$txtComments.Add_TextChanged({ Update-RoundingCommentsLayout })
-$txtComments.Add_SizeChanged({ Update-RoundingCommentsLayout })
+$txtComments.Add_TextChanged({
+  if(Get-Command Update-RoundingCommentsLayout -ErrorAction SilentlyContinue){
+    Update-RoundingCommentsLayout
+  }
+})
+$txtComments.Add_SizeChanged({
+  if(Get-Command Update-RoundingCommentsLayout -ErrorAction SilentlyContinue){
+    Update-RoundingCommentsLayout
+  }
+})
 $grpMaint.Controls.Add($lblMaintType); $grpMaint.Controls.Add($cmbMaintType)
 # Compose columns
 $tlpRight.Controls.Add($grpAssoc,0,0)
