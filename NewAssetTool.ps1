@@ -1976,8 +1976,22 @@ function Do-Lookup(){
 }
 function Clear-UI(){
   $script:CurrentDisplay = $null; $script:CurrentParent  = $null
-  foreach($tb in @($txtType,$txtHost,$txtAT,$txtSN,$txtParent,$txtRITM,$txtRetire,$txtRound,$txtCity,$txtLocation,$txtBldg,$txtFloor,$txtRoom,$txtComments)){
+  foreach($tb in @($txtType,$txtHost,$txtAT,$txtSN,$txtParent,$txtRITM,$txtRetire,$txtRound,$txtCity,$txtLocation,$txtBldg,$txtFloor,$txtRoom,$txtDept,$txtDepartment,$txtComments)){
     $tb.Text = ''; $tb.BackColor = [System.Drawing.Color]::White
+  }
+  foreach($combo in @($cmbDept,$cmbDepartment,$ddlDept,$ddlDepartment)){
+    try {
+      if($combo){
+        $combo.SelectedIndex = -1
+        $combo.Text = ''
+      }
+    } catch {}
+  }
+  if($cmbMaintType){
+    try {
+      $cmbMaintType.SelectedIndex = -1
+      $cmbMaintType.Text = ''
+    } catch {}
   }
   try { $dgv.Rows.Clear() } catch {}
   try { $cards.Controls.Clear() } catch {}
@@ -1985,7 +1999,6 @@ function Clear-UI(){
   foreach($cb in @($chkCable,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked=$false }
   $btnFixName.Enabled = $false
   if($btnAddPeripheral){ $btnAddPeripheral.Enabled = $false }
-  try { Set-ComboSelectionCaseInsensitive $cmbMaintType 'General Rounding' } catch {}
   $statusLabel.Text = "Ready - scan or enter a device."
   Size-AssocForRows(1) | Out-Null
 }
