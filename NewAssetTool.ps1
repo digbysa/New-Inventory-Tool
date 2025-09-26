@@ -1258,10 +1258,6 @@ function Update-MaintenanceTypeSelection([object]$displayRec,[object]$parentRec)
     $displayIsComputer = $false
     try {
       if($displayRec){
-        if(
-          ($displayRec.PSObject.Properties['Type'] -and $displayRec.Type -eq 'Computer') -or
-          ($displayRec.PSObject.Properties['Kind'] -and $displayRec.Kind -eq 'Computer')
-        ){
           $displayIsComputer = $true
         }
       }
