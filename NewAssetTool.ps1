@@ -2231,13 +2231,12 @@ if (-not $script:NEAR_STATUSES) {
     "Pending Repair"
   )
 }
-# Track active column filters for Nearby grid (value selections per column)
-if (-not $script:NearbyValueFilters) {
-  $script:NearbyValueFilters = @{}
+# Track active column filters for Nearby grid
+if (-not $script:NearbyFilters) {
+  $script:NearbyFilters = @{}
 }
-if (-not $script:NearbyHeaderText) {
-  $script:NearbyHeaderText = @{}
-}
+$script:NearbyFilterInputs = $null
+$script:SuppressNearbyFilterEvents = $false
 # In-memory cache of rounding events
 if (-not (Get-Variable -Scope Script -Name RoundingEvents -ErrorAction SilentlyContinue)) {
   $script:RoundingEvents = @()
@@ -2288,101 +2287,107 @@ function Load-RoundingEvents {
   } catch { $script:RoundingEvents = @() }
 }
 Load-RoundingEvents
-function Get-NearbyCellText($cell) {
-  if (-not $cell) { return '' }
-  try {
-    if ($null -ne $cell.FormattedValue -and $cell.FormattedValue -ne [System.DBNull]::Value) {
-      return [string]$cell.FormattedValue
-    }
-  } catch {}
-  if ($null -eq $cell.Value -or $cell.Value -eq [System.DBNull]::Value) { return '' }
-  return [string]$cell.Value
+function Get-ActiveNearbyFilters {
+  if (-not $script:NearbyFilters) { return @() }
+  $active = @()
+  foreach ($key in $script:NearbyFilters.Keys) {
+    $raw = $script:NearbyFilters[$key]
+    if ($null -eq $raw) { continue }
+    $text = [string]$raw
+    if ([string]::IsNullOrWhiteSpace($text)) { continue }
+    $trimmed = $text.Trim()
+    if ([string]::IsNullOrWhiteSpace($trimmed)) { continue }
+    $active += [pscustomobject]@{ Key = $key; Value = $trimmed }
+  }
+  return $active
 }
-function Normalize-NearbyFilterValue($value) {
-  if ($null -eq $value -or $value -eq [System.DBNull]::Value) { return '' }
-  return [string]$value
-}
-function Update-NearbyFilterGlyph([string]$columnName) {
-  if (-not $dgvNearby) { return }
-  $col = $dgvNearby.Columns[$columnName]
-  if (-not $col) { return }
-  if (-not $script:NearbyHeaderText.ContainsKey($columnName)) {
-    $script:NearbyHeaderText[$columnName] = [string]$col.HeaderText
-  }
-  $base = [string]$script:NearbyHeaderText[$columnName]
-  $trimmed = $base -replace '\s*[▾▼]$',''
-  $hasFilter = ($script:NearbyValueFilters.ContainsKey($columnName) -and $script:NearbyValueFilters[$columnName])
-  $glyph = if ($hasFilter) { '▼' } else { '▾' }
-  try { $col.HeaderCell.Style.Alignment = [System.Windows.Forms.DataGridViewContentAlignment]::MiddleLeft } catch {}
-  $col.HeaderText = ($trimmed.TrimEnd() + ' ' + $glyph).Trim()
-}
-function Refresh-NearbyFilterGlyphs {
-  if (-not $dgvNearby) { return }
-  foreach ($col in $dgvNearby.Columns) {
-    if (-not $col) { continue }
-    $name = [string]$col.Name
-    if ($name -like '__*') { continue }
-    Update-NearbyFilterGlyph $name
-  }
-}
-function Set-NearbyColumnFilter([string]$columnName, [System.Collections.IEnumerable]$values) {
-  if (-not $script:NearbyValueFilters) { $script:NearbyValueFilters = @{} }
-  if (-not $values) {
-    if ($script:NearbyValueFilters.ContainsKey($columnName)) { $script:NearbyValueFilters.Remove($columnName) }
-    Update-NearbyFilterGlyph $columnName
-    return
-  }
-  $list = @()
-  foreach ($v in $values) {
-    $list += (Normalize-NearbyFilterValue $v)
-  }
-  if ($list.Count -eq 0) {
-    if ($script:NearbyValueFilters.ContainsKey($columnName)) { $script:NearbyValueFilters.Remove($columnName) }
-    Update-NearbyFilterGlyph $columnName
-    return
-  }
-  $hash = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
-  foreach ($item in $list) {
-    if (-not [string]::IsNullOrWhiteSpace($item)) {
-      [void]$hash.Add($item)
+function Test-NearbyNumericFilter([string]$filter, $value) {
+  $text = if ($filter) { $filter.Trim() } else { '' }
+  if ([string]::IsNullOrWhiteSpace($text)) { return $true }
+  $hasNum = $false
+  $numVal = 0
+  if ($null -ne $value) {
+    if ($value -is [int]) {
+      $numVal = [int]$value
+      $hasNum = $true
+    } elseif ($value -is [long]) {
+      $numVal = [int][long]$value
+      $hasNum = $true
     } else {
-      [void]$hash.Add('')
+      $str = [string]$value
+      $hasNum = [int]::TryParse($str, [ref]$numVal)
     }
   }
-  if ($hash.Count -eq 0) {
-    if ($script:NearbyValueFilters.ContainsKey($columnName)) { $script:NearbyValueFilters.Remove($columnName) }
-  } else {
-    $script:NearbyValueFilters[$columnName] = $hash
+  if ($text -match '^\((blank|empty|none)\)$') {
+    return (-not $hasNum)
   }
-  Update-NearbyFilterGlyph $columnName
+  if ($text -match '^\s*(-?\d+)\s*-\s*(-?\d+)\s*$') {
+    if (-not $hasNum) { return $false }
+    $min = [int]$matches[1]
+    $max = [int]$matches[2]
+    if ($min -gt $max) { $tmp = $min; $min = $max; $max = $tmp }
+    return ($numVal -ge $min -and $numVal -le $max)
+  }
+  if ($text -match '^\s*(<=|>=|=|<|>)?\s*(-?\d+)\s*$') {
+    if (-not $hasNum) { return $false }
+    $op = if ($matches[1]) { $matches[1] } else { '=' }
+    $target = [int]$matches[2]
+    switch ($op) {
+      '<'  { return ($numVal -lt $target) }
+      '<=' { return ($numVal -le $target) }
+      '>'  { return ($numVal -gt $target) }
+      '>=' { return ($numVal -ge $target) }
+      '='  { return ($numVal -eq $target) }
+      default { return ($numVal -eq $target) }
+    }
+  }
+  $valueStr = if ($null -ne $value) { [string]$value } else { '' }
+  return ($valueStr.IndexOf($text, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
 }
-function Get-NearbyFilterValues([string]$columnName) {
-  if (-not $script:NearbyValueFilters) { return $null }
-  if ($script:NearbyValueFilters.ContainsKey($columnName)) { return $script:NearbyValueFilters[$columnName] }
-  return $null
+function Test-NearbyFilters([hashtable]$values, [object[]]$filters = $null) {
+  if (-not $filters) { $filters = @(Get-ActiveNearbyFilters) }
+  if (-not $filters -or $filters.Count -eq 0) { return $true }
+  foreach ($filter in $filters) {
+    $key = [string]$filter.Key
+    $needle = [string]$filter.Value
+    $current = $null
+    if ($values.ContainsKey($key)) { $current = $values[$key] }
+    if ($key -eq 'DaysAgo') {
+      if (-not (Test-NearbyNumericFilter $needle $current)) { return $false }
+      continue
+    }
+    $trimNeedle = if ($needle) { $needle.Trim() } else { '' }
+    if ($trimNeedle -match '^\((blank|empty|none)\)$') {
+      if (-not [string]::IsNullOrWhiteSpace([string]$current)) { return $false }
+      continue
+    }
+    $hay = if ($null -ne $current) { [string]$current } else { '' }
+    if ($hay.IndexOf($trimNeedle, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) { return $false }
+  }
+  return $true
 }
 function Apply-NearbyFilters {
   if (-not $dgvNearby) { Update-ScopeLabel; return }
-  $hasFilters = ($script:NearbyValueFilters -and $script:NearbyValueFilters.Count -gt 0)
+  $filters = @(Get-ActiveNearbyFilters)
   foreach ($row in $dgvNearby.Rows) {
     if ($row.IsNewRow) { continue }
-    if (-not $hasFilters) {
+    if (-not $filters -or $filters.Count -eq 0) {
       $row.Visible = $true
       continue
     }
-    $include = $true
-    foreach ($entry in $script:NearbyValueFilters.GetEnumerator()) {
-      $name = [string]$entry.Key
-      $set = $entry.Value
-      if (-not $set -or $set.Count -eq 0) { continue }
-      $cell = $row.Cells[$name]
-      $value = Normalize-NearbyFilterValue (Get-NearbyCellText $cell)
-      if (-not $set.Contains($value)) {
-        $include = $false
-        break
-      }
+    $vals = @{
+      Host        = $row.Cells['Host'].Value
+      Asset       = $row.Cells['Asset'].Value
+      Location    = $row.Cells['Location'].Value
+      Building    = $row.Cells['Building'].Value
+      Floor       = $row.Cells['Floor'].Value
+      Room        = $row.Cells['Room'].Value
+      Department  = $row.Cells['Department'].Value
+      LastRounded = $row.Cells['LastRounded'].Value
+      DaysAgo     = $row.Cells['DaysAgo'].Value
+      Status      = $row.Cells['Status'].Value
     }
-    $row.Visible = $include
+    $row.Visible = Test-NearbyFilters $vals $filters
   }
   Update-ScopeLabel
 }
@@ -2390,219 +2395,63 @@ function Trigger-NearbyFilterRefresh {
   Apply-NearbyFilters
 }
 function Clear-NearbyFilters {
-  if (-not $script:NearbyValueFilters) { return }
-  $script:NearbyValueFilters.Clear()
-  Refresh-NearbyFilterGlyphs
+  $script:SuppressNearbyFilterEvents = $true
+  try {
+    if ($script:NearbyFilters) { $script:NearbyFilters.Clear() }
+    if ($script:NearbyFilterInputs) {
+      foreach ($tb in $script:NearbyFilterInputs) {
+        try {
+          if ($tb) { $tb.Text = '' }
+        } catch {}
+      }
+    }
+  } finally {
+    $script:SuppressNearbyFilterEvents = $false
+  }
   Trigger-NearbyFilterRefresh
 }
-function Show-NearbyFilterDialog([string]$columnName) {
-  if (-not $dgvNearby) { return $false }
-  $col = $dgvNearby.Columns[$columnName]
-  if (-not $col) { return $false }
-  $existing = Get-NearbyFilterValues $columnName
-  $seen = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
-  $values = New-Object System.Collections.ArrayList
-  $hasBlank = $false
-  foreach ($row in $dgvNearby.Rows) {
-    if ($row.IsNewRow) { continue }
-    $text = Get-NearbyCellText $row.Cells[$columnName]
-    $norm = Normalize-NearbyFilterValue $text
-    if ([string]::IsNullOrWhiteSpace($norm)) {
-      $hasBlank = $true
-      continue
-    }
-    if ($seen.Add($norm)) { [void]$values.Add($norm) }
-  }
-  if ($existing -and $existing.Count -gt 0) {
-    foreach ($entry in $existing) {
-      $normExisting = Normalize-NearbyFilterValue $entry
-      if ([string]::IsNullOrWhiteSpace($normExisting)) {
-        $hasBlank = $true
-        continue
-      }
-      if ($seen.Add($normExisting)) { [void]$values.Add($normExisting) }
-    }
-  }
-  if ($values.Count -gt 1) {
-    try { $values.Sort([System.Collections.CaseInsensitiveComparer]::DefaultInvariant) } catch {}
-  }
-  $items = @()
-  $items += @{ Display = '(All)'; Value = '__ALL__' }
-  if ($hasBlank) { $items += @{ Display = '(Blanks)'; Value = '' } }
-  foreach ($val in $values) {
-    $items += @{ Display = [string]$val; Value = [string]$val }
-  }
-  $form = New-Object System.Windows.Forms.Form
-  $form.FormBorderStyle = 'FixedToolWindow'
-  $form.StartPosition = 'Manual'
-  $form.ShowInTaskbar = $false
-  $form.MinimizeBox = $false
-  $form.MaximizeBox = $false
-  $form.Size = New-Object System.Drawing.Size(260, 320)
-  $titleBase = $col.HeaderText -replace '\s*[▾▼]$',''
-  $form.Text = "Filter — $titleBase"
-  $rect = $dgvNearby.GetCellDisplayRectangle($col.Index, -1, $true)
-  $screenPt = $dgvNearby.PointToScreen([System.Drawing.Point]::new($rect.X, $rect.Bottom))
-  $screen = [System.Windows.Forms.Screen]::FromControl($dgvNearby)
-  $x = [math]::Min([math]::Max($screenPt.X, $screen.WorkingArea.Left), $screen.WorkingArea.Right - $form.Width)
-  $y = [math]::Min([math]::Max($screenPt.Y, $screen.WorkingArea.Top), $screen.WorkingArea.Bottom - $form.Height)
-  $form.Location = New-Object System.Drawing.Point($x, $y)
-  $chkMulti = New-Object System.Windows.Forms.CheckBox
-  $chkMulti.Text = 'Select Multiple'
-  $chkMulti.AutoSize = $true
-  $chkMulti.Location = New-Object System.Drawing.Point(12, 12)
-  $list = New-Object System.Windows.Forms.CheckedListBox
-  $list.CheckOnClick = $true
-  $list.Location = New-Object System.Drawing.Point(12, 36)
-  $list.Size = New-Object System.Drawing.Size(220, 200)
-  $list.Anchor = 'Top,Bottom,Left,Right'
-  $btnOk = New-Object System.Windows.Forms.Button
-  $btnOk.Text = 'OK'
-  $btnOk.Size = New-Object System.Drawing.Size(70, 28)
-  $btnOk.Location = New-Object System.Drawing.Point(24, 246)
-  $btnOk.DialogResult = [System.Windows.Forms.DialogResult]::OK
-  $btnClear = New-Object System.Windows.Forms.Button
-  $btnClear.Text = 'Clear'
-  $btnClear.Size = New-Object System.Drawing.Size(70, 28)
-  $btnClear.Location = New-Object System.Drawing.Point(100, 246)
-  $btnCancel = New-Object System.Windows.Forms.Button
-  $btnCancel.Text = 'Cancel'
-  $btnCancel.Size = New-Object System.Drawing.Size(70, 28)
-  $btnCancel.Location = New-Object System.Drawing.Point(176, 246)
-  $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
-  $form.AcceptButton = $btnOk
-  $form.CancelButton = $btnCancel
-  $indexToValue = @{}
-  $allIndex = -1
-  $handling = $false
-  for ($i = 0; $i -lt $items.Count; $i++) {
-    $disp = [string]$items[$i].Display
-    $val = [string]$items[$i].Value
-    $idx = $list.Items.Add($disp)
-    $indexToValue[$idx] = $val
-    if ($val -eq '__ALL__') { $allIndex = $idx }
-  }
-  $handling = $true
-  $initialSelected = @()
-  if ($existing -and $existing.Count -gt 0) {
-    foreach ($entry in $existing) { $initialSelected += [string]$entry }
-    foreach ($pair in $indexToValue.GetEnumerator()) {
-      if ($existing.Contains($pair.Value)) { $list.SetItemChecked($pair.Key, $true) }
-    }
-    if ($allIndex -ge 0) { $list.SetItemChecked($allIndex, $false) }
-    $chkMulti.Checked = ($initialSelected.Count -gt 1)
-    if (-not $chkMulti.Checked -and $initialSelected.Count -gt 0) {
-      $first = $initialSelected[0]
-      foreach ($pair in $indexToValue.GetEnumerator()) {
-        if ($pair.Value -ne '__ALL__' -and $pair.Value -ne $first) { $list.SetItemChecked($pair.Key, $false) }
-      }
-    }
+function Add-NearFilterControl {
+  param(
+    [System.Windows.Forms.FlowLayoutPanel]$panel,
+    [string]$key,
+    [string]$labelText,
+    [int]$width = 120
+  )
+  if (-not $panel) { return }
+  $lbl = New-Object System.Windows.Forms.Label
+  $lbl.Text = $labelText
+  $lbl.AutoSize = $true
+  $lbl.Margin = [System.Windows.Forms.Padding]::new(4,8,4,4)
+  $panel.Controls.Add($lbl)
+  $tb = New-Object System.Windows.Forms.TextBox
+  $tb.Width = [math]::Max($width, 60)
+  $tb.Tag = $key
+  $tb.Margin = [System.Windows.Forms.Padding]::new(0,4,12,4)
+  if (-not $script:NearbyFilters) { $script:NearbyFilters = @{} }
+  if ($script:NearbyFilters.ContainsKey($key) -and $script:NearbyFilters[$key]) {
+    $tb.Text = [string]$script:NearbyFilters[$key]
   } else {
-    if ($allIndex -ge 0) { $list.SetItemChecked($allIndex, $true) }
-    $chkMulti.Checked = $false
+    $script:NearbyFilters[$key] = $tb.Text
   }
-  $handling = $false
-  $list.Add_ItemCheck({
-    param($sender, $e)
-    if ($handling) { return }
-    $handling = $true
-    $val = $indexToValue[[int]$e.Index]
-    if ($val -eq '__ALL__') {
-      if ($e.NewValue -eq [System.Windows.Forms.CheckState]::Checked) {
-        for ($j = 0; $j -lt $sender.Items.Count; $j++) {
-          if ($j -ne $e.Index) { $sender.SetItemChecked($j, $false) }
-        }
-      }
-    } else {
-      if ($e.NewValue -eq [System.Windows.Forms.CheckState]::Checked) {
-        if ($allIndex -ge 0) { $sender.SetItemChecked($allIndex, $false) }
-        if (-not $chkMulti.Checked) {
-          for ($j = 0; $j -lt $sender.Items.Count; $j++) {
-            if ($j -ne $e.Index -and $indexToValue[[int]$j] -ne '__ALL__') {
-              $sender.SetItemChecked($j, $false)
-            }
-          }
-        }
-      } elseif ($e.NewValue -eq [System.Windows.Forms.CheckState]::Unchecked) {
-        $any = $false
-        for ($j = 0; $j -lt $sender.Items.Count; $j++) {
-          if ($j -ne $e.Index -and $sender.GetItemChecked($j)) { $any = $true; break }
-        }
-        if (-not $any -and $allIndex -ge 0) {
-          $sender.SetItemChecked($allIndex, $true)
-        }
-      }
-    }
-    $handling = $false
-  })
-  $chkMulti.Add_CheckedChanged({
-    if ($handling) { return }
-    if (-not $chkMulti.Checked) {
-      $handling = $true
-      $selected = @()
-      for ($j = 0; $j -lt $list.Items.Count; $j++) {
-        if ($list.GetItemChecked($j) -and $indexToValue[[int]$j] -ne '__ALL__') { $selected += $j }
-      }
-      if ($selected.Count -gt 1) {
-        for ($k = 1; $k -lt $selected.Count; $k++) { $list.SetItemChecked($selected[$k], $false) }
-      }
-      if ($selected.Count -eq 0 -and $allIndex -ge 0) { $list.SetItemChecked($allIndex, $true) }
-      $handling = $false
-    }
-  })
-  $btnClear.Add_Click({
-    $form.Tag = '__CLEAR__'
-    $form.DialogResult = [System.Windows.Forms.DialogResult]::OK
-    $form.Close()
-  })
-  $form.Controls.AddRange(@($chkMulti, $list, $btnOk, $btnClear, $btnCancel))
-  $result = $form.ShowDialog()
-  try {
-    if ($result -ne [System.Windows.Forms.DialogResult]::OK) { return $false }
-    if ($form.Tag -eq '__CLEAR__') {
-      $had = ($existing -and $existing.Count -gt 0)
-      if ($had) {
-        Set-NearbyColumnFilter $columnName @()
-        Refresh-NearbyFilterGlyphs
-        Trigger-NearbyFilterRefresh
-      }
-      return $had
-    }
-    $selectedValues = New-Object System.Collections.Generic.List[string]
-    for ($j = 0; $j -lt $list.Items.Count; $j++) {
-      if (-not $list.GetItemChecked($j)) { continue }
-      $val = $indexToValue[[int]$j]
-      if ($val -eq '__ALL__') {
-        $selectedValues.Clear()
-        break
-      }
-      $selectedValues.Add($val)
-    }
-    if ($selectedValues.Count -eq 0) {
-      $changed = ($existing -and $existing.Count -gt 0)
-      if ($changed) {
-        Set-NearbyColumnFilter $columnName @()
-        Refresh-NearbyFilterGlyphs
-        Trigger-NearbyFilterRefresh
-      }
-      return $changed
-    }
-    $newSet = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
-    foreach ($v in $selectedValues) { [void]$newSet.Add($v) }
-    $isSame = $false
-    if ($existing -and $existing.Count -eq $newSet.Count) {
-      $isSame = $true
-      foreach ($v in $existing) {
-        if (-not $newSet.Contains([string]$v)) { $isSame = $false; break }
-      }
-    }
-    if ($isSame) { return $false }
-    Set-NearbyColumnFilter $columnName $selectedValues
-    Refresh-NearbyFilterGlyphs
+  $tb.Add_TextChanged({
+    param($sender,$eventArgs)
+    if ($script:SuppressNearbyFilterEvents) { return }
+    try {
+      $k = [string]$sender.Tag
+      if (-not $script:NearbyFilters) { $script:NearbyFilters = @{} }
+      $script:NearbyFilters[$k] = $sender.Text
+    } catch {}
     Trigger-NearbyFilterRefresh
-    return $true
-  } finally {
-    try { $form.Dispose() } catch {}
+  })
+  if (-not $script:NearbyFilterInputs -or -not ($script:NearbyFilterInputs -is [System.Collections.IList])) {
+    $script:NearbyFilterInputs = [System.Collections.Generic.List[System.Windows.Forms.TextBox]]::new()
+  }
+  [void]$script:NearbyFilterInputs.Add($tb)
+  $panel.Controls.Add($tb)
+  if ($key -eq 'DaysAgo' -and $tip) {
+    try { $tip.SetToolTip($tb, 'Use >, <, >=, <=, =, or ranges like 3-10. Enter (blank) to find empty values.') } catch {}
+  } elseif ($key -eq 'Status' -and $tip) {
+    try { $tip.SetToolTip($tb, 'Filters match text anywhere in the status value (case-insensitive).') } catch {}
   }
 }
 function ScopeKey([string]$city,[string]$loc,[string]$b,[string]$f){
@@ -2793,6 +2642,32 @@ $btnSetStatus.Add_Click({
     [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)","Multi-Status",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
   }
 })
+$nearFilterPanel = New-Object System.Windows.Forms.FlowLayoutPanel
+$nearFilterPanel.Dock = 'Top'
+$nearFilterPanel.Height = 76
+$nearFilterPanel.WrapContents = $true
+$nearFilterPanel.AutoScroll = $true
+$nearFilterPanel.FlowDirection = [System.Windows.Forms.FlowDirection]::LeftToRight
+$nearFilterPanel.Padding = [System.Windows.Forms.Padding]::new(8,4,8,4)
+$nearFilterPanel.Margin = [System.Windows.Forms.Padding]::new(0)
+if (-not $script:NearbyFilters) { $script:NearbyFilters = @{} }
+$script:NearbyFilterInputs = [System.Collections.Generic.List[System.Windows.Forms.TextBox]]::new()
+Add-NearFilterControl $nearFilterPanel 'Host' 'Host:' 140
+Add-NearFilterControl $nearFilterPanel 'Asset' 'Asset:' 110
+Add-NearFilterControl $nearFilterPanel 'Location' 'Location:' 140
+Add-NearFilterControl $nearFilterPanel 'Building' 'Building:' 110
+Add-NearFilterControl $nearFilterPanel 'Floor' 'Floor:' 80
+Add-NearFilterControl $nearFilterPanel 'Room' 'Room:' 90
+Add-NearFilterControl $nearFilterPanel 'Department' 'Department:' 160
+Add-NearFilterControl $nearFilterPanel 'LastRounded' 'Last Rounded:' 130
+Add-NearFilterControl $nearFilterPanel 'DaysAgo' 'Days Ago:' 100
+Add-NearFilterControl $nearFilterPanel 'Status' 'Status:' 140
+$btnClearNearFilters = New-Object System.Windows.Forms.Button
+$btnClearNearFilters.Text = 'Clear Filters'
+$btnClearNearFilters.AutoSize = $true
+$btnClearNearFilters.Margin = [System.Windows.Forms.Padding]::new(0,4,0,4)
+$btnClearNearFilters.Add_Click({ Clear-NearbyFilters })
+$nearFilterPanel.Controls.Add($btnClearNearFilters)
 $dgvNearby = New-Object System.Windows.Forms.DataGridView
 $dgvNearby.Dock='Fill'
 $dgvNearby.AllowUserToAddRows=$false
@@ -2889,7 +2764,6 @@ try {
 $colHiddenAT = New-NearCol 'AT_KEY' '__ATKEY' 10 $true; $colHiddenAT.Visible=$false; $dgvNearby.Columns.Add($colHiddenAT) | Out-Null
 $colHiddenToday = New-NearCol 'TODAY' '__TODAY' 10 $true; $colHiddenToday.Visible=$false; $dgvNearby.Columns.Add($colHiddenToday) | Out-Null
 $colHiddenLRRaw = New-NearCol 'LRRAW' '__LRRAW' 10 $true; $colHiddenLRRaw.Visible=$false; $dgvNearby.Columns.Add($colHiddenLRRaw) | Out-Null
-Refresh-NearbyFilterGlyphs
 $dgvNearby.add_CurrentCellDirtyStateChanged({
   if ($dgvNearby.CurrentCell -and $dgvNearby.CurrentCell.OwningColumn -and $dgvNearby.CurrentCell.OwningColumn.Name -eq 'Status') {
     try { $dgvNearby.CommitEdit([System.Windows.Forms.DataGridViewDataErrorContexts]::Commit) } catch {}
@@ -2937,6 +2811,7 @@ $nearPage = New-Object System.Windows.Forms.Panel
 $nearPage.Dock = 'Fill'
 $nearPage.Controls.Add($dgvNearby)
 $nearPage.Controls.Add($nearBottom)
+$nearPage.Controls.Add($nearFilterPanel)
 $nearPage.Controls.Add($nearToolbar)
 $tabPageNear.Controls.Add($nearPage)
 $tabTop.TabPages.AddRange(@($tabPageMain,$tabPageNear))
