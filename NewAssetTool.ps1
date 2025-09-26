@@ -3296,6 +3296,7 @@ function Refresh-NearbyFilterList($context) {
     try { $searchText = [string]$context.SearchBox.Text } catch { $searchText = '' }
   }
   $needle = if ($searchText) { $searchText.Trim() } else { '' }
+  $context.IsUpdating = $true
   $list.BeginUpdate()
   try {
     $list.Items.Clear()
@@ -3348,6 +3349,7 @@ function Refresh-NearbyFilterList($context) {
       $context.ClearItem.Enabled = $filterActive
     }
   } finally {
+    $context.IsUpdating = $false
     $list.EndUpdate()
   }
 }
@@ -3563,6 +3565,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
     VisibleItemCount = 0
     VisibleCheckedCount = 0
     IgnoreSelectAllEvent = $false
+    IsUpdating = $false
     Operator = $initialOperator
     Operand1 = $existingOperand1
     Operand2 = $existingOperand2
@@ -3982,7 +3985,9 @@ function Show-NearbyFilterMenu([string]$columnName) {
   $list.Add_ItemCheck({
     param($sender,$args)
     $ctx = $sender.Tag
-    if (-not $ctx) { return }
+    if (-not $ctx -or $ctx.IsUpdating) { return }
+    if ($null -eq $args.Index) { return }
+    if ($args.Index -lt 0 -or $args.Index -ge $sender.Items.Count) { return }
     $item = $sender.Items[$args.Index]
     $key = $item.Key
     if (-not $ctx.CheckedSet) {
