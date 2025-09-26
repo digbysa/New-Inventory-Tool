@@ -1258,8 +1258,7 @@ function Update-MaintenanceTypeSelection([object]$displayRec,[object]$parentRec)
     $displayIsComputer = $false
     try {
       if($displayRec){
-          $displayIsComputer = $true
-        }
+        $displayIsComputer = $true
       }
     } catch {}
     if(-not $displayIsComputer){
