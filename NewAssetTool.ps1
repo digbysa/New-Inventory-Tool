@@ -1193,6 +1193,81 @@ function Update-CartCheckbox-State([object]$parentRec){
   $chkCart.Checked = $false; $chkCart.Enabled = $false
   if($parentRec -and $parentRec.name -match '^(?i)AO'){ $chkCart.Enabled = $true }
 }
+function Resolve-ComputerRecord([object]$rec){
+  if(-not $rec){ return $null }
+  try {
+    if($rec.PSObject.Properties['u_device_rounding']){ return $rec }
+  } catch {}
+  try {
+    if($rec.asset_tag){
+      $key = $rec.asset_tag.Trim().ToUpper()
+      if($script:ComputerByAsset.ContainsKey($key)){ return $script:ComputerByAsset[$key] }
+    }
+  } catch {}
+  try {
+    if($rec.name){
+      foreach($k in (HostnameKeyVariants $rec.name)){
+        if($script:ComputerByName.ContainsKey($k)){ return $script:ComputerByName[$k] }
+      }
+    }
+  } catch {}
+  return $null
+}
+function Set-ComboSelectionCaseInsensitive([System.Windows.Forms.ComboBox]$combo,[string]$value){
+  if(-not $combo){ return }
+  if([string]::IsNullOrWhiteSpace($value)){
+    try { $combo.SelectedIndex = -1 } catch {}
+    return
+  }
+  $target = $value.Trim()
+  $selectedIndex = -1
+  for($i = 0; $i -lt $combo.Items.Count; $i++){
+    $item = $combo.Items[$i]
+    if(-not $item){ continue }
+    $text = $item.ToString()
+    if($text.Trim().ToUpper() -eq $target.ToUpper()){
+      $selectedIndex = $i
+      $target = $text
+      break
+    }
+  }
+  if($selectedIndex -ge 0){
+    try { $combo.SelectedIndex = $selectedIndex } catch { $combo.SelectedItem = $target }
+  } else {
+    [void]$combo.Items.Add($value)
+    try { $combo.SelectedIndex = ($combo.Items.Count - 1) } catch {}
+  }
+}
+function Update-MaintenanceTypeSelection([object]$displayRec,[object]$parentRec){
+  $selection = 'General Rounding'
+  $nameForCheck = ''
+  try {
+    if($displayRec -and $displayRec.name){ $nameForCheck = [string]$displayRec.name }
+  } catch {}
+  if([string]::IsNullOrWhiteSpace($nameForCheck)){
+    $nameSource = Resolve-ComputerRecord $displayRec
+    if(-not $nameSource){ $nameSource = Resolve-ComputerRecord $parentRec }
+    try {
+      if($nameSource -and $nameSource.name){ $nameForCheck = [string]$nameSource.name }
+    } catch {}
+  }
+  if(-not [string]::IsNullOrWhiteSpace($nameForCheck) -and ($nameForCheck.Trim() -match '^(?i)AO')){
+    $selection = 'Mobile Cart'
+  } else {
+    $source = Resolve-ComputerRecord $displayRec
+    if(-not $source){ $source = Resolve-ComputerRecord $parentRec }
+    $mt = ''
+    try {
+      if($source -and $source.PSObject.Properties['u_device_rounding']){
+        $mt = ('' + $source.u_device_rounding).Trim()
+      }
+    } catch {}
+    if(-not [string]::IsNullOrWhiteSpace($mt)){
+      $selection = $mt
+    }
+  }
+  Set-ComboSelectionCaseInsensitive $cmbMaintType $selection
+}
 function Get-RoundingUrlForParent($pc){
   if(-not $pc -or -not $pc.asset_tag){ return $null }
   $k = $pc.asset_tag.Trim().ToUpper()
@@ -1761,7 +1836,7 @@ function Fix-DisplayName(){
 # ---- Populate Summary/UI ----
 function Populate-UI($displayRec,$parentRec){
   try { Populate-Department-Combo $displayRec.u_department_location } catch {}
-  try { if($displayRec.u_device_rounding){ $cmbMaintType.Text=$displayRec.u_device_rounding } } catch {}
+  try { Update-MaintenanceTypeSelection $displayRec $parentRec } catch {}
   $script:CurrentDisplay = $displayRec
   $script:CurrentParent  = $parentRec
   $txtType.Text = Get-DetectedType $displayRec
@@ -1910,6 +1985,7 @@ function Clear-UI(){
   foreach($cb in @($chkCable,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked=$false }
   $btnFixName.Enabled = $false
   if($btnAddPeripheral){ $btnAddPeripheral.Enabled = $false }
+  try { Set-ComboSelectionCaseInsensitive $cmbMaintType 'General Rounding' } catch {}
   $statusLabel.Text = "Ready - scan or enter a device."
   Size-AssocForRows(1) | Out-Null
 }
@@ -1951,9 +2027,25 @@ $dgv.Add_CellDoubleClick({
   if($rec){ $par=Resolve-ParentComputer $rec; Populate-UI $rec $par }
 })
 $btnCheckComplete.Add_Click({
-  $chkCable.Checked=$true; $chkLabels.Checked=$true; $chkPeriph.Checked=$true
-  $pc = $script:CurrentParent
-  if($pc -and $pc.name -match '^(?i)AO'){ $chkCart.Enabled=$true; $chkCart.Checked=$true } else { $chkCart.Checked=$false; $chkCart.Enabled=$false }
+  $checkboxes = @($chkCable,$chkLabels,$chkPeriph,$chkCart)
+  $enabledBoxes = $checkboxes | Where-Object { $_.Enabled }
+  $allEnabledChecked = $false
+  if($enabledBoxes.Count -gt 0){
+    $allEnabledChecked = (($enabledBoxes | Where-Object { -not $_.Checked }).Count -eq 0)
+  }
+  if($allEnabledChecked){
+    foreach($cb in $checkboxes){ $cb.Checked = $false }
+    Update-CartCheckbox-State $script:CurrentParent
+  } else {
+    foreach($cb in $checkboxes){
+      if($cb.Enabled){ $cb.Checked = $true }
+    }
+    $pc = $script:CurrentParent
+    if($pc -and $pc.name -match '^(?i)AO'){
+      $chkCart.Enabled = $true
+      $chkCart.Checked = $true
+    }
+  }
 })
 $btnSave.Add_Click({
   $out = $script:OutputFolder
