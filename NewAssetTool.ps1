@@ -1254,8 +1254,22 @@ function Update-MaintenanceTypeSelection([object]$displayRec,[object]$parentRec)
   if(-not [string]::IsNullOrWhiteSpace($nameForCheck) -and ($nameForCheck.Trim() -match '^(?i)AO')){
     $selection = 'Mobile Cart'
   } else {
-    $source = Resolve-ComputerRecord $displayRec
-    if(-not $source){ $source = Resolve-ComputerRecord $parentRec }
+    $source = $null
+    $displayIsComputer = $false
+    try {
+      if($displayRec){
+        if(($displayRec.PSObject.Properties['Type'] -and $displayRec.Type -eq 'Computer') -or \
+           ($displayRec.PSObject.Properties['Kind'] -and $displayRec.Kind -eq 'Computer')){
+          $displayIsComputer = $true
+        }
+      }
+    } catch {}
+    if(-not $displayIsComputer){
+      $source = Resolve-ComputerRecord $parentRec
+    }
+    if(-not $source){
+      $source = Resolve-ComputerRecord $displayRec
+    }
     $mt = ''
     try {
       if($source -and $source.PSObject.Properties['u_device_rounding']){
