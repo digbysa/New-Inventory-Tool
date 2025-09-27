@@ -3356,31 +3356,44 @@ function Refresh-NearbyFilterList($context) {
 
 function Set-NearbySelectAllState($context, [bool]$selectAllChecked) {
   if (-not $context) { return }
-  if ($selectAllChecked) {
-    $context.CheckedSet = $null
-  } else {
-    $context.CheckedSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+  $previousIgnore = $false
+  if ($context.PSObject.Properties['IgnoreSelectAllEvent']) {
+    try { $previousIgnore = [bool]$context.IgnoreSelectAllEvent } catch { $previousIgnore = $false }
   }
-  $list = $context.ListBox
-  if ($list) {
-    $desiredState = if ($selectAllChecked) {
-      [System.Windows.Forms.CheckState]::Checked
+  $context.IgnoreSelectAllEvent = $true
+  try {
+    if ($selectAllChecked) {
+      $context.CheckedSet = $null
     } else {
-      [System.Windows.Forms.CheckState]::Unchecked
-    }
-    $context.IsUpdating = $true
-    try {
-      for ($i = 0; $i -lt $list.Items.Count; $i++) {
-        try {
-          $list.SetItemCheckState($i, $desiredState)
-        } catch {}
+      if ($context.CheckedSet -is [System.Collections.Generic.HashSet[string]]) {
+        $context.CheckedSet.Clear()
+      } else {
+        $context.CheckedSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
       }
-    } finally {
-      $context.IsUpdating = $false
     }
+    $list = $context.ListBox
+    if ($list) {
+      $desiredState = if ($selectAllChecked) {
+        [System.Windows.Forms.CheckState]::Checked
+      } else {
+        [System.Windows.Forms.CheckState]::Unchecked
+      }
+      $context.IsUpdating = $true
+      try {
+        for ($i = 0; $i -lt $list.Items.Count; $i++) {
+          try {
+            $list.SetItemCheckState($i, $desiredState)
+          } catch {}
+        }
+      } finally {
+        $context.IsUpdating = $false
+      }
+    }
+    Refresh-NearbyFilterList $context
+    Update-NearbyFilterSelection $context
+  } finally {
+    $context.IgnoreSelectAllEvent = $previousIgnore
   }
-  Refresh-NearbyFilterList $context
-  Update-NearbyFilterSelection $context
 }
 
 function Update-NearbyFilterSelection($context) {
@@ -3997,7 +4010,9 @@ function Show-NearbyFilterMenu([string]$columnName) {
     param($sender,$args)
     $ctx = $sender.Tag
     if (-not $ctx -or $ctx.IgnoreSelectAllEvent) { return }
-    Set-NearbySelectAllState $ctx $sender.Checked
+    $localCtx = $ctx
+    $shouldSelectAll = $sender.Checked
+    Set-NearbySelectAllState $localCtx $shouldSelectAll
   })
 
   $list.Add_ItemCheck({
