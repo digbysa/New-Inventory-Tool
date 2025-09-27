@@ -3366,8 +3366,9 @@ function Refresh-NearbyFilterList($context) {
       $allSelected = ($checkedCount -eq $visibleCount)
     }
     if ($context.SelectAll) {
+      $desiredText = if ($allSelected) { 'Deselect All' } else { 'Select All' }
       $context.IgnoreSelectAllEvent = $true
-      try { $context.SelectAll.Checked = $allSelected } catch {}
+      try { $context.SelectAll.Text = $desiredText } catch {}
       $context.IgnoreSelectAllEvent = $false
     }
     if ($context.ClearItem) {
@@ -3581,11 +3582,10 @@ function Show-NearbyFilterMenu([string]$columnName) {
   $searchHost.Margin = [System.Windows.Forms.Padding]::new(4,4,4,2)
   [void]$menu.Items.Add($searchHost)
 
-  $selectAll = New-Object System.Windows.Forms.CheckBox
-  $selectAll.Text = 'Select All'
+  $selectAll = New-Object System.Windows.Forms.Button
+  $selectAll.Text = 'Deselect All'
   $selectAll.AutoSize = $true
   $selectAll.Margin = [System.Windows.Forms.Padding]::new(2,2,2,2)
-  if ($checkedSet -eq $null) { $selectAll.Checked = $true }
   $selectHost = New-Object System.Windows.Forms.ToolStripControlHost($selectAll)
   [void]$menu.Items.Add($selectHost)
 
@@ -4031,12 +4031,12 @@ function Show-NearbyFilterMenu([string]$columnName) {
     Refresh-NearbyFilterList $ctx
   })
 
-  $selectAll.Add_CheckedChanged({
+  $selectAll.Add_Click({
     param($sender,$args)
     $ctx = $sender.Tag
     if (-not $ctx -or $ctx.IgnoreSelectAllEvent) { return }
     $localCtx = $ctx
-    $shouldSelectAll = $sender.Checked
+    $shouldSelectAll = ($sender.Text -eq 'Select All')
     Set-NearbySelectAllState $localCtx $shouldSelectAll
   })
 
