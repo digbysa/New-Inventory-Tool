@@ -9,6 +9,193 @@ function Get-OwnScriptDir {
   try {
     if ($PSCommandPath -and $PSCommandPath -ne '') { return (Split-Path -Parent $PSCommandPath) }
   } catch {}
+
+
+# =================== Modern WinForms Theming Kit (PowerShell) ===================
+
+# Ensure core assemblies are available
+try {
+  Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction SilentlyContinue
+} catch {}
+
+# --- DWM dark title bar + Mica (Win10/11) ---
+try {
+Add-Type -Namespace Dwm -Name Api -MemberDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class Api {
+  [DllImport("dwmapi.dll", PreserveSig=true)]
+  public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+}
+"@ -ErrorAction SilentlyContinue
+} catch {}
+
+function Enable-ModernWindowEffects {
+  param([System.Windows.Forms.Form]$Form, [switch]$Mica)
+  try {
+    $hwnd = $Form.Handle
+    foreach ($attr in 20,19) {
+      try { $val = 1; [void][Dwm.Api]::DwmSetWindowAttribute($hwnd, $attr, [ref]$val, 4); break } catch {}
+    }
+    if ($Mica) {
+      try { $micaAttr = 38; $micaVal = 2; [void][Dwm.Api]::DwmSetWindowAttribute($hwnd, $micaAttr, [ref]$micaVal, 4) } catch {}
+    }
+  } catch {}
+}
+
+# --- Rounded corners for any control (e.g., Button) ---
+function Set-RoundedCorners {
+  param([System.Windows.Forms.Control]$Control, [int]$Radius = 8)
+  $Control.Add_Resize({
+    $r = New-Object System.Drawing.Rectangle(0,0,$Control.Width,$Control.Height)
+    $d = $Radius * 2
+    $gp = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $gp.AddArc($r.X, $r.Y, $d, $d, 180, 90)
+    $gp.AddArc($r.Right - $d, $r.Y, $d, $d, 270, 90)
+    $gp.AddArc($r.Right - $d, $r.Bottom - $d, $d, $d, 0, 90)
+    $gp.AddArc($r.X, $r.Bottom - $d, $d, $d, 90, 90)
+    $gp.CloseAllFigures()
+    if ($Control.Region) { $Control.Region.Dispose() }
+    $Control.Region = New-Object System.Drawing.Region($gp)
+  })
+  $Control.OnResize([EventArgs]::Empty)
+}
+
+# --- DataGridView modern style (dark, compact, anti-flicker) ---
+function Style-DataGridView {
+  param([System.Windows.Forms.DataGridView]$Dgv)
+  try {
+    $pi = $Dgv.GetType().GetProperty('DoubleBuffered', 'NonPublic,Instance')
+    if ($pi) { $pi.SetValue($Dgv, $true, $null) }
+  } catch {}
+  $Dgv.BorderStyle = 'None'
+  $Dgv.BackgroundColor = [System.Drawing.Color]::FromArgb(32,32,36)
+  $Dgv.EnableHeadersVisualStyles = $false
+  $Dgv.GridColor = [System.Drawing.Color]::FromArgb(58,58,64)
+  $Dgv.RowHeadersVisible = $false
+  $Dgv.AutoSizeColumnsMode = 'Fill'
+  $Dgv.SelectionMode = 'FullRowSelect'
+  $Dgv.MultiSelect = $false
+  $Dgv.AllowUserToResizeRows = $false
+  $Dgv.RowTemplate.Height = 28
+
+  $fg  = [System.Drawing.Color]::White
+  $bg  = [System.Drawing.Color]::FromArgb(32,32,36)
+  $bg2 = [System.Drawing.Color]::FromArgb(40,40,46)
+  $sel = [System.Drawing.Color]::FromArgb(62,142,252)
+
+  $Dgv.DefaultCellStyle.BackColor   = $bg
+  $Dgv.DefaultCellStyle.ForeColor   = $fg
+  $Dgv.DefaultCellStyle.SelectionBackColor = $sel
+  $Dgv.DefaultCellStyle.SelectionForeColor = [System.Drawing.Color]::Black
+  $Dgv.AlternatingRowsDefaultCellStyle.BackColor = $bg2
+
+  $Dgv.ColumnHeadersDefaultCellStyle.BackColor = [System.Drawing.Color]::FromArgb(50,50,56)
+  $Dgv.ColumnHeadersDefaultCellStyle.ForeColor = $fg
+  $Dgv.ColumnHeadersDefaultCellStyle.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 9)
+  foreach ($c in $Dgv.Columns) { $c.MinimumWidth = 60 }
+}
+
+# --- Recursively theme common controls (dark palette, flat buttons, fonts) ---
+function Set-ModernTheme {
+  param([System.Windows.Forms.Control]$Root)
+
+  $Root.Font = New-Object System.Drawing.Font('Segoe UI', 9)
+
+  $bgForm = [System.Drawing.Color]::FromArgb(24,24,28)
+  $bgPane = [System.Drawing.Color]::FromArgb(32,32,36)
+  $fgText = [System.Drawing.Color]::White
+  $accent = [System.Drawing.Color]::FromArgb(62,142,252)
+
+  if ($Root -is [System.Windows.Forms.Form]) { $Root.BackColor = $bgForm; $Root.ForeColor = $fgText }
+
+  foreach ($ctl in $Root.Controls) {
+    switch -Regex ($ctl.GetType().FullName) {
+      'System\.Windows\.Forms\.(Panel|GroupBox|TableLayoutPanel|FlowLayoutPanel)' {
+        $ctl.BackColor = $bgPane; $ctl.ForeColor = $fgText
+      }
+      'System\.Windows\.Forms\.Label' { $ctl.ForeColor = $fgText }
+      'System\.Windows\.Forms\.Button' {
+        $ctl.FlatStyle = 'Flat'
+        $ctl.FlatAppearance.BorderSize = 0
+        $ctl.BackColor = $accent
+        $ctl.ForeColor = [System.Drawing.Color]::Black
+        Set-RoundedCorners $ctl 10
+        $ctl.Add_MouseEnter({ param($s,$e) $s.BackColor = [System.Drawing.Color]::FromArgb(80,160,255) })
+        $ctl.Add_MouseLeave({ param($s,$e) $s.BackColor = $accent })
+      }
+      'System\.Windows\.Forms\.TextBox' {
+        $ctl.BorderStyle = 'FixedSingle'
+        $ctl.BackColor = [System.Drawing.Color]::FromArgb(28,28,32)
+        $ctl.ForeColor = $fgText
+      }
+      'System\.Windows\.Forms\.ComboBox' {
+        $ctl.FlatStyle = 'Flat'
+        $ctl.BackColor = [System.Drawing.Color]::FromArgb(28,28,32)
+        $ctl.ForeColor = $fgText
+        if (-not $ctl.DropDownStyle -or $ctl.DropDownStyle -ne 'DropDownList') { $ctl.DropDownStyle = 'DropDownList' }
+      }
+      'System\.Windows\.Forms\.CheckBox|System\.Windows\.Forms\.RadioButton' {
+        $ctl.ForeColor = $fgText; $ctl.BackColor = [System.Drawing.Color]::Transparent
+      }
+      'System\.Windows\.Forms\.DataGridView' { Style-DataGridView $ctl }
+    }
+    if ($ctl.HasChildren) { Set-ModernTheme $ctl }
+  }
+}
+
+# --- Lightweight icons via MDL2 glyphs ---
+function Set-IconText {
+  param([System.Windows.Forms.Control]$Control, [int]$Codepoint)
+  try {
+    $Control.Font = New-Object System.Drawing.Font('Segoe MDL2 Assets', 12)
+    $Control.Text = [char]$Codepoint
+  } catch {}
+}
+
+# ---------- Integration wrapper ----------
+function Apply-ModernThemeToForm {
+  param([Parameter(Mandatory)][System.Windows.Forms.Form]$Form)
+
+  function Get-AllControls { param([System.Windows.Forms.Control]$Root)
+    $list = New-Object System.Collections.Generic.List[System.Windows.Forms.Control]
+    $q = New-Object System.Collections.Queue
+    $q.Enqueue($Root)
+    while ($q.Count) {
+      $p = $q.Dequeue()
+      foreach ($c in $p.Controls) { [void]$list.Add($c); $q.Enqueue($c) }
+    }
+    return $list
+  }
+
+  function Enable-DoubleBuffer { param([System.Windows.Forms.Control]$Ctrl)
+    try {
+      $flags = [System.Windows.Forms.ControlStyles]::OptimizedDoubleBuffer -bor
+               [System.Windows.Forms.ControlStyles]::AllPaintingInWmPaint -bor
+               [System.Windows.Forms.ControlStyles]::UserPaint
+      $Ctrl.GetType().InvokeMember('SetStyle','InvokeMethod,NonPublic,Instance',$null,$Ctrl,@($flags,$true)) | Out-Null
+      $Ctrl.Update()
+    } catch {}
+  }
+
+  Set-ModernTheme $Form
+  Enable-DoubleBuffer $Form
+
+  $all = Get-AllControls $Form
+  foreach ($container in $all | Where-Object {
+      $_ -is [System.Windows.Forms.TableLayoutPanel] -or
+      $_ -is [System.Windows.Forms.FlowLayoutPanel]  -or
+      $_ -is [System.Windows.Forms.Panel]
+    }) { Enable-DoubleBuffer $container }
+
+  foreach ($dgv in $all | Where-Object { $_ -is [System.Windows.Forms.DataGridView] }) { Style-DataGridView $dgv }
+
+  $Form.Add_Shown({ Enable-ModernWindowEffects $Form -Mica })
+}
+
+# ================= End Modern WinForms Theming Kit =================
+
   try {
     if ($MyInvocation -and $MyInvocation.MyCommand -and $MyInvocation.MyCommand.Path) {
       return (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -2937,4 +3124,6 @@ function Get-StatusOptionsFromGrid {
   # Distinct, sorted
   return ($opts | Where-Object { $_ -and $_.Trim().Length -gt 0 } | Sort-Object -Unique)
 }
+
+Apply-ModernThemeToForm -Form $form
 [void]$form.ShowDialog()
