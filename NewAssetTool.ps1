@@ -3332,11 +3332,36 @@ function Refresh-NearbyFilterList($context) {
     }
     $context.VisibleItemCount = $visibleCount
     $context.VisibleCheckedCount = $checkedCount
+
+    $totalCount = 0
+    if ($context.PSObject.Properties['TotalCount']) {
+      try { $totalCount = [int]$context.TotalCount } catch { $totalCount = 0 }
+    }
+    if ($totalCount -le 0) {
+      try { $totalCount = [int]$context.Items.Count } catch {
+        try { $totalCount = @($context.Items).Count } catch { $totalCount = 0 }
+      }
+      if ($context.PSObject.Properties['TotalCount']) {
+        $context.TotalCount = $totalCount
+      }
+    }
+
+    $checkedTotal = 0
+    if ($multiActive -and $context.CheckedSet) {
+      try { $checkedTotal = [int]$context.CheckedSet.Count } catch {
+        try { $checkedTotal = @($context.CheckedSet).Count } catch { $checkedTotal = 0 }
+      }
+    }
+
     $allSelected = $false
     if (-not $multiActive) {
       $allSelected = $true
     } elseif ($visibleCount -eq 0) {
-      $allSelected = ($context.CheckedSet.Count -ge $context.TotalCount)
+      if ($totalCount -gt 0) {
+        $allSelected = ($checkedTotal -ge $totalCount)
+      } else {
+        $allSelected = $false
+      }
     } else {
       $allSelected = ($checkedCount -eq $visibleCount)
     }
