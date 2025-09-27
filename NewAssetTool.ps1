@@ -1,4 +1,4 @@
-﻿﻿Add-Type -AssemblyName System.Windows.Forms
+﻿Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 # ===== Script directory resolver (robust, PS 5.1-safe) =====
