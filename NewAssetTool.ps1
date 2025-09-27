@@ -3279,6 +3279,39 @@ function Apply-NearbyFilters {
   Update-NearbyActiveFilterUI
 }
 
+function Get-NearbyFilterContextFromSender($sender) {
+  if (-not $sender) { return $null }
+  $ctx = $null
+  try { $ctx = $sender.Tag } catch { $ctx = $null }
+  if ($ctx) { return $ctx }
+
+  if ($sender -is [System.Windows.Forms.ToolStripItem]) {
+    try {
+      $owner = $sender.Owner
+      if ($owner -and $owner.Tag) { return $owner.Tag }
+    } catch {}
+    try {
+      $parent = $sender.GetCurrentParent()
+      if ($parent -and $parent.Tag) { return $parent.Tag }
+    } catch {}
+  }
+
+  if ($sender -is [System.Windows.Forms.Control]) {
+    $current = $sender.Parent
+    while ($current) {
+      try { $ctx = $current.Tag } catch { $ctx = $null }
+      if ($ctx) { return $ctx }
+      if ($current -is [System.Windows.Forms.Control]) {
+        $current = $current.Parent
+      } else {
+        break
+      }
+    }
+  }
+
+  return $null
+}
+
 function Clear-NearbyColumnFilter([string]$columnName) {
   if (-not $script:NearbyColumnFilters) { $script:NearbyColumnFilters = @{} }
   if ($script:NearbyColumnFilters.ContainsKey($columnName)) {
@@ -3580,6 +3613,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
   $searchBox.Width = 180
   $searchHost = New-Object System.Windows.Forms.ToolStripControlHost($searchBox)
   $searchHost.Margin = [System.Windows.Forms.Padding]::new(4,4,4,2)
+  $searchHost.Tag = $context
   [void]$menu.Items.Add($searchHost)
 
   $selectAll = New-Object System.Windows.Forms.Button
@@ -3587,6 +3621,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
   $selectAll.AutoSize = $true
   $selectAll.Margin = [System.Windows.Forms.Padding]::new(2,2,2,2)
   $selectHost = New-Object System.Windows.Forms.ToolStripControlHost($selectAll)
+  $selectHost.Tag = $context
   [void]$menu.Items.Add($selectHost)
 
   $list = New-Object System.Windows.Forms.CheckedListBox
@@ -3599,6 +3634,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
   $list.ValueMember = 'Key'
   $listHost = New-Object System.Windows.Forms.ToolStripControlHost($list)
   $listHost.Margin = [System.Windows.Forms.Padding]::new(2,2,2,2)
+  $listHost.Tag = $context
   [void]$menu.Items.Add($listHost)
 
   $initialOperator = if ([string]::IsNullOrWhiteSpace($existingOperator)) { $null } else { $existingOperator }
@@ -3664,6 +3700,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
       $panel.AutoSize = $true
       $panel.AutoSizeMode = 'GrowAndShrink'
       $panel.Margin = [System.Windows.Forms.Padding]::new(4,2,4,4)
+      $panel.Tag = $context
 
       $lbl = New-Object System.Windows.Forms.Label
       $lbl.Text = 'Condition'
@@ -3705,7 +3742,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
 
       $applyButton.Add_Click({
         param($sender,$args)
-        $ctx = $sender.Tag
+        $ctx = Get-NearbyFilterContextFromSender $sender
         if (-not $ctx) { return }
         if (Commit-NearbyConditionFromControls $ctx) {
           Refresh-NearbyFilterList $ctx
@@ -3732,6 +3769,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
 
       $panelHost = New-Object System.Windows.Forms.ToolStripControlHost($panel)
       $panelHost.Margin = [System.Windows.Forms.Padding]::new(4,2,4,4)
+      $panelHost.Tag = $context
       [void]$menu.Items.Add($panelHost)
     }
     'Number' {
@@ -3742,6 +3780,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
       $panel.AutoSize = $true
       $panel.AutoSizeMode = 'GrowAndShrink'
       $panel.Margin = [System.Windows.Forms.Padding]::new(4,2,4,4)
+      $panel.Tag = $context
 
       $lbl = New-Object System.Windows.Forms.Label
       $lbl.Text = 'Condition'
@@ -3771,6 +3810,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
       $valuePanel.WrapContents = $false
       $valuePanel.AutoSize = $true
       $valuePanel.Margin = [System.Windows.Forms.Padding]::new(0,2,0,2)
+      $valuePanel.Tag = $context
 
       $txtStart = New-Object System.Windows.Forms.TextBox
       $txtStart.Width = 90
@@ -3807,7 +3847,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
 
       $combo.Add_SelectedIndexChanged({
         param($sender,$args)
-        $ctx = $sender.Tag
+        $ctx = Get-NearbyFilterContextFromSender $sender
         if (-not $ctx) { return }
         $val = ''
         try { $val = [string]$sender.SelectedValue } catch { $val = '' }
@@ -3821,7 +3861,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
 
       $applyButton.Add_Click({
         param($sender,$args)
-        $ctx = $sender.Tag
+        $ctx = Get-NearbyFilterContextFromSender $sender
         if (-not $ctx) { return }
         if (Commit-NearbyConditionFromControls $ctx) {
           Refresh-NearbyFilterList $ctx
@@ -3852,6 +3892,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
 
       $panelHost = New-Object System.Windows.Forms.ToolStripControlHost($panel)
       $panelHost.Margin = [System.Windows.Forms.Padding]::new(4,2,4,4)
+      $panelHost.Tag = $context
       [void]$menu.Items.Add($panelHost)
     }
     'DateTime' {
@@ -3862,6 +3903,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
       $panel.AutoSize = $true
       $panel.AutoSizeMode = 'GrowAndShrink'
       $panel.Margin = [System.Windows.Forms.Padding]::new(4,2,4,4)
+      $panel.Tag = $context
 
       $lbl = New-Object System.Windows.Forms.Label
       $lbl.Text = 'Condition'
@@ -3888,6 +3930,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
       $datePanel.WrapContents = $false
       $datePanel.AutoSize = $true
       $datePanel.Margin = [System.Windows.Forms.Padding]::new(0,2,0,2)
+      $datePanel.Tag = $context
 
       $dtStart = New-Object System.Windows.Forms.DateTimePicker
       $dtStart.Format = [System.Windows.Forms.DateTimePickerFormat]::Short
@@ -3935,7 +3978,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
 
       $combo.Add_SelectedIndexChanged({
         param($sender,$args)
-        $ctx = $sender.Tag
+        $ctx = Get-NearbyFilterContextFromSender $sender
         if (-not $ctx) { return }
         $val = ''
         try { $val = [string]$sender.SelectedValue } catch { $val = '' }
@@ -3955,7 +3998,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
 
       $applyButton.Add_Click({
         param($sender,$args)
-        $ctx = $sender.Tag
+        $ctx = Get-NearbyFilterContextFromSender $sender
         if (-not $ctx) { return }
         if (Commit-NearbyConditionFromControls $ctx) {
           Refresh-NearbyFilterList $ctx
@@ -4018,6 +4061,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
 
       $panelHost = New-Object System.Windows.Forms.ToolStripControlHost($panel)
       $panelHost.Margin = [System.Windows.Forms.Padding]::new(4,2,4,4)
+      $panelHost.Tag = $context
       [void]$menu.Items.Add($panelHost)
 
       Update-NearbyPresetButtonStyles $context
@@ -4027,13 +4071,13 @@ function Show-NearbyFilterMenu([string]$columnName) {
 
   $searchBox.Add_TextChanged({
     param($sender,$args)
-    $ctx = $sender.Tag
+    $ctx = Get-NearbyFilterContextFromSender $sender
     Refresh-NearbyFilterList $ctx
   })
 
   $selectAll.Add_Click({
     param($sender,$args)
-    $ctx = $sender.Tag
+    $ctx = Get-NearbyFilterContextFromSender $sender
     if (-not $ctx -or $ctx.IgnoreSelectAllEvent) { return }
     $localCtx = $ctx
     $shouldSelectAll = ($sender.Text -eq 'Select All')
@@ -4042,7 +4086,7 @@ function Show-NearbyFilterMenu([string]$columnName) {
 
   $list.Add_ItemCheck({
     param($sender,$args)
-    $ctx = $sender.Tag
+    $ctx = Get-NearbyFilterContextFromSender $sender
     if (-not $ctx -or $ctx.IsUpdating) { return }
     if ($null -eq $args.Index) { return }
     if ($args.Index -lt 0 -or $args.Index -ge $sender.Items.Count) { return }
