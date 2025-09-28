@@ -78,11 +78,11 @@ try {
   $reader.Close()
 }
 
-$host = $window.FindName('WinFormsHost')
-if (-not $host) {
+$windowsFormsHost = $window.FindName('WinFormsHost')
+if (-not $windowsFormsHost) {
   throw "Could not locate the WindowsFormsHost named 'WinFormsHost' in XAML."
 }
-$host.Child = $form
+$windowsFormsHost.Child = $form
 $form.Visible = $true
 
 $app = [System.Windows.Application]::Current
