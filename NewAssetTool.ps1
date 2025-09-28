@@ -86,9 +86,9 @@ function Style-DataGridView {
     if ($pi) { $pi.SetValue($Dgv, $true, $null) }
   } catch {}
   $Dgv.BorderStyle = 'None'
-  $Dgv.BackgroundColor = [System.Drawing.Color]::FromArgb(32,32,36)
+  $Dgv.BackgroundColor = [System.Drawing.Color]::White
   $Dgv.EnableHeadersVisualStyles = $false
-  $Dgv.GridColor = [System.Drawing.Color]::FromArgb(58,58,64)
+  $Dgv.GridColor = [System.Drawing.Color]::FromArgb(224,224,224)
   $Dgv.RowHeadersVisible = $false
   $Dgv.AutoSizeColumnsMode = 'Fill'
   $Dgv.SelectionMode = 'FullRowSelect'
@@ -96,18 +96,18 @@ function Style-DataGridView {
   $Dgv.AllowUserToResizeRows = $false
   $Dgv.RowTemplate.Height = 28
 
-  $fg  = [System.Drawing.Color]::White
-  $bg  = [System.Drawing.Color]::FromArgb(32,32,36)
-  $bg2 = [System.Drawing.Color]::FromArgb(40,40,46)
-  $sel = [System.Drawing.Color]::FromArgb(62,142,252)
+  $fg  = [System.Drawing.Color]::FromArgb(32,32,32)
+  $bg  = [System.Drawing.Color]::White
+  $bg2 = [System.Drawing.Color]::FromArgb(245,245,245)
+  $sel = [System.Drawing.Color]::FromArgb(0,120,215)
 
   $Dgv.DefaultCellStyle.BackColor   = $bg
   $Dgv.DefaultCellStyle.ForeColor   = $fg
   $Dgv.DefaultCellStyle.SelectionBackColor = $sel
-  $Dgv.DefaultCellStyle.SelectionForeColor = [System.Drawing.Color]::Black
+  $Dgv.DefaultCellStyle.SelectionForeColor = [System.Drawing.Color]::White
   $Dgv.AlternatingRowsDefaultCellStyle.BackColor = $bg2
 
-  $Dgv.ColumnHeadersDefaultCellStyle.BackColor = [System.Drawing.Color]::FromArgb(50,50,56)
+  $Dgv.ColumnHeadersDefaultCellStyle.BackColor = [System.Drawing.Color]::FromArgb(240,240,240)
   $Dgv.ColumnHeadersDefaultCellStyle.ForeColor = $fg
   $Dgv.ColumnHeadersDefaultCellStyle.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 9)
   foreach ($c in $Dgv.Columns) { $c.MinimumWidth = 60 }
@@ -119,10 +119,10 @@ function Set-ModernTheme {
 
   $Root.Font = New-Object System.Drawing.Font('Segoe UI', 9)
 
-  $bgForm = [System.Drawing.Color]::FromArgb(24,24,28)
-  $bgPane = [System.Drawing.Color]::FromArgb(32,32,36)
-  $fgText = [System.Drawing.Color]::White
-  $accent = [System.Drawing.Color]::FromArgb(62,142,252)
+  $bgForm = [System.Drawing.Color]::FromArgb(248,249,252)
+  $bgPane = [System.Drawing.Color]::White
+  $fgText = [System.Drawing.Color]::FromArgb(32,32,32)
+  $accent = [System.Drawing.Color]::FromArgb(0,120,215)
 
   if ($Root -is [System.Windows.Forms.Form]) { $Root.BackColor = $bgForm; $Root.ForeColor = $fgText }
 
@@ -136,10 +136,10 @@ function Set-ModernTheme {
         $ctl.FlatStyle = 'Flat'
         $ctl.FlatAppearance.BorderSize = 0
         $ctl.BackColor = $accent
-        $ctl.ForeColor = [System.Drawing.Color]::Black
+        $ctl.ForeColor = [System.Drawing.Color]::White
         Set-RoundedCorners $ctl 10
         $accentCopy = $accent
-        $ctl.Add_MouseEnter({ param($s,$e) $s.BackColor = [System.Drawing.Color]::FromArgb(80,160,255) })
+        $ctl.Add_MouseEnter({ param($s,$e) $s.BackColor = [System.Drawing.Color]::FromArgb(0,150,255) })
         $ctl.Add_MouseLeave(({
           param($s,$e)
           $s.BackColor = $accentCopy
@@ -147,12 +147,12 @@ function Set-ModernTheme {
       }
       'System\.Windows\.Forms\.TextBox' {
         $ctl.BorderStyle = 'FixedSingle'
-        $ctl.BackColor = [System.Drawing.Color]::FromArgb(28,28,32)
+        $ctl.BackColor = [System.Drawing.Color]::White
         $ctl.ForeColor = $fgText
       }
       'System\.Windows\.Forms\.ComboBox' {
         $ctl.FlatStyle = 'Flat'
-        $ctl.BackColor = [System.Drawing.Color]::FromArgb(28,28,32)
+        $ctl.BackColor = [System.Drawing.Color]::White
         $ctl.ForeColor = $fgText
         if (-not $ctl.DropDownStyle -or $ctl.DropDownStyle -ne 'DropDownList') { $ctl.DropDownStyle = 'DropDownList' }
       }
