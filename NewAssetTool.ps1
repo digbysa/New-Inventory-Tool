@@ -231,6 +231,7 @@ $script:RoundingByAssetTag = @{}
 $script:CurrentDisplay = $null
 $script:CurrentParent  = $null
 $script:editing = $false
+$script:NewAssetToolMainForm = $null
 # Canonical column order for rounding event exports (includes Comments column)
 $script:RoundingEventColumns = @(
   'Timestamp','AssetTag','Name','Serial','City','Location','Building','Floor','Room',
@@ -3124,4 +3125,19 @@ function Get-StatusOptionsFromGrid {
 }
 
 Apply-ModernThemeToForm -Form $form
-[void]$form.ShowDialog()
+
+$script:NewAssetToolMainForm = $form
+
+$shouldShowForm = $true
+try {
+  if ($global:NewAssetToolSuppressShow) { $shouldShowForm = $false }
+} catch {}
+try {
+  if ($script:NewAssetToolSuppressShow) { $shouldShowForm = $false }
+} catch {}
+
+if ($shouldShowForm) {
+  [void]$form.ShowDialog()
+} else {
+  return $form
+}
