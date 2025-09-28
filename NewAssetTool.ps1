@@ -75,7 +75,7 @@ function Set-RoundedCorners {
   }
 
   $Control.Add_Resize($applyRegion)
-  & $applyRegion.Invoke($Control, [EventArgs]::Empty)
+  $applyRegion.Invoke($Control, [System.EventArgs]::Empty)
 }
 
 # --- DataGridView modern style (dark, compact, anti-flicker) ---
