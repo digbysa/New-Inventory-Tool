@@ -40,13 +40,14 @@ namespace ModernUI
 
   public class RoundedButton : Button
   {
-    public int CornerRadius { get; set; } = 12;
+    public int CornerRadius { get; set; }
 
     public RoundedButton()
     {
         FlatStyle = FlatStyle.Flat;
         FlatAppearance.BorderSize = 0;
         UseVisualStyleBackColor = false;
+        CornerRadius = 12;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
     }
 
