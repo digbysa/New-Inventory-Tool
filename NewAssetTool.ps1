@@ -27,6 +27,131 @@ try {
   Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction SilentlyContinue
 } catch {}
 
+# --- High quality rounded button class ---
+if (-not ('ModernUI.RoundedButton' -as [Type])) {
+  try {
+    Add-Type -ReferencedAssemblies System.Windows.Forms,System.Drawing -Namespace ModernUI -Name RoundedButton -MemberDefinition @"
+using System;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Windows.Forms;
+
+public class RoundedButton : Button
+{
+    public int CornerRadius { get; set; } = 12;
+
+    public RoundedButton()
+    {
+        FlatStyle = FlatStyle.Flat;
+        FlatAppearance.BorderSize = 0;
+        UseVisualStyleBackColor = false;
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+        Rectangle bounds = ClientRectangle;
+        bounds.Width -= 1;
+        bounds.Height -= 1;
+
+        using (GraphicsPath path = CreatePath(bounds, CornerRadius))
+        {
+            Region oldRegion = Region;
+            Region = new Region(path);
+            if (oldRegion != null)
+            {
+                oldRegion.Dispose();
+            }
+
+            Color fill = Enabled ? BackColor : ControlPaint.Light(BackColor);
+            using (SolidBrush brush = new SolidBrush(fill))
+            {
+                e.Graphics.FillPath(brush, path);
+            }
+
+            if (Focused && ShowFocusCues)
+            {
+                Rectangle focusBounds = bounds;
+                focusBounds.Inflate(-4, -4);
+                if (focusBounds.Width > 0 && focusBounds.Height > 0)
+                {
+                    using (GraphicsPath focusPath = CreatePath(focusBounds, Math.Max(0, CornerRadius - 3)))
+                    using (Pen focusPen = new Pen(Color.FromArgb(200, Color.White)))
+                    {
+                        focusPen.DashStyle = DashStyle.Dot;
+                        e.Graphics.DrawPath(focusPen, focusPath);
+                    }
+                }
+            }
+
+            TextFormatFlags format = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis;
+            Color textColor = Enabled ? ForeColor : ControlPaint.Dark(ForeColor);
+            TextRenderer.DrawText(e.Graphics, Text, Font, bounds, textColor, format);
+        }
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs pevent)
+    {
+        // Prevent default background painting to avoid square artifacts.
+    }
+
+    protected override void OnBackColorChanged(EventArgs e)
+    {
+        base.OnBackColorChanged(e);
+        Invalidate();
+    }
+
+    protected override void OnForeColorChanged(EventArgs e)
+    {
+        base.OnForeColorChanged(e);
+        Invalidate();
+    }
+
+    protected override void OnTextChanged(EventArgs e)
+    {
+        base.OnTextChanged(e);
+        Invalidate();
+    }
+
+    protected override void OnEnabledChanged(EventArgs e)
+    {
+        base.OnEnabledChanged(e);
+        Invalidate();
+    }
+
+    private static GraphicsPath CreatePath(Rectangle rect, int radius)
+    {
+        GraphicsPath path = new GraphicsPath();
+
+        if (radius <= 0)
+        {
+            path.AddRectangle(rect);
+            return path;
+        }
+
+        int diameter = radius * 2;
+        Rectangle arc = new Rectangle(rect.Location, new Size(diameter, diameter));
+        path.AddArc(arc, 180, 90);
+
+        arc.X = rect.Right - diameter;
+        path.AddArc(arc, 270, 90);
+
+        arc.Y = rect.Bottom - diameter;
+        path.AddArc(arc, 0, 90);
+
+        arc.X = rect.Left;
+        path.AddArc(arc, 90, 90);
+
+        path.CloseFigure();
+        return path;
+    }
+}
+"@
+  } catch {}
+}
+
 # --- DWM dark title bar + Mica (Win10/11) ---
 try {
 Add-Type -Namespace Dwm -Name Api -MemberDefinition @"
@@ -132,12 +257,16 @@ function Set-ModernTheme {
         $ctl.BackColor = $bgPane; $ctl.ForeColor = $fgText
       }
       'System\.Windows\.Forms\.Label' { $ctl.ForeColor = $fgText }
-      'System\.Windows\.Forms\.Button' {
-        $ctl.FlatStyle = 'Flat'
-        $ctl.FlatAppearance.BorderSize = 0
+      'System\.Windows\.Forms\.Button|ModernUI\.RoundedButton' {
+        try { $ctl.FlatStyle = 'Flat' } catch {}
+        try { $ctl.FlatAppearance.BorderSize = 0 } catch {}
         $ctl.BackColor = $accent
         $ctl.ForeColor = [System.Drawing.Color]::White
-        Set-RoundedCorners $ctl 10
+        if ($ctl -is [ModernUI.RoundedButton]) {
+          $ctl.CornerRadius = 14
+        } else {
+          Set-RoundedCorners $ctl 12
+        }
         $accentCopy = $accent
         $ctl.Add_MouseEnter({ param($s,$e) $s.BackColor = [System.Drawing.Color]::FromArgb(0,150,255) })
         $ctl.Add_MouseLeave(({
@@ -1002,7 +1131,7 @@ $txtScan = New-Object System.Windows.Forms.TextBox
 $txtScan.Location='16,22'
 $txtScan.Anchor='Top,Left,Right'
 $txtScan.Size='900,24'
-$btnLookup = New-Object System.Windows.Forms.Button
+$btnLookup = New-Object ModernUI.RoundedButton
 $btnLookup.Text="Lookup"
 $btnLookup.Location='930,20'
 $btnLookup.Anchor='Top,Right'
@@ -1062,7 +1191,7 @@ $txtRetire=New-RO 120 205 340
 $txtRound=New-RO 120 235 340
 $grpSummary.Controls.AddRange(@($txtType,$txtHost,$txtAT,$txtSN,$txtParent,$txtRITM,$txtRetire,$txtRound))
 # Fix button beside "Name:"
-$btnFixName = New-Object System.Windows.Forms.Button
+$btnFixName = New-Object ModernUI.RoundedButton
 $btnFixName.Text = "Fix"
 $btnFixName.Size = '45,24'
 $btnFixName.Location = New-Object System.Drawing.Point(70, 55)
@@ -1082,7 +1211,7 @@ $grpLoc.Controls.AddRange(@(
   (New-L "Department:" 12 178)
 ))
 if(-not $btnEditLoc){
-  $btnEditLoc = New-Object System.Windows.Forms.Button
+  $btnEditLoc = New-Object ModernUI.RoundedButton
   $btnEditLoc.Text = 'Edit Location'
   $btnEditLoc.Size = '120,26'
   $grpLoc.Controls.Add($btnEditLoc)
@@ -1174,13 +1303,13 @@ $tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windo
 $tlpAssoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tlpAssoc.Margin  = New-Object System.Windows.Forms.Padding($GAP)
 # Toolbar row
-$btnAddPeripheral = New-Object System.Windows.Forms.Button
+$btnAddPeripheral = New-Object ModernUI.RoundedButton
 $btnAddPeripheral.Text   = 'Add Peripheral'
 $btnAddPeripheral.AutoSize = $true
 $btnAddPeripheral.AutoSizeMode = 'GrowAndShrink'
 $btnAddPeripheral.Margin = '0,6,6,0'
 $btnAddPeripheral.Anchor = 'Left'
-$btnRemove = New-Object System.Windows.Forms.Button
+$btnRemove = New-Object ModernUI.RoundedButton
 $btnRemove.Text   = 'Remove Peripheral'
 $btnRemove.AutoSize = $true
 $btnRemove.AutoSizeMode = 'GrowAndShrink'
@@ -1236,11 +1365,11 @@ $chkLabels=New-Object System.Windows.Forms.CheckBox; $chkLabels.Text="Ensure mon
 $chkLabels.TabIndex = 5
 $chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate peripherals are connected and working"; $chkPeriph.Location='320,124'; $chkPeriph.AutoSize=$true
 $chkPeriph.TabIndex = 6
-$btnCheckComplete=New-Object System.Windows.Forms.Button; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Location='12,160'; $btnCheckComplete.Size='180,30'
+$btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Location='12,160'; $btnCheckComplete.Size='180,30'
 $btnCheckComplete.TabIndex = 7
-$btnSave=New-Object System.Windows.Forms.Button; $btnSave.Text="Save Event"; $btnSave.Location='204,160'; $btnSave.Size='180,30'
+$btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Location='204,160'; $btnSave.Size='180,30'
 $btnSave.TabIndex = 8
-$btnManualRound=New-Object System.Windows.Forms.Button; $btnManualRound.Text="Manual Round"; $btnManualRound.Location='396,160'; $btnManualRound.Size='180,30'; $btnManualRound.Enabled=$false
+$btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Location='396,160'; $btnManualRound.Size='180,30'; $btnManualRound.Enabled=$false
 $btnManualRound.TabIndex = 9
 $lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments:'; $lblComments.AutoSize=$true; $lblComments.Location='12,202'
 $lblComments.TabIndex = 10
@@ -1912,11 +2041,11 @@ function Show-AddPeripheralDialog($parentRec){
   $buttonPanel.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)) )
   $buttonPanel.RowStyles.Clear()
   $buttonPanel.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
-  $btnDialogAdd = New-Object System.Windows.Forms.Button
+  $btnDialogAdd = New-Object ModernUI.RoundedButton
   $btnDialogAdd.Text = 'Add'
   $btnDialogAdd.Enabled = $false
   $btnDialogAdd.Margin = '0,8,6,0'
-  $btnDialogCancel = New-Object System.Windows.Forms.Button
+  $btnDialogCancel = New-Object ModernUI.RoundedButton
   $btnDialogCancel.Text = 'Cancel'
   $btnDialogCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
   $btnDialogCancel.Margin = '0,8,0,0'
@@ -2579,7 +2708,7 @@ $lblScopes = New-Object System.Windows.Forms.Label
 $lblScopes.AutoSize = $true
 $lblScopes.Text = "Nearby scopes: 0"
 $lblScopes.Location = '8,10'
-$btnNearbyShowAll = New-Object System.Windows.Forms.Button
+$btnNearbyShowAll = New-Object ModernUI.RoundedButton
 $btnNearbyShowAll.Text = 'Show All'
 $btnNearbyShowAll.AutoSize = $true
 $btnNearbyShowAll.Location = '8,32'
@@ -2614,7 +2743,7 @@ $cmbSort.Visible = $false; $cmbSort.Enabled = $false
 ))
 $cmbSort.Location = '470,6'
 $cmbSort.Width = 210
-$btnClearScopes = New-Object System.Windows.Forms.Button
+$btnClearScopes = New-Object ModernUI.RoundedButton
 $btnClearScopes.Text = "Clear List"
 $btnClearScopes.AutoSize = $true
 $btnClearScopes.Location = '700,6'
@@ -2652,7 +2781,7 @@ $btnNearbyShowAll.Add_Click({
   } catch {}
 })
 # --- Multi-Status (apply one status to selected rows) ---
-$btnSetStatus = New-Object System.Windows.Forms.Button
+$btnSetStatus = New-Object ModernUI.RoundedButton
 $btnSetStatus.Text = 'Multi-Status'
 $btnSetStatus.Width = 110
 $btnSetStatus.Height = 24
@@ -2827,7 +2956,7 @@ $lblNearNote = New-Object System.Windows.Forms.Label
 $lblNearNote.AutoSize = $true
 $lblNearNote.Text = "Bulk Save adds events with selected Status, 3 min each. Today's devices are shown only when ""View all"" is on and are not saved again."
 $lblNearNote.Location = '8,14'
-$btnNearSave = New-Object System.Windows.Forms.Button
+$btnNearSave = New-Object ModernUI.RoundedButton
 $btnNearSave.Text = "Save"
 $btnNearSave.Anchor = 'Bottom,Right'
 $btnNearSave.Size = '120,30'
