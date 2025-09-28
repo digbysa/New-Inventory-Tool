@@ -30,14 +30,16 @@ try {
 # --- High quality rounded button class ---
 if (-not ('ModernUI.RoundedButton' -as [Type])) {
   try {
-    Add-Type -ReferencedAssemblies System.Windows.Forms,System.Drawing -Namespace ModernUI -Name RoundedButton -MemberDefinition @"
-using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Windows.Forms;
-
-public class RoundedButton : Button
+    Add-Type -ReferencedAssemblies System.Windows.Forms,System.Drawing -TypeDefinition @"
+namespace ModernUI
 {
+  using System;
+  using System.Drawing;
+  using System.Drawing.Drawing2D;
+  using System.Windows.Forms;
+
+  public class RoundedButton : Button
+  {
     public int CornerRadius { get; set; } = 12;
 
     public RoundedButton()
@@ -147,6 +149,7 @@ public class RoundedButton : Button
         path.CloseFigure();
         return path;
     }
+  }
 }
 "@
   } catch {}
