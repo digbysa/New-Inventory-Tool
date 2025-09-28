@@ -4,7 +4,9 @@
         Title="New Inventory Tool"
         Height="900"
         Width="1400"
-        Background="#FFF4F5F9"
+        Background="#FFF8F9FB"
+        FontFamily="Segoe UI"
+        FontSize="10"
         WindowStartupLocation="CenterScreen">
     <Grid>
         <wfi:WindowsFormsHost x:Name="WinFormsHost"/>
