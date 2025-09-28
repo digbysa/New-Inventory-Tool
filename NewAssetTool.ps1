@@ -56,19 +56,26 @@ function Enable-ModernWindowEffects {
 # --- Rounded corners for any control (e.g., Button) ---
 function Set-RoundedCorners {
   param([System.Windows.Forms.Control]$Control, [int]$Radius = 8)
-  $Control.Add_Resize({
-    $r = New-Object System.Drawing.Rectangle(0,0,$Control.Width,$Control.Height)
-    $d = $Radius * 2
-    $gp = New-Object System.Drawing.Drawing2D.GraphicsPath
-    $gp.AddArc($r.X, $r.Y, $d, $d, 180, 90)
-    $gp.AddArc($r.Right - $d, $r.Y, $d, $d, 270, 90)
-    $gp.AddArc($r.Right - $d, $r.Bottom - $d, $d, $d, 0, 90)
-    $gp.AddArc($r.X, $r.Bottom - $d, $d, $d, 90, 90)
-    $gp.CloseAllFigures()
-    if ($Control.Region) { $Control.Region.Dispose() }
-    $Control.Region = New-Object System.Drawing.Region($gp)
-  })
-  $Control.OnResize([EventArgs]::Empty)
+
+  $applyRegion = {
+    param($sender, $eventArgs)
+    try {
+      if (-not $sender) { return }
+      $r = New-Object System.Drawing.Rectangle(0, 0, $sender.Width, $sender.Height)
+      $d = $Radius * 2
+      $gp = New-Object System.Drawing.Drawing2D.GraphicsPath
+      $gp.AddArc($r.X, $r.Y, $d, $d, 180, 90)
+      $gp.AddArc($r.Right - $d, $r.Y, $d, $d, 270, 90)
+      $gp.AddArc($r.Right - $d, $r.Bottom - $d, $d, $d, 0, 90)
+      $gp.AddArc($r.X, $r.Bottom - $d, $d, $d, 90, 90)
+      $gp.CloseAllFigures()
+      if ($sender.Region) { $sender.Region.Dispose() }
+      $sender.Region = New-Object System.Drawing.Region($gp)
+    } catch {}
+  }
+
+  $Control.Add_Resize($applyRegion)
+  & $applyRegion.Invoke($Control, [EventArgs]::Empty)
 }
 
 # --- DataGridView modern style (dark, compact, anti-flicker) ---
