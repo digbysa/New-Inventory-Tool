@@ -1237,33 +1237,100 @@ $tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Window
 $grpSummary = New-Object System.Windows.Forms.GroupBox; $grpSummary.Text="Device Summary"; $grpSummary.Dock='Fill'
 $grpSummary.Margin = New-Object System.Windows.Forms.Padding($GAP)
 $grpSummary.Padding = New-Object System.Windows.Forms.Padding($GAP)
-$grpSummary.Controls.AddRange(@(
-  (New-L "Detected Type:" 12 28),
-  (New-L "Name:" 12 58),
-  (New-L "Asset Tag:" 12 88),
-  (New-L "Serial:" 12 118),
-  (New-L "Parent:" 12 148),
-  (New-L "PO RITM:" 12 178),
-  (New-L "Retire Date:" 12 208),
-  (New-L "Last Rounded:" 12 238)
-$txtType=New-RO 120 25 340
-))
-$txtHost=New-RO 120 55 340
-$txtAT=New-RO 120 85 340
-$txtSN=New-RO 120 115 340
-$txtParent=New-RO 120 145 340
-$txtRITM=New-RO 120 175 340
-$txtRetire=New-RO 120 205 340
-$txtRound=New-RO 120 235 340
-$grpSummary.Controls.AddRange(@($txtType,$txtHost,$txtAT,$txtSN,$txtParent,$txtRITM,$txtRetire,$txtRound))
-# Fix button beside "Name:"
+
+$tlpSummary = New-Object System.Windows.Forms.TableLayoutPanel
+$tlpSummary.Dock = 'Fill'
+$tlpSummary.Margin = New-Object System.Windows.Forms.Padding(0)
+$tlpSummary.Padding = New-Object System.Windows.Forms.Padding(0)
+$tlpSummary.ColumnCount = 1
+$tlpSummary.RowCount = 16
+$tlpSummary.ColumnStyles.Clear()
+$tlpSummary.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$tlpSummary.RowStyles.Clear()
+for($i = 0; $i -lt 16; $i++){
+  $tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+}
+
+$rowIndex = 0
+
+function New-SummaryLabel([string]$text){
+  $label = New-Object System.Windows.Forms.Label
+  $label.Text = $text
+  $label.AutoSize = $true
+  $label.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+  return $label
+}
+
+function New-SummaryTextBox([bool]$readOnly=$true, [bool]$isLast=$false){
+  $box = New-Object System.Windows.Forms.TextBox
+  $box.Anchor = 'Top,Left,Right'
+  $box.Margin = if($isLast){ New-Object System.Windows.Forms.Padding(0,6,0,0) } else { New-Object System.Windows.Forms.Padding(0,6,0,6) }
+  $box.MinimumSize = New-Object System.Drawing.Size(0,24)
+  $box.Height = 24
+  if($readOnly){
+    $box.ReadOnly = $true
+    $box.BackColor = [System.Drawing.Color]::White
+  }
+  return $box
+}
+
+$tlpSummary.Controls.Add((New-SummaryLabel "Detected Type:"), 0, $rowIndex); $rowIndex++
+$txtType = New-SummaryTextBox
+$tlpSummary.Controls.Add($txtType, 0, $rowIndex); $rowIndex++
+
+$tlpSummary.Controls.Add((New-SummaryLabel "Name:"), 0, $rowIndex); $rowIndex++
+$nameRow = New-Object System.Windows.Forms.TableLayoutPanel
+$nameRow.ColumnCount = 2
+$nameRow.RowCount = 1
+$nameRow.Margin = New-Object System.Windows.Forms.Padding(0,6,0,6)
+$nameRow.ColumnStyles.Clear()
+$nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$nameRow.RowStyles.Clear()
+$nameRow.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$nameRow.Dock = 'Top'
+$nameRow.Anchor = 'Top,Left,Right'
+
+$txtHost = New-SummaryTextBox
+$txtHost.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+$txtHost.Dock = 'Fill'
+$nameRow.Controls.Add($txtHost,0,0)
+
 $btnFixName = New-Object ModernUI.RoundedButton
 $btnFixName.Text = "Fix"
-$btnFixName.Size = '45,24'
-$btnFixName.Location = New-Object System.Drawing.Point(70, 55)
-$btnFixName.Anchor = 'Top,Left'
+$btnFixName.Size = '60,24'
+$btnFixName.Anchor = 'Top,Right'
+$btnFixName.Margin = New-Object System.Windows.Forms.Padding(6,0,0,0)
 $btnFixName.Enabled = $false
-$grpSummary.Controls.Add($btnFixName)
+$nameRow.Controls.Add($btnFixName,1,0)
+
+$tlpSummary.Controls.Add($nameRow, 0, $rowIndex); $rowIndex++
+
+$tlpSummary.Controls.Add((New-SummaryLabel "Asset Tag:"), 0, $rowIndex); $rowIndex++
+$txtAT = New-SummaryTextBox
+$tlpSummary.Controls.Add($txtAT, 0, $rowIndex); $rowIndex++
+
+$tlpSummary.Controls.Add((New-SummaryLabel "Serial:"), 0, $rowIndex); $rowIndex++
+$txtSN = New-SummaryTextBox
+$tlpSummary.Controls.Add($txtSN, 0, $rowIndex); $rowIndex++
+
+$tlpSummary.Controls.Add((New-SummaryLabel "Parent:"), 0, $rowIndex); $rowIndex++
+$txtParent = New-SummaryTextBox
+$tlpSummary.Controls.Add($txtParent, 0, $rowIndex); $rowIndex++
+
+$tlpSummary.Controls.Add((New-SummaryLabel "PO RITM:"), 0, $rowIndex); $rowIndex++
+$txtRITM = New-SummaryTextBox
+$tlpSummary.Controls.Add($txtRITM, 0, $rowIndex); $rowIndex++
+
+$tlpSummary.Controls.Add((New-SummaryLabel "Retire Date:"), 0, $rowIndex); $rowIndex++
+$txtRetire = New-SummaryTextBox
+$tlpSummary.Controls.Add($txtRetire, 0, $rowIndex); $rowIndex++
+
+$tlpSummary.Controls.Add((New-SummaryLabel "Last Rounded:"), 0, $rowIndex); $rowIndex++
+$txtRound = New-SummaryTextBox -isLast $true
+$tlpSummary.Controls.Add($txtRound, 0, $rowIndex)
+
+$grpSummary.Controls.Add($tlpSummary)
 # Device Location (with City)
 $grpLoc = New-Object System.Windows.Forms.GroupBox; $grpLoc.Text="Device Location"; $grpLoc.Dock='Fill'
 $grpLoc.Margin = New-Object System.Windows.Forms.Padding($GAP)
