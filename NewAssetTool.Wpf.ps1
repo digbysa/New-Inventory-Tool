@@ -39,7 +39,7 @@ try {
 $global:NewAssetToolSuppressShow = $true
 
 try {
-  $form = . $ps1Path
+  $scriptOutput = . $ps1Path
 } catch {
   if ($hadPrevious) {
     $global:NewAssetToolSuppressShow = $previousSuppress
@@ -49,11 +49,17 @@ try {
   throw
 }
 
-if (-not $form) {
+if ($scriptOutput -is [System.Windows.Forms.Form]) {
+  $form = $scriptOutput
+} else {
+  $form = ($scriptOutput | Where-Object { $_ -is [System.Windows.Forms.Form] } | Select-Object -First 1)
+}
+
+if (-not $form -and $script:NewAssetToolMainForm -is [System.Windows.Forms.Form]) {
   $form = $script:NewAssetToolMainForm
 }
 
-if (-not $form) {
+if (-not $form -or -not ($form -is [System.Windows.Forms.Form])) {
   throw "NewAssetTool.ps1 did not expose a main form instance."
 }
 
