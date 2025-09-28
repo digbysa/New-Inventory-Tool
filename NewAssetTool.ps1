@@ -9,7 +9,16 @@ function Get-OwnScriptDir {
   try {
     if ($PSCommandPath -and $PSCommandPath -ne '') { return (Split-Path -Parent $PSCommandPath) }
   } catch {}
-
+  try {
+    if ($MyInvocation -and $MyInvocation.MyCommand -and $MyInvocation.MyCommand.Path) {
+      return (Split-Path -Parent $MyInvocation.MyCommand.Path)
+    }
+  } catch {}
+  try {
+    if ($env:__ScriptDir -and (Test-Path $env:__ScriptDir)) { return $env:__ScriptDir }
+  } catch {}
+  return (Get-Location).Path
+}
 
 # =================== Modern WinForms Theming Kit (PowerShell) ===================
 
@@ -195,17 +204,6 @@ function Apply-ModernThemeToForm {
 }
 
 # ================= End Modern WinForms Theming Kit =================
-
-  try {
-    if ($MyInvocation -and $MyInvocation.MyCommand -and $MyInvocation.MyCommand.Path) {
-      return (Split-Path -Parent $MyInvocation.MyCommand.Path)
-    }
-  } catch {}
-  try {
-    if ($env:__ScriptDir -and (Test-Path $env:__ScriptDir)) { return $env:__ScriptDir }
-  } catch {}
-  return (Get-Location).Path
-}
 # Force Data/Output to be script-relative and exist (Output).
 $__ownDir = Get-OwnScriptDir
 $script:DataFolder   = Join-Path $__ownDir 'Data'
