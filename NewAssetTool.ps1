@@ -1,6 +1,25 @@
 ﻿Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+try { [System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.HighDpiMode]::PerMonitorV2) | Out-Null } catch {}
 [System.Windows.Forms.Application]::EnableVisualStyles()
+try { [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false) } catch {}
+
+$script:ThemeFontName = 'Segoe UI'
+$script:ThemeFontSize = 10
+$script:ThemeFont = New-Object System.Drawing.Font($script:ThemeFontName, $script:ThemeFontSize)
+$script:ThemeFontSemibold = New-Object System.Drawing.Font('Segoe UI Semibold', $script:ThemeFontSize)
+$script:ThemeColors = @{
+  Background = [System.Drawing.Color]::FromArgb(248, 249, 251)
+  Surface    = [System.Drawing.Color]::FromArgb(255, 255, 255)
+  Header     = [System.Drawing.Color]::FromArgb(246, 247, 249)
+  Text       = [System.Drawing.Color]::FromArgb(32, 32, 32)
+  MutedText  = [System.Drawing.Color]::FromArgb(90, 90, 90)
+  Accent     = [System.Drawing.Color]::FromArgb(0, 120, 212)
+  AccentHover= [System.Drawing.Color]::FromArgb(0, 102, 189)
+  Grid       = [System.Drawing.Color]::FromArgb(230, 234, 238)
+  AltRow     = [System.Drawing.Color]::FromArgb(250, 252, 255)
+  Selection  = [System.Drawing.Color]::FromArgb(229, 241, 251)
+}
 # ===== Script directory resolver (robust, PS 5.1-safe) =====
 function Get-OwnScriptDir {
   try {
@@ -215,9 +234,9 @@ function Style-DataGridView {
     if ($pi) { $pi.SetValue($Dgv, $true, $null) }
   } catch {}
   $Dgv.BorderStyle = 'None'
-  $Dgv.BackgroundColor = [System.Drawing.Color]::White
+  $Dgv.BackgroundColor = $script:ThemeColors.Surface
   $Dgv.EnableHeadersVisualStyles = $false
-  $Dgv.GridColor = [System.Drawing.Color]::FromArgb(224,224,224)
+  $Dgv.GridColor = $script:ThemeColors.Grid
   $Dgv.RowHeadersVisible = $false
   $Dgv.AutoSizeColumnsMode = 'Fill'
   $Dgv.SelectionMode = 'FullRowSelect'
@@ -225,20 +244,28 @@ function Style-DataGridView {
   $Dgv.AllowUserToResizeRows = $false
   $Dgv.RowTemplate.Height = 28
 
-  $fg  = [System.Drawing.Color]::FromArgb(32,32,32)
-  $bg  = [System.Drawing.Color]::White
-  $bg2 = [System.Drawing.Color]::FromArgb(245,245,245)
-  $sel = [System.Drawing.Color]::FromArgb(0,120,215)
+  $fg  = $script:ThemeColors.Text
+  $bg  = $script:ThemeColors.Surface
+  $bg2 = $script:ThemeColors.AltRow
+  $sel = $script:ThemeColors.Selection
+  $header = $script:ThemeColors.Header
 
   $Dgv.DefaultCellStyle.BackColor   = $bg
   $Dgv.DefaultCellStyle.ForeColor   = $fg
+  $Dgv.DefaultCellStyle.Font = $script:ThemeFont
   $Dgv.DefaultCellStyle.SelectionBackColor = $sel
-  $Dgv.DefaultCellStyle.SelectionForeColor = [System.Drawing.Color]::White
+  $Dgv.DefaultCellStyle.SelectionForeColor = $fg
   $Dgv.AlternatingRowsDefaultCellStyle.BackColor = $bg2
 
-  $Dgv.ColumnHeadersDefaultCellStyle.BackColor = [System.Drawing.Color]::FromArgb(240,240,240)
+  $Dgv.ColumnHeadersDefaultCellStyle.BackColor = $header
   $Dgv.ColumnHeadersDefaultCellStyle.ForeColor = $fg
-  $Dgv.ColumnHeadersDefaultCellStyle.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 9)
+  $Dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = $header
+  $Dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = $fg
+  $Dgv.ColumnHeadersDefaultCellStyle.Font = $script:ThemeFontSemibold
+  $Dgv.RowHeadersDefaultCellStyle.BackColor = $header
+  $Dgv.RowHeadersDefaultCellStyle.ForeColor = $fg
+  $Dgv.RowHeadersDefaultCellStyle.SelectionBackColor = $header
+  $Dgv.RowHeadersDefaultCellStyle.SelectionForeColor = $fg
   foreach ($c in $Dgv.Columns) { $c.MinimumWidth = 60 }
 }
 
@@ -246,21 +273,51 @@ function Style-DataGridView {
 function Set-ModernTheme {
   param([System.Windows.Forms.Control]$Root)
 
-  $Root.Font = New-Object System.Drawing.Font('Segoe UI', 9)
+  $font = $Root.Font
+  if (-not $font) {
+    $Root.Font = $script:ThemeFont
+  } elseif ($font.Name -eq $script:ThemeFontName) {
+    if ([Math]::Abs($font.Size - $script:ThemeFontSize) -gt 0.01) { $Root.Font = $script:ThemeFont }
+  } elseif ($font.Name -eq 'Segoe UI Semibold') {
+    if ([Math]::Abs($font.Size - $script:ThemeFontSize) -gt 0.01) { $Root.Font = $script:ThemeFontSemibold }
+  } elseif ($font.Name -like 'Segoe UI*') {
+    if ([Math]::Abs($font.Size - $script:ThemeFontSize) -gt 0.01) {
+      try { $Root.Font = New-Object System.Drawing.Font($font.Name, $script:ThemeFontSize, $font.Style) } catch { $Root.Font = $script:ThemeFont }
+    }
+  } elseif ($font.Name -notlike 'Segoe MDL2 Assets') {
+    $Root.Font = $script:ThemeFont
+  }
 
-  $bgForm = [System.Drawing.Color]::FromArgb(248,249,252)
-  $bgPane = [System.Drawing.Color]::White
-  $fgText = [System.Drawing.Color]::FromArgb(32,32,32)
-  $accent = [System.Drawing.Color]::FromArgb(0,120,215)
+  $bgForm    = $script:ThemeColors.Background
+  $bgPane    = $script:ThemeColors.Surface
+  $bgHeader  = $script:ThemeColors.Header
+  $fgText    = $script:ThemeColors.Text
+  $accent    = $script:ThemeColors.Accent
+  $accentHv  = $script:ThemeColors.AccentHover
 
   if ($Root -is [System.Windows.Forms.Form]) { $Root.BackColor = $bgForm; $Root.ForeColor = $fgText }
 
   foreach ($ctl in $Root.Controls) {
     switch -Regex ($ctl.GetType().FullName) {
+      'System\.Windows\.Forms\.StatusStrip|System\.Windows\.Forms\.ToolStrip|System\.Windows\.Forms\.MenuStrip|System\.Windows\.Forms\.ContextMenuStrip' {
+        $ctl.BackColor = $bgHeader; $ctl.ForeColor = $fgText
+      }
       'System\.Windows\.Forms\.(Panel|GroupBox|TableLayoutPanel|FlowLayoutPanel)' {
         $ctl.BackColor = $bgPane; $ctl.ForeColor = $fgText
       }
-      'System\.Windows\.Forms\.Label' { $ctl.ForeColor = $fgText }
+      'System\.Windows\.Forms\.TabControl' {
+        $ctl.BackColor = $bgPane; $ctl.ForeColor = $fgText
+      }
+      'System\.Windows\.Forms\.TabPage' {
+        $ctl.BackColor = $bgPane; $ctl.ForeColor = $fgText
+      }
+      'System\.Windows\.Forms\.Label' {
+        try {
+          if ($ctl.ForeColor.IsEmpty -or $ctl.ForeColor.ToArgb() -eq [System.Drawing.SystemColors]::ControlText.ToArgb()) {
+            $ctl.ForeColor = $fgText
+          }
+        } catch { $ctl.ForeColor = $fgText }
+      }
       'System\.Windows\.Forms\.Button|ModernUI\.RoundedButton' {
         try { $ctl.FlatStyle = 'Flat' } catch {}
         try { $ctl.FlatAppearance.BorderSize = 0 } catch {}
@@ -272,7 +329,11 @@ function Set-ModernTheme {
           Set-RoundedCorners $ctl 12
         }
         $accentCopy = $accent
-        $ctl.Add_MouseEnter({ param($s,$e) $s.BackColor = [System.Drawing.Color]::FromArgb(0,150,255) })
+        $accentHover = $accentHv
+        $ctl.Add_MouseEnter(({
+          param($s,$e)
+          $s.BackColor = $accentHover
+        }).GetNewClosure())
         $ctl.Add_MouseLeave(({
           param($s,$e)
           $s.BackColor = $accentCopy
@@ -1101,6 +1162,7 @@ $panelTop.Dock = 'Top'
 $panelTop.AutoSize = $true
 $panelTop.AutoSizeMode = 'GrowAndShrink'
 $panelTop.Padding = New-Object System.Windows.Forms.Padding($GAP, $GAP, $GAP, 0)
+$panelTop.BackColor = $script:ThemeColors.Header
 # Row 1: Paths + counters
 $flpTop = New-Object System.Windows.Forms.FlowLayoutPanel
 $flpTop.Dock = 'Top'
@@ -1258,8 +1320,8 @@ $grpAssoc = New-Object System.Windows.Forms.GroupBox; $grpAssoc.Text="Associated
 $grpAssoc.Margin = New-Object System.Windows.Forms.Padding($GAP)
 $grpAssoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tabAssoc = New-Object System.Windows.Forms.TabControl; $tabAssoc.Dock='Fill'
-$tabGrid = New-Object System.Windows.Forms.TabPage; $tabGrid.Text='Grid'
-$tabCards = New-Object System.Windows.Forms.TabPage; $tabCards.Text='Cards'
+$tabGrid = New-Object System.Windows.Forms.TabPage; $tabGrid.Text='Grid'; $tabGrid.UseVisualStyleBackColor = $false
+$tabCards = New-Object System.Windows.Forms.TabPage; $tabCards.Text='Cards'; $tabCards.UseVisualStyleBackColor = $false
 $tabAssoc.TabPages.AddRange(@($tabGrid,$tabCards))
 $dgv = New-Object System.Windows.Forms.DataGridView
 $dgv.Dock='Fill'; $dgv.AutoGenerateColumns=$false; $dgv.AllowUserToAddRows=$false; $dgv.ReadOnly=$true
@@ -1726,7 +1788,7 @@ function Refresh-AssocGrid($parentRec){
   $dgv.Rows[$prow].Cells['Serial'].Value=$parentRec.serial_number
   $dgv.Rows[$prow].Cells['RITM'].Value=$parentRec.RITM
   $dgv.Rows[$prow].Cells['Retire'].Value= (Fmt-DateLong $parentRec.Retire)
-  $dgv.Rows[$prow].DefaultCellStyle.BackColor=[System.Drawing.Color]::WhiteSmoke
+  $dgv.Rows[$prow].DefaultCellStyle.BackColor = $script:ThemeColors.Header
   $kids = Get-ChildrenForParent $parentRec
   foreach($ch in $kids){
     $rowIdx = $dgv.Rows.Add()
@@ -1754,7 +1816,7 @@ function Refresh-AssocGrid($parentRec){
 function Make-Card($title,$kvPairs,[System.Drawing.Color]$ritmColor,[bool]$showRITM,[bool]$showRetire,$tagPayload){
   $p = New-Object System.Windows.Forms.Panel
   $p.Width = 280; $p.Height = 160; $p.Margin = '6,6,6,6'
-  $p.BackColor = [System.Drawing.Color]::WhiteSmoke; $p.BorderStyle='FixedSingle'
+  $p.BackColor = $script:ThemeColors.Surface; $p.BorderStyle='FixedSingle'
   $p.Tag = $tagPayload
   $p.Add_DoubleClick({
     $ids = $_.Sender.Tag
@@ -1769,7 +1831,7 @@ function Make-Card($title,$kvPairs,[System.Drawing.Color]$ritmColor,[bool]$showR
     }
   })
   $lblTitle = New-Object System.Windows.Forms.Label
-  $lblTitle.Text = $title; $lblTitle.Font = New-Object System.Drawing.Font('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
+  $lblTitle.Text = $title; $lblTitle.Font = $script:ThemeFontSemibold
   $lblTitle.AutoSize=$true; $lblTitle.Location='8,6'
   $p.Controls.Add($lblTitle)
   $y = 28
@@ -1961,7 +2023,7 @@ function Show-AddPeripheralDialog($parentRec){
   $lblHint = New-Object System.Windows.Forms.Label
   $lblHint.Text = 'Press Enter to search.'
   $lblHint.AutoSize = $true
-  $lblHint.ForeColor = [System.Drawing.Color]::DimGray
+  $lblHint.ForeColor = $script:ThemeColors.MutedText
   $lblHint.Margin = '0,0,0,0'
   $inputPanel.Controls.Add($lblSearch,0,0)
   $inputPanel.Controls.Add($txtSearch,0,1)
@@ -2125,6 +2187,7 @@ function Show-AddPeripheralDialog($parentRec){
     }
   })
   $dialog.Add_Shown({ $txtSearch.Focus() })
+  Apply-ModernThemeToForm -Form $dialog
   try { [void]$dialog.ShowDialog($form) } finally { try { $dialog.Dispose() } catch {} }
 }
 function Remove-Selected-Associations($parentRec){
@@ -2708,6 +2771,7 @@ if($assetTag -and $script:RoundingEvents){
 $nearToolbar = New-Object System.Windows.Forms.Panel
 $nearToolbar.Dock = 'Top'
 $nearToolbar.Height = 68
+$nearToolbar.BackColor = $script:ThemeColors.Header
 $lblScopes = New-Object System.Windows.Forms.Label
 $lblScopes.AutoSize = $true
 $lblScopes.Text = "Nearby scopes: 0"
@@ -2972,8 +3036,10 @@ $tabTop = New-Object System.Windows.Forms.TabControl
 $tabTop.Dock = 'Fill'
 $tabPageMain = New-Object System.Windows.Forms.TabPage
 $tabPageMain.Text = 'Main'
+$tabPageMain.UseVisualStyleBackColor = $false
 $tabPageNear = New-Object System.Windows.Forms.TabPage
 $tabPageNear.Text = 'Nearby'
+$tabPageNear.UseVisualStyleBackColor = $false
 # Move existing main UI into a panel and then into TabPageMain
 $pageMain = New-Object System.Windows.Forms.Panel
 $pageMain.Dock = 'Fill'
@@ -3269,6 +3335,25 @@ function Get-StatusOptionsFromGrid {
 }
 
 Apply-ModernThemeToForm -Form $form
+
+$form.BackColor = $script:ThemeColors.Background
+try {
+  $panelTop.BackColor = $script:ThemeColors.Header
+  $nearToolbar.BackColor = $script:ThemeColors.Header
+  $status.BackColor = $script:ThemeColors.Header
+  $status.ForeColor = $script:ThemeColors.Text
+} catch {}
+try {
+  $tlpMain.BackColor = $script:ThemeColors.Background
+  $pageMain.BackColor = $script:ThemeColors.Background
+  $nearPage.BackColor = $script:ThemeColors.Background
+  $tabPageMain.BackColor = $script:ThemeColors.Background
+  $tabPageNear.BackColor = $script:ThemeColors.Background
+  $tabAssoc.BackColor = $script:ThemeColors.Background
+  $tabGrid.BackColor = $script:ThemeColors.Background
+  $tabCards.BackColor = $script:ThemeColors.Background
+  $cards.BackColor = $script:ThemeColors.Background
+} catch {}
 
 $script:NewAssetToolMainForm = $form
 
