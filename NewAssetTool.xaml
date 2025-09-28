@@ -9,7 +9,74 @@
         FontSize="10"
         WindowStartupLocation="CenterScreen">
     <Grid>
-        <wfi:WindowsFormsHost x:Name="WinFormsHost"/>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="60"/>
+            <RowDefinition Height="42"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="#FFFFFFFF">
+            <Grid Margin="24,0"
+                  VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="New Inventory Tool"
+                           FontFamily="Segoe UI Semibold"
+                           FontSize="12"
+                           VerticalAlignment="Center"/>
+                <TabControl Grid.Column="2"
+                            Margin="0"
+                            Width="180"
+                            Height="36"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            SelectedIndex="0">
+                    <TabItem Header="Main"/>
+                    <TabItem Header="Nearby"/>
+                </TabControl>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1"
+                Margin="24,0"
+                Height="42"
+                Background="#FFFDFDFE"
+                BorderBrush="#FFE0E3E9"
+                BorderThickness="1"
+                CornerRadius="6"
+                VerticalAlignment="Center">
+            <Grid>
+                <TextBox x:Name="SearchTextBox"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         FontSize="14"
+                         Padding="12,10"
+                         VerticalContentAlignment="Center"/>
+                <TextBlock Text="Scan / Enter Name, SN# or Asset Tag ⌕"
+                           Margin="12,0"
+                           VerticalAlignment="Center"
+                           Foreground="#FF8A92A6"
+                           IsHitTestVisible="False">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Text, ElementName=SearchTextBox}" Value="">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </Border>
+
+        <wfi:WindowsFormsHost x:Name="WinFormsHost"
+                              Grid.Row="2"/>
     </Grid>
 </Window>
 
