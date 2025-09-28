@@ -1210,15 +1210,15 @@ $panelTop.Controls.Add($flpTop)
 # Main 2-col table
 $tlpMain = New-Object System.Windows.Forms.TableLayoutPanel
 $LEFT_COL_WIDTH  = 520
-$RIGHT_COL_WIDTH = 640
 $tlpMain.Dock = 'Fill'
 $tlpMain.ColumnCount = 2
 $tlpMain.RowCount = 1
-$tlpMain.Padding = New-Object System.Windows.Forms.Padding($GAP, 0, $GAP, $GAP)
+$tlpMain.Padding = New-Object System.Windows.Forms.Padding(16)
+$tlpMain.CellBorderStyle = [System.Windows.Forms.TableLayoutPanelCellBorderStyle]::None
 $tlpMain.BackColor = [System.Drawing.Color]::White
 $tlpMain.ColumnStyles.Clear()
 $tlpMain.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, $LEFT_COL_WIDTH)) )
-$tlpMain.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, $RIGHT_COL_WIDTH)) )
+$tlpMain.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 $tlpMain.RowStyles.Clear()
 $tlpMain.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 function New-L($t,$x,$y){$l=New-Object System.Windows.Forms.Label;$l.Text=$t;$l.AutoSize=$true;$l.Location=New-Object System.Drawing.Point($x,$y);$l}
