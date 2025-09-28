@@ -57,7 +57,7 @@ function Enable-ModernWindowEffects {
 function Set-RoundedCorners {
   param([System.Windows.Forms.Control]$Control, [int]$Radius = 8)
 
-  $applyRegion = {
+  $applyRegion = ({
     param($sender, $eventArgs)
     try {
       if (-not $sender) { return }
@@ -72,7 +72,7 @@ function Set-RoundedCorners {
       if ($sender.Region) { $sender.Region.Dispose() }
       $sender.Region = New-Object System.Drawing.Region($gp)
     } catch {}
-  }
+  }).GetNewClosure()
 
   $Control.Add_Resize($applyRegion)
   $applyRegion.Invoke($Control, [System.EventArgs]::Empty)
@@ -138,8 +138,12 @@ function Set-ModernTheme {
         $ctl.BackColor = $accent
         $ctl.ForeColor = [System.Drawing.Color]::Black
         Set-RoundedCorners $ctl 10
+        $accentCopy = $accent
         $ctl.Add_MouseEnter({ param($s,$e) $s.BackColor = [System.Drawing.Color]::FromArgb(80,160,255) })
-        $ctl.Add_MouseLeave({ param($s,$e) $s.BackColor = $accent })
+        $ctl.Add_MouseLeave(({
+          param($s,$e)
+          $s.BackColor = $accentCopy
+        }).GetNewClosure())
       }
       'System\.Windows\.Forms\.TextBox' {
         $ctl.BorderStyle = 'FixedSingle'
