@@ -20,6 +20,61 @@ $script:ThemeColors = @{
   AltRow     = [System.Drawing.Color]::FromArgb(250, 252, 255)
   Selection  = [System.Drawing.Color]::FromArgb(229, 241, 251)
 }
+$script:CardPadding = 16
+
+function Get-DarkerColor {
+  param(
+    [Parameter(Mandatory)] [System.Drawing.Color] $Color,
+    [double] $Amount = 0.12
+  )
+
+  $factor = [Math]::Min([Math]::Max($Amount, 0), 1)
+  $scale  = 1 - $factor
+  return [System.Drawing.Color]::FromArgb(
+    $Color.A,
+    [Math]::Max([int][Math]::Round($Color.R * $scale), 0),
+    [Math]::Max([int][Math]::Round($Color.G * $scale), 0),
+    [Math]::Max([int][Math]::Round($Color.B * $scale), 0)
+  )
+}
+
+if (-not ('Win32.NativeMethods' -as [Type])) {
+  Add-Type -Namespace Win32 -Name NativeMethods -MemberDefinition @"
+using System;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
+
+public static class NativeMethods
+{
+    private const int EM_SETCUEBANNER = 0x1501;
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, string lParam);
+
+    public static void SetCueBanner(TextBox box, string text)
+    {
+        if (box == null)
+        {
+            return;
+        }
+
+        SendMessage(box.Handle, EM_SETCUEBANNER, IntPtr.Zero, text ?? string.Empty);
+    }
+}
+"@
+}
+
+function Set-CueBanner {
+  param(
+    [System.Windows.Forms.TextBox] $TextBox,
+    [string] $Text
+  )
+
+  if (-not $TextBox) { return }
+  try {
+    [Win32.NativeMethods]::SetCueBanner($TextBox, $Text)
+  } catch {}
+}
 # ===== Script directory resolver (robust, PS 5.1-safe) =====
 function Get-OwnScriptDir {
   try {
@@ -302,7 +357,18 @@ function Set-ModernTheme {
       'System\.Windows\.Forms\.StatusStrip|System\.Windows\.Forms\.ToolStrip|System\.Windows\.Forms\.MenuStrip|System\.Windows\.Forms\.ContextMenuStrip' {
         $ctl.BackColor = $bgHeader; $ctl.ForeColor = $fgText
       }
-      'System\.Windows\.Forms\.(Panel|GroupBox|TableLayoutPanel|FlowLayoutPanel)' {
+      'System\.Windows\.Forms\.GroupBox' {
+        $ctl.BackColor = $bgPane
+        try { $ctl.ForeColor = $script:ThemeColors.MutedText } catch { $ctl.ForeColor = $fgText }
+        try { $ctl.Font = $script:ThemeFontSemibold } catch {}
+        try {
+          $targetPadding = [System.Windows.Forms.Padding]::new($script:CardPadding)
+          if (-not $ctl.Padding -or $ctl.Padding.Left -ne $targetPadding.Left -or $ctl.Padding.Top -ne $targetPadding.Top -or $ctl.Padding.Right -ne $targetPadding.Right -or $ctl.Padding.Bottom -ne $targetPadding.Bottom) {
+            $ctl.Padding = $targetPadding
+          }
+        } catch {}
+      }
+      'System\.Windows\.Forms\.(Panel|TableLayoutPanel|FlowLayoutPanel)' {
         $ctl.BackColor = $bgPane; $ctl.ForeColor = $fgText
       }
       'System\.Windows\.Forms\.TabControl' {
@@ -321,23 +387,37 @@ function Set-ModernTheme {
       'System\.Windows\.Forms\.Button|ModernUI\.RoundedButton' {
         try { $ctl.FlatStyle = 'Flat' } catch {}
         try { $ctl.FlatAppearance.BorderSize = 0 } catch {}
-        $ctl.BackColor = $accent
-        $ctl.ForeColor = [System.Drawing.Color]::White
+        try { $ctl.Cursor = [System.Windows.Forms.Cursors]::Hand } catch {}
+        $baseColor = $null
+        try {
+          $baseColor = $ctl.BackColor
+        } catch {}
+        if (-not $baseColor -or $baseColor.IsEmpty -or $baseColor.A -eq 0 -or $baseColor.ToArgb() -eq [System.Drawing.SystemColors]::Control.ToArgb()) {
+          $baseColor = $accent
+        }
+        $hoverColor = Get-DarkerColor -Color $baseColor
+        $ctl.BackColor = $baseColor
+        try {
+          $brightness = $baseColor.GetBrightness()
+          if ($brightness -lt 0.65) { $ctl.ForeColor = [System.Drawing.Color]::White } else { $ctl.ForeColor = $fgText }
+        } catch { $ctl.ForeColor = [System.Drawing.Color]::White }
         if ($ctl -is [ModernUI.RoundedButton]) {
           $ctl.CornerRadius = 14
         } else {
           Set-RoundedCorners $ctl 12
         }
-        $accentCopy = $accent
-        $accentHover = $accentHv
-        $ctl.Add_MouseEnter(({
-          param($s,$e)
-          $s.BackColor = $accentHover
-        }).GetNewClosure())
-        $ctl.Add_MouseLeave(({
-          param($s,$e)
-          $s.BackColor = $accentCopy
-        }).GetNewClosure())
+        try {
+          $ctl.MinimumSize = New-Object System.Drawing.Size($ctl.MinimumSize.Width, [Math]::Max(32, $ctl.MinimumSize.Height))
+        } catch {}
+        if ($ctl.Height -lt 32) { $ctl.Height = 32 }
+        $mouseEnterHandler = ({ param($s,$e) $s.BackColor = $hoverColor }).GetNewClosure()
+        $mouseLeaveHandler = ({ param($s,$e) if (-not $s.Focused) { $s.BackColor = $baseColor } }).GetNewClosure()
+        $focusHandler      = ({ param($s,$e) $s.BackColor = $hoverColor }).GetNewClosure()
+        $blurHandler       = ({ param($s,$e) $s.BackColor = $baseColor }).GetNewClosure()
+        $ctl.Add_MouseEnter($mouseEnterHandler)
+        $ctl.Add_MouseLeave($mouseLeaveHandler)
+        $ctl.Add_GotFocus($focusHandler)
+        $ctl.Add_LostFocus($blurHandler)
       }
       'System\.Windows\.Forms\.TextBox' {
         $ctl.BorderStyle = 'FixedSingle'
@@ -1164,7 +1244,7 @@ $panelTop = New-Object System.Windows.Forms.Panel
 $panelTop.Dock = 'Top'
 $panelTop.AutoSize = $true
 $panelTop.AutoSizeMode = 'GrowAndShrink'
-$panelTop.Padding = New-Object System.Windows.Forms.Padding($GAP, $GAP, $GAP, 0)
+$panelTop.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding, $script:CardPadding, $script:CardPadding, 0)
 $panelTop.BackColor = $script:ThemeColors.Header
 # Row 1: Paths + counters
 $flpTop = New-Object System.Windows.Forms.FlowLayoutPanel
@@ -1193,19 +1273,36 @@ $grpScan = New-Object System.Windows.Forms.GroupBox
 $grpScan.Text="Scan / enter Name, SN# or Asset Tag"
 $grpScan.Dock='Top'
 $grpScan.Margin = '0,6,0,0'
-$grpScan.Padding = '8,8,8,8'
-$grpScan.AutoSize = $false
-$grpScan.Height = 56
+$grpScan.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
+$grpScan.AutoSize = $true
+$grpScan.AutoSizeMode = 'GrowAndShrink'
 $txtScan = New-Object System.Windows.Forms.TextBox
-$txtScan.Location='16,22'
-$txtScan.Anchor='Top,Left,Right'
-$txtScan.Size='900,24'
+$txtScan.Dock = 'Fill'
+$txtScan.Margin = New-Object System.Windows.Forms.Padding(0,0,8,0)
+try { $txtScan.MinimumSize = New-Object System.Drawing.Size(0,32) } catch {}
+$txtScan.Height = 32
 $btnLookup = New-Object ModernUI.RoundedButton
 $btnLookup.Text="Lookup"
-$btnLookup.Location='930,20'
-$btnLookup.Anchor='Top,Right'
-$btnLookup.Size='110,26'
-$grpScan.Controls.AddRange(@($txtScan,$btnLookup))
+$btnLookup.AutoSize = $false
+$btnLookup.Dock = 'Fill'
+$btnLookup.Margin = New-Object System.Windows.Forms.Padding(0)
+try { $btnLookup.MinimumSize = New-Object System.Drawing.Size(110,32) } catch {}
+$btnLookup.Size='110,32'
+$scanLayout = New-Object System.Windows.Forms.TableLayoutPanel
+$scanLayout.Dock = 'Fill'
+$scanLayout.ColumnCount = 2
+$scanLayout.RowCount = 1
+$scanLayout.Margin = New-Object System.Windows.Forms.Padding(0)
+$scanLayout.Padding = New-Object System.Windows.Forms.Padding(0)
+$scanLayout.ColumnStyles.Clear()
+$scanLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$scanLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$scanLayout.RowStyles.Clear()
+$scanLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$scanLayout.Controls.Add($txtScan,0,0)
+$scanLayout.Controls.Add($btnLookup,1,0)
+$grpScan.Controls.Add($scanLayout)
+Set-CueBanner -TextBox $txtScan -Text 'Scan / enter Name, SN# or Asset Tag'
 # Add SCAN first, then TOP row second so the TOP row ends up above the scan row
 $panelTop.Controls.Add($grpScan)
 $panelTop.Controls.Add($flpTop)
@@ -1216,7 +1313,7 @@ $LEFT_COL_WIDTH  = 520
 $tlpMain.Dock = 'Fill'
 $tlpMain.ColumnCount = 2
 $tlpMain.RowCount = 1
-$tlpMain.Padding = New-Object System.Windows.Forms.Padding(16)
+$tlpMain.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
 $tlpMain.CellBorderStyle = [System.Windows.Forms.TableLayoutPanelCellBorderStyle]::None
 $tlpMain.BackColor = [System.Drawing.Color]::White
 $tlpMain.ColumnStyles.Clear()
@@ -1235,7 +1332,7 @@ $leftColumn.Padding = New-Object System.Windows.Forms.Padding(0)
 # Device Summary
 $grpSummary = New-Object System.Windows.Forms.GroupBox; $grpSummary.Text="Device Summary"; $grpSummary.Dock='Top'
 $grpSummary.Margin = New-Object System.Windows.Forms.Padding(0,0,0,$CARD_SPACING)
-$grpSummary.Padding = New-Object System.Windows.Forms.Padding($GAP)
+$grpSummary.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
 
 $tlpSummary = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpSummary.Dock = 'Fill'
@@ -1333,7 +1430,7 @@ $grpSummary.Controls.Add($tlpSummary)
 # Device Location (with City)
 $grpLoc = New-Object System.Windows.Forms.GroupBox; $grpLoc.Text="Device Location"; $grpLoc.Dock='Top'
 $grpLoc.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
-$grpLoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
+$grpLoc.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
 
 $tlpLoc = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpLoc.Dock = 'Fill'
@@ -1359,7 +1456,7 @@ function New-LocTextBox {
   $box.ReadOnly = $true
   $box.BackColor = [System.Drawing.Color]::White
   $box.Dock = 'Fill'
-  $box.Margin = New-Object System.Windows.Forms.Padding(0,4,0,0)
+  $box.Margin = New-Object System.Windows.Forms.Padding(0,6,0,0)
   $box.MinimumSize = New-Object System.Drawing.Size(0,24)
   $box.Height = 24
   return $box
@@ -1368,7 +1465,7 @@ function New-LocTextBox {
 function New-LocCombo {
   $combo = New-Object System.Windows.Forms.ComboBox
   $combo.Dock = 'Fill'
-  $combo.Margin = New-Object System.Windows.Forms.Padding(0,4,0,0)
+  $combo.Margin = New-Object System.Windows.Forms.Padding(0,6,0,0)
   $combo.Visible = $false
   $combo.DropDownStyle = 'DropDown'
   return $combo
@@ -1481,7 +1578,7 @@ $rightColumn.Padding = New-Object System.Windows.Forms.Padding(0)
 # Associated devices (right column, top)
 $grpAssoc = New-Object System.Windows.Forms.GroupBox; $grpAssoc.Text="Associated Devices"; $grpAssoc.Dock='Top'
 $grpAssoc.Margin = New-Object System.Windows.Forms.Padding(0,0,0,$CARD_SPACING)
-$grpAssoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
+$grpAssoc.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
 $tlpAssoc = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpAssoc.Dock = 'Fill'
 $tlpAssoc.ColumnCount = 1
@@ -1521,7 +1618,7 @@ $assocButtonsPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndSh
 $assocButtonsPanel.WrapContents = $false
 $assocButtonsPanel.FlowDirection = 'LeftToRight'
 $assocButtonsPanel.Margin = '0,0,0,0'
-$assocButtonsPanel.Padding = '0,4,0,0'
+$assocButtonsPanel.Padding = '0,6,0,0'
 $assocButtonsPanel.Controls.Add($btnAddPeripheral)
 $assocButtonsPanel.Controls.Add($btnRemove)
 $assocToolbarPanel.Controls.Add($assocButtonsPanel)
@@ -1602,7 +1699,7 @@ $grpAssoc.Controls.Add($tlpAssoc)
 # Rounding group
 $grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Top'
 $grpMaint.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
-$grpMaint.Padding = New-Object System.Windows.Forms.Padding(12)
+$grpMaint.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
 
 $lblMaintType=New-Object System.Windows.Forms.Label; $lblMaintType.Text='Maintenance Type'; $lblMaintType.AutoSize=$true
 $cmbMaintType=New-Object System.Windows.Forms.ComboBox; $cmbMaintType.DropDownStyle='DropDownList'; $cmbMaintType.Dock='Fill'
@@ -1736,7 +1833,7 @@ $actionsPanel.Controls.Add($btnSave)
 $actionsPanel.Controls.Add($btnManualRound)
 
 $lblComments.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
-$txtComments.Margin = New-Object System.Windows.Forms.Padding(0,4,0,0)
+$txtComments.Margin = New-Object System.Windows.Forms.Padding(0,6,0,0)
 
 $layoutMaint.Controls.Add($rowCombos,0,0)
 $layoutMaint.Controls.Add($rowTime,0,1)
@@ -2312,7 +2409,7 @@ function Show-AddPeripheralDialog($parentRec){
   $dialog.ShowIcon = $false
   $dialog.AutoSize = $true
   $dialog.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
-  $dialog.Padding = New-Object System.Windows.Forms.Padding(12)
+  $dialog.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
 
   $layout = New-Object System.Windows.Forms.TableLayoutPanel
   $layout.Dock = 'Fill'
@@ -2337,10 +2434,11 @@ function Show-AddPeripheralDialog($parentRec){
   $lblSearch = New-Object System.Windows.Forms.Label
   $lblSearch.Text = 'Universal Search:'
   $lblSearch.AutoSize = $true
-  $lblSearch.Margin = '0,0,0,2'
+  $lblSearch.Margin = '0,0,0,6'
   $txtSearch = New-Object System.Windows.Forms.TextBox
   $txtSearch.Width = 260
-  $txtSearch.Margin = '0,0,0,4'
+  $txtSearch.Margin = '0,6,0,6'
+  Set-CueBanner -TextBox $txtSearch -Text 'Search name, asset tag or serial'
   $lblHint = New-Object System.Windows.Forms.Label
   $lblHint.Text = 'Press Enter to search.'
   $lblHint.AutoSize = $true
@@ -2356,7 +2454,7 @@ function Show-AddPeripheralDialog($parentRec){
   $grpPreview.AutoSize = $true
   $grpPreview.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $grpPreview.Dock = 'Top'
-  $grpPreview.Padding = New-Object System.Windows.Forms.Padding(10)
+  $grpPreview.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
   $tblPreview = New-Object System.Windows.Forms.TableLayoutPanel
   $tblPreview.AutoSize = $true
   $tblPreview.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
@@ -2374,13 +2472,13 @@ function Show-AddPeripheralDialog($parentRec){
     $lbl = New-Object System.Windows.Forms.Label
     $lbl.Text = $text
     $lbl.AutoSize = $true
-    $lbl.Margin = '0,0,6,4'
+    $lbl.Margin = '0,0,6,6'
     return $lbl
   }
   $createValue = {
     $lbl = New-Object System.Windows.Forms.Label
     $lbl.AutoSize = $true
-    $lbl.Margin = '0,0,0,4'
+    $lbl.Margin = '0,0,0,6'
     return $lbl
   }
 
