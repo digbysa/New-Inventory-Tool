@@ -46,7 +46,7 @@ using System.Windows.Forms;
 
 namespace Win32
 {
-    internal static class NativeMethods
+    public static class NativeMethods
     {
         private const int EM_SETCUEBANNER = 0x1501;
 
@@ -1325,7 +1325,7 @@ $tlpMain.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.
 $tlpMain.RowStyles.Clear()
 $tlpMain.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 function New-L($t,$x,$y){$l=New-Object System.Windows.Forms.Label;$l.Text=$t;$l.AutoSize=$true;$l.Location=New-Object System.Drawing.Point($x,$y);$l}
-function New-RO($x,$y,$w){$t=New-Object System.Windows.Forms.TextBox;$t.Location="$x,$y";$t.Size="$w,24";$t.ReadOnly=$true;$t.BackColor='White';$t}
+function New-RO($x,$y,$w){$t=New-Object System.Windows.Forms.TextBox;$t.Location="$x,$y";$t.Size="$w,24";$t.ReadOnly=$true;$t.BackColor='White';$t.TabStop=$false;$t}
 # Left column stack (panel with top-docked group boxes)
 $leftColumn = New-Object System.Windows.Forms.Panel
 $leftColumn.Dock = 'Fill'
@@ -1369,6 +1369,9 @@ function New-SummaryTextBox([bool]$readOnly=$true, [bool]$isLast=$false){
   if($readOnly){
     $box.ReadOnly = $true
     $box.BackColor = [System.Drawing.Color]::White
+    $box.TabStop = $false
+  } else {
+    $box.TabStop = $true
   }
   return $box
 }
@@ -1462,6 +1465,7 @@ function New-LocTextBox {
   $box.Margin = New-Object System.Windows.Forms.Padding(0,6,0,0)
   $box.MinimumSize = New-Object System.Drawing.Size(0,24)
   $box.Height = 24
+  $box.TabStop = $false
   return $box
 }
 
