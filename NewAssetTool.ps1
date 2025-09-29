@@ -53,7 +53,7 @@ namespace Win32
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, string lParam);
 
-        internal static void SetCueBanner(TextBox box, string text)
+        public static void SetCueBanner(TextBox box, string text)
         {
             if (box == null)
             {
@@ -1220,6 +1220,7 @@ $LEFT_COL_PERCENT   = 46
 $RIGHT_COL_PERCENT  = 54
 $GAP                = 6
 $CARD_SPACING       = 10
+$ASSOC_GRID_HEIGHT  = 260
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Inventory Assoc Finder - OMI"
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
@@ -1332,6 +1333,7 @@ $leftColumn.Dock = 'Fill'
 $leftColumn.AutoScroll = $true
 $leftColumn.Margin = New-Object System.Windows.Forms.Padding(0, $GAP, $CARD_SPACING, $GAP)
 $leftColumn.Padding = New-Object System.Windows.Forms.Padding(0)
+try { $leftColumn.MinimumSize = New-Object System.Drawing.Size($LEFT_COL_WIDTH, 0) } catch {}
 # Device Summary
 $grpSummary = New-Object System.Windows.Forms.GroupBox; $grpSummary.Text="Device Summary"; $grpSummary.Dock='Top'
 $grpSummary.Margin = New-Object System.Windows.Forms.Padding(0,0,0,$CARD_SPACING)
@@ -1596,7 +1598,8 @@ $tlpAssoc.ColumnStyles.Clear()
 $tlpAssoc.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 $tlpAssoc.RowStyles.Clear()
 $tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
-$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 200)) )
+$assocGridRowStyle = New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, $ASSOC_GRID_HEIGHT)
+$tlpAssoc.RowStyles.Add($assocGridRowStyle)
 $assocToolbarPanel = New-Object System.Windows.Forms.Panel
 $assocToolbarPanel.Dock = 'Fill'
 $assocToolbarPanel.AutoSize = $false
@@ -1633,6 +1636,8 @@ $assocGridPanel = New-Object System.Windows.Forms.Panel
 $assocGridPanel.Dock = 'Fill'
 $assocGridPanel.Margin = '0,0,0,0'
 $assocGridPanel.Padding = '0,0,0,0'
+try { $assocGridPanel.MinimumSize = New-Object System.Drawing.Size(0, $ASSOC_GRID_HEIGHT) } catch {}
+try { $assocGridPanel.MaximumSize = New-Object System.Drawing.Size([System.Int32]::MaxValue, $ASSOC_GRID_HEIGHT) } catch {}
 $dgv = New-Object System.Windows.Forms.DataGridView
 $dgv.Dock='Fill'; $dgv.AutoGenerateColumns=$false; $dgv.AllowUserToAddRows=$false; $dgv.ReadOnly=$true
 $dgv.SelectionMode=[System.Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
@@ -1753,7 +1758,7 @@ $btnManualRound.BackColor = $secondaryBlue
 $btnManualRound.ForeColor = [System.Drawing.Color]::White
 
 $lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 10
-$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Anchor='Top,Left,Right,Bottom'; $txtComments.TabIndex=11; $txtComments.WordWrap = $true
+$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=11; $txtComments.WordWrap = $true
 
 $layoutMaint = New-Object System.Windows.Forms.TableLayoutPanel
 $layoutMaint.Dock = 'Fill'
@@ -1952,36 +1957,10 @@ function Get-AssocSizing([int]$rows){
   try{
     if($rows -lt 1){ $rows = 1 }
     $result.Rows = $rows
-    $visibleHeight = 0
-    $visibleCount  = 0
-    foreach($row in $dgv.Rows){
-      if($null -eq $row){ continue }
-      if($row.IsNewRow){ continue }
-      if(-not $row.Visible){ continue }
-      $visibleHeight += [int][Math]::Max($row.Height, 0)
-      $visibleCount++
-      if($visibleCount -ge $rows){ break }
-    }
-    if($visibleCount -lt $rows){
-      $rowH = [Math]::Max($dgv.RowTemplate.Height, 22)
-      $visibleHeight += ($rows - $visibleCount) * $rowH
-    }
-    $hdrH = 0
-    if($dgv.ColumnHeadersVisible){
-      $hdrH = [Math]::Max($dgv.ColumnHeadersHeight, 24)
-    }
-    $gridH = $visibleHeight + $hdrH
-    $gridH += [Math]::Max([System.Windows.Forms.SystemInformation]::BorderSize.Height * 2, 2)
-    $totalColW = 0
-    foreach($c in $dgv.Columns){ if($c.Visible){ $totalColW += [int]$c.Width } }
-    $clientW = [Math]::Max($dgv.ClientSize.Width, $dgv.DisplayRectangle.Width)
-    if($clientW -le 0){ $clientW = $dgv.Width }
-    if($totalColW -gt $clientW){
-      $gridH += [System.Windows.Forms.SystemInformation]::HorizontalScrollBarHeight
-    }
+    $gridH = [Math]::Max([int]$ASSOC_GRID_HEIGHT, 0)
     $target = $gridH + $dgv.Margin.Vertical + $tlpAssoc.Padding.Vertical + $assocGridPanel.Padding.Vertical
     $result.Target = [Math]::Max([int]$target, 0)
-    $result.Grid   = [Math]::Max([int]$gridH, 0)
+    $result.Grid   = $gridH
   } catch { }
   return $result
 }
@@ -1991,8 +1970,9 @@ function Size-AssocForRows([int]$rows){
     if($info.Target -gt 0){
       $tlpAssoc.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::AutoSize
       $tlpAssoc.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
-      $tlpAssoc.RowStyles[1].Height   = $info.Grid
-      try { $assocGridPanel.MinimumSize = New-Object System.Drawing.Size(0, [Math]::Max([int]$info.Grid, 0)) } catch {}
+      $tlpAssoc.RowStyles[1].Height   = $ASSOC_GRID_HEIGHT
+      try { $assocGridPanel.MinimumSize = New-Object System.Drawing.Size(0, [Math]::Max([int]$ASSOC_GRID_HEIGHT, 0)) } catch {}
+      try { $assocGridPanel.MaximumSize = New-Object System.Drawing.Size([System.Int32]::MaxValue, [Math]::Max([int]$ASSOC_GRID_HEIGHT, 0)) } catch {}
     }
   } catch { }
   return $info
