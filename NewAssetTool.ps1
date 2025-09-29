@@ -1483,21 +1483,97 @@ $tlpRight.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tlpRight.RowStyles.Clear()
 $tlpRight.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
 $tlpRight.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
-# Associated Devices
+# Associated devices (right column, top)
 $grpAssoc = New-Object System.Windows.Forms.GroupBox; $grpAssoc.Text="Associated Devices"; $grpAssoc.Dock='Fill'
 $grpAssoc.Margin = New-Object System.Windows.Forms.Padding($GAP)
 $grpAssoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
-$tabAssoc = New-Object System.Windows.Forms.TabControl; $tabAssoc.Dock='Fill'
-$tabGrid = New-Object System.Windows.Forms.TabPage; $tabGrid.Text='Grid'; $tabGrid.UseVisualStyleBackColor = $false
-$tabCards = New-Object System.Windows.Forms.TabPage; $tabCards.Text='Cards'; $tabCards.UseVisualStyleBackColor = $false
-$tabAssoc.TabPages.AddRange(@($tabGrid,$tabCards))
+$tlpAssoc = New-Object System.Windows.Forms.TableLayoutPanel
+$tlpAssoc.Dock = 'Fill'
+$tlpAssoc.ColumnCount = 1
+$tlpAssoc.RowCount = 2
+$tlpAssoc.Margin = '0,0,0,0'
+$tlpAssoc.Padding = '0,0,0,0'
+$tlpAssoc.ColumnStyles.Clear()
+$tlpAssoc.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
+$tlpAssoc.RowStyles.Clear()
+$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
+$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 200)) )
+$assocToolbarPanel = New-Object System.Windows.Forms.Panel
+$assocToolbarPanel.Dock = 'Fill'
+$assocToolbarPanel.AutoSize = $false
+$assocToolbarPanel.Margin = '0,0,0,6'
+$assocToolbarPanel.Padding = '0,0,0,0'
+$assocToolbarPanel.Height = 40
+try { $assocToolbarPanel.MinimumSize = New-Object System.Drawing.Size(0, 40) } catch {}
+$btnAddPeripheral = New-Object ModernUI.RoundedButton
+$btnAddPeripheral.Text   = 'Add Peripheral'
+$btnAddPeripheral.Size   = '140,32'
+$btnAddPeripheral.Margin = '0,0,8,0'
+$btnAddPeripheral.Anchor = 'Left'
+$btnAddPeripheral.BackColor = [System.Drawing.Color]::FromArgb(0,120,212)
+$btnAddPeripheral.ForeColor = [System.Drawing.Color]::White
+$btnRemove = New-Object ModernUI.RoundedButton
+$btnRemove.Text   = 'Remove Peripheral'
+$btnRemove.Size   = '160,32'
+$btnRemove.Margin = '0,0,0,0'
+$btnRemove.Anchor = 'Left'
+$btnRemove.BackColor = [System.Drawing.Color]::FromArgb(243,245,248)
+$btnRemove.ForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
+$assocButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
+$assocButtonsPanel.Dock = 'Left'
+$assocButtonsPanel.AutoSize = $true
+$assocButtonsPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+$assocButtonsPanel.WrapContents = $false
+$assocButtonsPanel.FlowDirection = 'LeftToRight'
+$assocButtonsPanel.Margin = '0,0,0,0'
+$assocButtonsPanel.Padding = '0,4,0,0'
+$assocButtonsPanel.Controls.Add($btnAddPeripheral)
+$assocButtonsPanel.Controls.Add($btnRemove)
+$assocToolbarPanel.Controls.Add($assocButtonsPanel)
+$assocGridPanel = New-Object System.Windows.Forms.Panel
+$assocGridPanel.Dock = 'Fill'
+$assocGridPanel.Margin = '0,0,0,0'
+$assocGridPanel.Padding = '0,0,0,0'
 $dgv = New-Object System.Windows.Forms.DataGridView
 $dgv.Dock='Fill'; $dgv.AutoGenerateColumns=$false; $dgv.AllowUserToAddRows=$false; $dgv.ReadOnly=$true
 $dgv.SelectionMode=[System.Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
-$dgv.MultiSelect=$true; $dgv.RowHeadersVisible=$false; $dgv.BackgroundColor=[System.Drawing.Color]::White; $dgv.BorderStyle='FixedSingle'
+$dgv.MultiSelect=$false; $dgv.RowHeadersVisible=$false; $dgv.BackgroundColor=[System.Drawing.Color]::White; $dgv.BorderStyle='None'
 $dgv.AutoSizeColumnsMode='Fill'
 $dgv.AutoSizeRowsMode=[System.Windows.Forms.DataGridViewAutoSizeRowsMode]::AllCells
-$dgv.ScrollBars=[System.Windows.Forms.ScrollBars]::None
+$dgv.ScrollBars=[System.Windows.Forms.ScrollBars]::Vertical
+$dgv.EnableHeadersVisualStyles = $false
+$dgv.GridColor = [System.Drawing.Color]::FromArgb(230,234,238)
+$dgv.CellBorderStyle = [System.Windows.Forms.DataGridViewCellBorderStyle]::SingleHorizontal
+$dgv.ColumnHeadersBorderStyle = [System.Windows.Forms.DataGridViewHeaderBorderStyle]::Single
+$dgv.RowTemplate.Height = 28
+$dgv.AllowUserToResizeRows = $false
+$dgv.Margin = '0,0,0,0'
+try {
+  $headerStyle = New-Object System.Windows.Forms.DataGridViewCellStyle
+  $headerStyle.BackColor = [System.Drawing.Color]::FromArgb(246,247,249)
+  $headerStyle.ForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
+  $headerStyle.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 9)
+  $headerStyle.SelectionBackColor = [System.Drawing.Color]::FromArgb(229,241,251)
+  $headerStyle.SelectionForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
+  $headerStyle.Alignment = [System.Windows.Forms.DataGridViewContentAlignment]::MiddleLeft
+  $dgv.ColumnHeadersDefaultCellStyle = $headerStyle
+} catch {}
+try {
+  $cellStyle = New-Object System.Windows.Forms.DataGridViewCellStyle
+  $cellStyle.BackColor = [System.Drawing.Color]::White
+  $cellStyle.ForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
+  $cellStyle.SelectionBackColor = [System.Drawing.Color]::FromArgb(229,241,251)
+  $cellStyle.SelectionForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
+  $cellStyle.Font = New-Object System.Drawing.Font('Segoe UI', 9)
+  $dgv.DefaultCellStyle = $cellStyle
+} catch {}
+try {
+  $altStyle = New-Object System.Windows.Forms.DataGridViewCellStyle
+  $altStyle.BackColor = [System.Drawing.Color]::FromArgb(250,252,255)
+  $altStyle.SelectionBackColor = [System.Drawing.Color]::FromArgb(229,241,251)
+  $altStyle.SelectionForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
+  $dgv.AlternatingRowsDefaultCellStyle = $altStyle
+} catch {}
 # Enable double buffering to reduce flicker
 try { $dgv.GetType().GetProperty('DoubleBuffered', [System.Reflection.BindingFlags] 'NonPublic,Instance').SetValue($dgv, $true, $null) } catch {}
 function New-TextCol([string]$name,[string]$header,[int]$width,[bool]$ro=$true){
@@ -1512,7 +1588,6 @@ $dgv.Columns.Add((New-TextCol 'AssetTag' 'Asset Tag' 120)) | Out-Null
 $dgv.Columns.Add((New-TextCol 'Serial' 'Serial' 120))  | Out-Null
 $dgv.Columns.Add((New-TextCol 'RITM' 'RITM' 100))      | Out-Null
 $dgv.Columns.Add((New-TextCol 'Retire' 'Retire' 120)) | Out-Null
-$tabGrid.Controls.Add($dgv)
 try{
   $dgv.Columns['Role'].FillWeight   = 60
   $dgv.Columns['Type'].FillWeight   = 90
@@ -1522,46 +1597,12 @@ try{
   $dgv.Columns['RITM'].FillWeight   = 170
   $dgv.Columns['Retire'].FillWeight = 110
 } catch {}
+$assocGridPanel.Controls.Add($dgv)
 $cards = New-Object System.Windows.Forms.FlowLayoutPanel
-$cards.Dock='Fill'; $cards.AutoScroll=$true; $cards.WrapContents=$true; $cards.FlowDirection='LeftToRight'
-$tabCards.Controls.Add($cards)
-$tlpAssoc = New-Object System.Windows.Forms.TableLayoutPanel
-$tlpAssoc.Dock = 'Fill'
-$tlpAssoc.ColumnCount = 1
-$tlpAssoc.RowCount = 2
-$tlpAssoc.ColumnStyles.Clear()
-$tlpAssoc.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
-$tlpAssoc.RowStyles.Clear()
-$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
-$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
-$tlpAssoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
-$tlpAssoc.Margin  = New-Object System.Windows.Forms.Padding($GAP)
-# Toolbar row
-$btnAddPeripheral = New-Object ModernUI.RoundedButton
-$btnAddPeripheral.Text   = 'Add Peripheral'
-$btnAddPeripheral.AutoSize = $true
-$btnAddPeripheral.AutoSizeMode = 'GrowAndShrink'
-$btnAddPeripheral.Margin = '0,6,6,0'
-$btnAddPeripheral.Anchor = 'Left'
-$btnRemove = New-Object ModernUI.RoundedButton
-$btnRemove.Text   = 'Remove Peripheral'
-$btnRemove.AutoSize = $true
-$btnRemove.AutoSizeMode = 'GrowAndShrink'
-$btnRemove.Margin = '0,6,0,0'
-$btnRemove.Anchor = 'Left'
-$assocButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
-$assocButtonsPanel.Dock = 'Fill'
-$assocButtonsPanel.AutoSize = $true
-$assocButtonsPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
-$assocButtonsPanel.WrapContents = $false
-$assocButtonsPanel.FlowDirection = 'LeftToRight'
-$assocButtonsPanel.Margin = '0,0,0,0'
-$assocButtonsPanel.Padding = '0,0,0,0'
-$assocButtonsPanel.Anchor = 'Top,Left'
-$assocButtonsPanel.Controls.Add($btnAddPeripheral)
-$assocButtonsPanel.Controls.Add($btnRemove)
-$tlpAssoc.Controls.Add($dgv,0,0)
-$tlpAssoc.Controls.Add($assocButtonsPanel,0,1)
+$cards.AutoScroll=$true; $cards.WrapContents=$true; $cards.FlowDirection='LeftToRight'
+$cards.Visible = $false
+$tlpAssoc.Controls.Add($assocToolbarPanel,0,0)
+$tlpAssoc.Controls.Add($assocGridPanel,0,1)
 $grpAssoc.Controls.Add($tlpAssoc)
 # Rounding group
 $grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Fill'
@@ -1659,10 +1700,15 @@ function Apply-ResponsiveHeights {
     if($assocInfo -and $assocInfo.Target){
       $assocTarget = [Math]::Max([int]$assocInfo.Target, 0)
     }
-    $stripHeight = $assocButtonsPanel.PreferredSize.Height
-    if($stripHeight -le 0){ $stripHeight = [Math]::Max($btnAddPeripheral.PreferredSize.Height, $btnRemove.PreferredSize.Height) }
-    if($stripHeight -le 0){ $stripHeight = 34 }
-    $assocPadding = $grpAssoc.Padding.Vertical + $grpAssoc.Margin.Vertical + $tlpAssoc.Margin.Vertical
+    $stripHeight = $assocToolbarPanel.PreferredSize.Height
+    if($stripHeight -le 0){
+      $stripHeight = [Math]::Max($assocButtonsPanel.PreferredSize.Height, [Math]::Max($btnAddPeripheral.PreferredSize.Height, $btnRemove.PreferredSize.Height))
+    }
+    if($stripHeight -le 0){
+      $stripHeight = [Math]::Max($assocToolbarPanel.Height, [Math]::Max($assocButtonsPanel.Height, [Math]::Max($btnAddPeripheral.Height, $btnRemove.Height)))
+    }
+    if($stripHeight -le 0){ $stripHeight = 36 }
+    $assocPadding = $grpAssoc.Padding.Vertical + $grpAssoc.Margin.Vertical + $tlpAssoc.Margin.Vertical + $tlpAssoc.Padding.Vertical + $assocToolbarPanel.Margin.Vertical + $assocToolbarPanel.Padding.Vertical + $assocGridPanel.Margin.Vertical + $assocGridPanel.Padding.Vertical
     $minAssoc   = [Math]::Max($assocTarget + $stripHeight + $assocPadding, 220)
     $minRound   = [Math]::Max($grpMaint.PreferredSize.Height, 220)
     $tlpRight.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Absolute
@@ -1723,7 +1769,7 @@ function Get-AssocSizing([int]$rows){
     if($totalColW -gt $clientW){
       $gridH += [System.Windows.Forms.SystemInformation]::HorizontalScrollBarHeight
     }
-    $target = $gridH + $dgv.Margin.Vertical + $tlpAssoc.Padding.Vertical
+    $target = $gridH + $dgv.Margin.Vertical + $tlpAssoc.Padding.Vertical + $assocGridPanel.Padding.Vertical
     $result.Target = [Math]::Max([int]$target, 0)
     $result.Grid   = [Math]::Max([int]$gridH, 0)
   } catch { }
@@ -1733,10 +1779,10 @@ function Size-AssocForRows([int]$rows){
   $info = Get-AssocSizing $rows
   try{
     if($info.Target -gt 0){
-      $tlpAssoc.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Absolute
-      $tlpAssoc.RowStyles[0].Height   = $info.Target
-      $tlpAssoc.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::AutoSize
-      $tlpAssoc.RowStyles[1].Height   = 0
+      $tlpAssoc.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::AutoSize
+      $tlpAssoc.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
+      $tlpAssoc.RowStyles[1].Height   = $info.Grid
+      try { $assocGridPanel.MinimumSize = New-Object System.Drawing.Size(0, [Math]::Max([int]$info.Grid, 0)) } catch {}
     }
   } catch { }
   return $info
@@ -2014,6 +2060,7 @@ function Make-Card($title,$kvPairs,[System.Drawing.Color]$ritmColor,[bool]$showR
   return $p
 }
 function Refresh-AssocCards($parentRec){
+  if(-not $cards){ return }
   $cards.SuspendLayout(); $cards.Controls.Clear()
   if($parentRec){
     $cards.Controls.Add( (Make-Card ("Parent - " + (Get-DetectedType $parentRec)) @(
@@ -3517,9 +3564,9 @@ try {
   $nearPage.BackColor = $script:ThemeColors.Background
   $tabPageMain.BackColor = $script:ThemeColors.Background
   $tabPageNear.BackColor = $script:ThemeColors.Background
-  $tabAssoc.BackColor = $script:ThemeColors.Background
-  $tabGrid.BackColor = $script:ThemeColors.Background
-  $tabCards.BackColor = $script:ThemeColors.Background
+  $tlpAssoc.BackColor = $script:ThemeColors.Surface
+  $assocToolbarPanel.BackColor = $script:ThemeColors.Surface
+  $assocGridPanel.BackColor = $script:ThemeColors.Surface
   $cards.BackColor = $script:ThemeColors.Background
 } catch {}
 
