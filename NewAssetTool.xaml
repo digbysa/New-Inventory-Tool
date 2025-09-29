@@ -10,14 +10,11 @@
         WindowStartupLocation="CenterScreen">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <wfi:WindowsFormsHost x:Name="WinFormsHost"
-                              Grid.Row="0"/>
-
-        <Border Grid.Row="1"
+        <Border Grid.Row="0"
                 Margin="24,24,24,24"
                 Height="42"
                 Background="#FFFDFDFE"
@@ -50,6 +47,9 @@
                 </TextBlock>
             </Grid>
         </Border>
+
+        <wfi:WindowsFormsHost x:Name="WinFormsHost"
+                              Grid.Row="1"/>
     </Grid>
 </Window>
 
