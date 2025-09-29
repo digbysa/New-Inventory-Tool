@@ -39,13 +39,7 @@ function Get-DarkerColor {
 }
 
 if (-not ('Win32.NativeMethods' -as [Type])) {
-  Add-Type -Namespace Win32 -Name NativeMethods -MemberDefinition @"
-using System;
-using System.Runtime.InteropServices;
-using System.Windows.Forms;
-
-public static class NativeMethods
-{
+  Add-Type -Namespace Win32 -Name NativeMethods -UsingNamespace System,System.Runtime.InteropServices,System.Windows.Forms -MemberDefinition @"
     private const int EM_SETCUEBANNER = 0x1501;
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -60,7 +54,6 @@ public static class NativeMethods
 
         SendMessage(box.Handle, EM_SETCUEBANNER, IntPtr.Zero, text ?? string.Empty);
     }
-}
 "@
 }
 
