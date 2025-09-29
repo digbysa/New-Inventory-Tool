@@ -39,22 +39,32 @@ function Get-DarkerColor {
 }
 
 if (-not ('Win32.NativeMethods' -as [Type])) {
-  Add-Type -Namespace Win32 -Name NativeMethods -UsingNamespace System,System.Runtime.InteropServices,System.Windows.Forms -MemberDefinition @"
-    private const int EM_SETCUEBANNER = 0x1501;
+  Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, string lParam);
-
-    public static void SetCueBanner(TextBox box, string text)
+namespace Win32
+{
+    internal static class NativeMethods
     {
-        if (box == null)
-        {
-            return;
-        }
+        private const int EM_SETCUEBANNER = 0x1501;
 
-        SendMessage(box.Handle, EM_SETCUEBANNER, IntPtr.Zero, text ?? string.Empty);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, string lParam);
+
+        internal static void SetCueBanner(TextBox box, string text)
+        {
+            if (box == null)
+            {
+                return;
+            }
+
+            SendMessage(box.Handle, EM_SETCUEBANNER, IntPtr.Zero, text ?? string.Empty);
+        }
     }
-"@
+}
+"@ -ReferencedAssemblies System.Windows.Forms
 }
 
 function Set-CueBanner {
