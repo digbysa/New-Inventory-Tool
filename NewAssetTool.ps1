@@ -1138,13 +1138,15 @@ $RIGHT_COL_PERCENT  = 54
 $GAP                = 6
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Inventory Assoc Finder - OMI"
-$lblPaths = New-Object System.Windows.Forms.Label
-$lblPaths.AutoSize = $true
-$lblPaths.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Right
-$lblPaths.TextAlign = "MiddleRight"
-$lblPaths.Location = New-Object System.Drawing.Point(($form.ClientSize.Width - 720), ($form.ClientSize.Height - 20))
-$lblPaths.Size = New-Object System.Drawing.Size(560, 18)
-$form.Controls.Add($lblPaths)
+$statusStrip = New-Object System.Windows.Forms.StatusStrip
+$statusStrip.Dock = [System.Windows.Forms.DockStyle]::Bottom
+$statusStrip.SizingGrip = $false
+$statusStrip.BackColor = [System.Drawing.ColorTranslator]::FromHtml('#F6F7F9')
+$statusStrip.Padding = New-Object System.Windows.Forms.Padding(12, 4, 12, 4)
+$statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
+$statusLabel.Spring = $true
+$statusLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+$statusStrip.Items.Add($statusLabel) | Out-Null
 $form.StartPosition="CenterScreen"
 $form.WindowState='Maximized'
 $form.BackColor=[System.Drawing.Color]::White
@@ -1767,8 +1769,6 @@ $tlpRight.Controls.Add($grpMaint,0,1)
 $tlpMain.Controls.Add($tlpLeft, 0, 0)
 $tlpMain.Controls.Add($tlpRight,1, 0)
 # StatusStrip
-$status=New-Object System.Windows.Forms.StatusStrip
-$statusLabel=New-Object System.Windows.Forms.ToolStripStatusLabel; $status.Items.Add($statusLabel) | Out-Null; $statusLabel.Text="Ready"
 # Add to form
 $form.SuspendLayout()
 $form.Controls.Add($tlpMain)   # Fill
@@ -1777,10 +1777,10 @@ $form.Add_Shown({
   foreach($t in @($txtDept,$txtDepartment)){ if ($t) { $t.Visible = $true } }
   if ($cmbDept) { $cmbDept.Visible = $false }
   if ($txtDept) { $txtDept.Visible = $true }
-  $lblPaths.Text = "Data: " + $DataFolder + "    |    Output: " + $OutputFolder
+  $statusLabel.Text = "Data: $DataFolder | Output: $OutputFolder"
 })
 $form.Controls.Add($panelTop)  # Top
-$form.Controls.Add($status)    # Bottom
+$form.Controls.Add($statusStrip)    # Bottom
 $form.ResumeLayout($true)
 $form.PerformLayout()
 # -------- Responsive row sizing (DPI aware) --------
