@@ -1190,10 +1190,77 @@ $lblDataStatus.Text = "Computers: 0 | Monitors: 0 | Mics: 0 | Scanners: 0 | Cart
 $lblDataStatus.AutoSize = $true
 $lblDataStatus.Margin = '0,6,0,0'
 $flpTop.Visible = $false  # moved to status bar
-# Row 2: Scan box logic (UI hosted in WPF shell)
+# Search panel (native WinForms)
 $txtScan = New-Object System.Windows.Forms.TextBox
-$txtScan.Visible = $false
-# Maintain layout order even though scan UI is hosted externally
+$txtScan.BorderStyle = 'None'
+$txtScan.Margin = New-Object System.Windows.Forms.Padding(0)
+$txtScan.Font = New-Object System.Drawing.Font('Segoe UI', 14)
+$txtScan.ForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
+$txtScan.Visible = $true
+
+$searchPanel = New-Object System.Windows.Forms.Panel
+$searchPanel.Dock = 'Top'
+$searchPanel.Height = 66
+$searchPanel.Padding = New-Object System.Windows.Forms.Padding(24,12,24,0)
+$searchPanel.Margin = New-Object System.Windows.Forms.Padding(0)
+$searchPanel.TabStop = $false
+
+$searchContainer = New-Object System.Windows.Forms.Panel
+$searchContainer.Dock = 'Fill'
+$searchContainer.Padding = New-Object System.Windows.Forms.Padding(12,10,12,10)
+$searchContainer.Margin = New-Object System.Windows.Forms.Padding(0)
+$searchContainer.BackColor = [System.Drawing.Color]::FromArgb(253,253,254)
+$searchContainer.MinimumSize = New-Object System.Drawing.Size(0,42)
+$searchContainer.Height = 42
+$searchContainer.TabStop = $false
+$searchContainer.Add_Paint({
+  param($sender,$eventArgs)
+  try {
+    $g = $eventArgs.Graphics
+    $rect = $sender.ClientRectangle
+    $rect.Width -= 1
+    $rect.Height -= 1
+    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(224,227,233))
+    try { $g.DrawRectangle($pen, 0, 0, $rect.Width, $rect.Height) } finally { $pen.Dispose() }
+  } catch {}
+})
+
+$txtScan.Dock = 'Fill'
+$txtScan.BackColor = $searchContainer.BackColor
+
+$searchPlaceholder = New-Object System.Windows.Forms.Label
+$searchPlaceholder.Text = 'Scan / Enter Name, SN# or Asset Tag ⌕'
+$searchPlaceholder.Dock = 'Fill'
+$searchPlaceholder.TextAlign = 'MiddleLeft'
+$searchPlaceholder.Margin = New-Object System.Windows.Forms.Padding(0)
+$searchPlaceholder.Padding = New-Object System.Windows.Forms.Padding(0)
+$searchPlaceholder.ForeColor = [System.Drawing.Color]::FromArgb(138,146,166)
+$searchPlaceholder.BackColor = $searchContainer.BackColor
+$searchPlaceholder.Cursor = 'IBeam'
+$searchPlaceholder.TabStop = $false
+$searchPlaceholder.Add_Click({ try { $txtScan.Focus() } catch {} })
+
+$updateSearchPlaceholder = {
+  if ([string]::IsNullOrWhiteSpace($txtScan.Text)) {
+    $searchPlaceholder.Visible = $true
+  } else {
+    $searchPlaceholder.Visible = $false
+  }
+}
+$null = $txtScan.Add_TextChanged($updateSearchPlaceholder)
+$null = $txtScan.Add_GotFocus($updateSearchPlaceholder)
+$null = $txtScan.Add_LostFocus($updateSearchPlaceholder)
+$updateSearchPlaceholder.Invoke()
+
+$searchContainer.Controls.Add($txtScan)
+$searchContainer.Controls.Add($searchPlaceholder)
+$searchPlaceholder.BringToFront()
+$searchPanel.Controls.Add($searchContainer)
+
+Set-ScanSearchControl $txtScan
+try { Focus-ScanInput } catch {}
+
+# Maintain layout order for header items
 $panelTop.Controls.Add($flpTop)
 # ---------- END HEADER ----------
 # Main 2-col table
@@ -3360,6 +3427,7 @@ $pageMain.Dock = 'Fill'
 $form.Controls.Remove($panelTop)
 $form.Controls.Remove($tlpMain)
 $pageMain.Controls.Add($tlpMain); $tlpMain.Dock='Fill'
+$pageMain.Controls.Add($searchPanel); $searchPanel.Dock='Top'
 $pageMain.Controls.Add($panelTop); $panelTop.Dock='Top'
 $tabPageMain.Controls.Add($pageMain)
 # Compose Nearby page
@@ -3652,6 +3720,10 @@ Apply-ModernThemeToForm -Form $form
 $form.BackColor = $script:ThemeColors.Background
 try {
   $panelTop.BackColor = $script:ThemeColors.Header
+  $searchPanel.BackColor = $script:ThemeColors.Background
+  $searchContainer.BackColor = [System.Drawing.Color]::FromArgb(253,253,254)
+  $txtScan.BackColor = $searchContainer.BackColor
+  $searchPlaceholder.BackColor = $searchContainer.BackColor
   $nearToolbar.BackColor = $script:ThemeColors.Header
   $status.BackColor = $script:ThemeColors.Header
   $status.ForeColor = $script:ThemeColors.Text
