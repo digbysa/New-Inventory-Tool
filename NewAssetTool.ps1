@@ -20,6 +20,11 @@ $script:ThemeColors = @{
   AltRow     = [System.Drawing.Color]::FromArgb(250, 252, 255)
   Selection  = [System.Drawing.Color]::FromArgb(229, 241, 251)
 }
+$script:NewAssetToolSearchTextBox = $null
+function Set-ScanSearchControl {
+  param([object]$control)
+  $script:NewAssetToolSearchTextBox = $control
+}
 # ===== Script directory resolver (robust, PS 5.1-safe) =====
 function Get-OwnScriptDir {
   try {
@@ -1185,26 +1190,10 @@ $lblDataStatus.Text = "Computers: 0 | Monitors: 0 | Mics: 0 | Scanners: 0 | Cart
 $lblDataStatus.AutoSize = $true
 $lblDataStatus.Margin = '0,6,0,0'
 $flpTop.Visible = $false  # moved to status bar
-# Row 2: Scan box
-$grpScan = New-Object System.Windows.Forms.GroupBox
-$grpScan.Text="Scan / enter Name, SN# or Asset Tag"
-$grpScan.Dock='Top'
-$grpScan.Margin = '0,6,0,0'
-$grpScan.Padding = '8,8,8,8'
-$grpScan.AutoSize = $false
-$grpScan.Height = 56
+# Row 2: Scan box logic (UI hosted in WPF shell)
 $txtScan = New-Object System.Windows.Forms.TextBox
-$txtScan.Location='16,22'
-$txtScan.Anchor='Top,Left,Right'
-$txtScan.Size='900,24'
-$btnLookup = New-Object ModernUI.RoundedButton
-$btnLookup.Text="Lookup"
-$btnLookup.Location='930,20'
-$btnLookup.Anchor='Top,Right'
-$btnLookup.Size='110,26'
-$grpScan.Controls.AddRange(@($txtScan,$btnLookup))
-# Add SCAN first, then TOP row second so the TOP row ends up above the scan row
-$panelTop.Controls.Add($grpScan)
+$txtScan.Visible = $false
+# Maintain layout order even though scan UI is hosted externally
 $panelTop.Controls.Add($flpTop)
 # ---------- END HEADER ----------
 # Main 2-col table
@@ -2700,6 +2689,13 @@ $cmbFloor.Add_TextChanged({
   }
 })
 # ---- Actions ----
+function Focus-ScanInput(){
+  if ($script:NewAssetToolSearchTextBox) {
+    try { [void]$script:NewAssetToolSearchTextBox.Focus() } catch {}
+  } elseif ($txtScan) {
+    try { $txtScan.Focus() } catch {}
+  }
+}
 function Do-Lookup(){
   $raw = Find-RecordRaw $txtScan.Text
   if(-not $raw){ $statusLabel.Text=("No match for '" + $txtScan.Text + "'"); return }
@@ -2739,7 +2735,6 @@ function Clear-UI(){
   Size-AssocForRows(1) | Out-Null
 }
 # ---- Events ----
-$btnLookup.Add_Click({ Do-Lookup })
 $txtScan.Add_KeyDown({ if($_.KeyCode -eq 'Enter'){ Do-Lookup; $_.SuppressKeyPress=$true } })
 $txtScan.Add_TextChanged({ if([string]::IsNullOrWhiteSpace($txtScan.Text)){ Clear-UI } })
 $btnEditLoc.Add_Click({ Toggle-EditLocation })
@@ -2855,7 +2850,7 @@ $pc.serial_number}else{$null}
   $cmbChkStatus.SelectedIndex = 0
   $txtScan.Clear()
   Clear-UI
-  $txtScan.Focus()
+  Focus-ScanInput
   # -- Nearby: add Location-only scope and rebuild
   try {
     if ($row -and $row.Location) {
