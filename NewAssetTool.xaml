@@ -10,45 +10,21 @@
         WindowStartupLocation="CenterScreen">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="60"/>
-            <RowDefinition Height="42"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0"
-                Background="#FFFFFFFF">
-            <Grid Margin="24,0"
-                  VerticalAlignment="Center">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="16"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="New Inventory Tool"
-                           FontFamily="Segoe UI Semibold"
-                           FontSize="12"
-                           VerticalAlignment="Center"/>
-                <TabControl Grid.Column="2"
-                            Margin="0"
-                            Width="180"
-                            Height="36"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Center"
-                            SelectedIndex="0">
-                    <TabItem Header="Main"/>
-                    <TabItem Header="Nearby"/>
-                </TabControl>
-            </Grid>
-        </Border>
+        <wfi:WindowsFormsHost x:Name="WinFormsHost"
+                              Grid.Row="0"/>
 
         <Border Grid.Row="1"
-                Margin="24,0"
+                Margin="24,24,24,24"
                 Height="42"
                 Background="#FFFDFDFE"
                 BorderBrush="#FFE0E3E9"
                 BorderThickness="1"
                 CornerRadius="6"
-                VerticalAlignment="Center">
+                VerticalAlignment="Top">
             <Grid>
                 <TextBox x:Name="SearchTextBox"
                          Background="Transparent"
@@ -74,9 +50,6 @@
                 </TextBlock>
             </Grid>
         </Border>
-
-        <wfi:WindowsFormsHost x:Name="WinFormsHost"
-                              Grid.Row="2"/>
     </Grid>
 </Window>
 
