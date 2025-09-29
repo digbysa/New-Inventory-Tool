@@ -1238,15 +1238,58 @@ $searchPlaceholder.ForeColor = [System.Drawing.Color]::FromArgb(138,146,166)
 $searchPlaceholder.BackColor = $searchContainer.BackColor
 $searchPlaceholder.Cursor = 'IBeam'
 $searchPlaceholder.TabStop = $false
-$searchPlaceholder.Add_Click({ try { $txtScan.Focus() } catch {} })
+$searchPlaceholder.Add_Click({
+  try {
+    $bridge = $script:NewAssetToolSearchTextBox
+    if ($bridge -and $bridge -ne $txtScan) {
+      try { [void]$bridge.Focus() } catch {}
+    } elseif ($txtScan) {
+      [void]$txtScan.Focus()
+    }
+  } catch {}
+})
 
 $updateSearchPlaceholder = {
-  if ([string]::IsNullOrWhiteSpace($txtScan.Text)) {
+  $textIsEmpty = $true
+  try {
+    $textIsEmpty = [string]::IsNullOrWhiteSpace($txtScan.Text)
+  } catch {}
+
+  $winFormsFocused = $false
+  try {
+    if ($txtScan -and $txtScan.Focused) { $winFormsFocused = $true }
+  } catch {}
+
+  $bridgeFocused = $false
+  try {
+    $bridge = $script:NewAssetToolSearchTextBox
+    if ($bridge -and $bridge -ne $txtScan) {
+      if ($bridge -is [System.Windows.Forms.Control]) {
+        if ($bridge.Focused) { $bridgeFocused = $true }
+      } else {
+        try {
+          $type = $bridge.GetType()
+          $focusWithinProp = $type.GetProperty('IsKeyboardFocusWithin')
+          if ($focusWithinProp -and ($focusWithinProp.GetValue($bridge, $null))) {
+            $bridgeFocused = $true
+          } else {
+            $isFocusedProp = $type.GetProperty('IsKeyboardFocused')
+            if ($isFocusedProp -and ($isFocusedProp.GetValue($bridge, $null))) {
+              $bridgeFocused = $true
+            }
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+
+  if ($textIsEmpty -and -not $winFormsFocused -and -not $bridgeFocused) {
     $searchPlaceholder.Visible = $true
   } else {
     $searchPlaceholder.Visible = $false
   }
 }
+$script:UpdateScanPlaceholderAction = $updateSearchPlaceholder
 $null = $txtScan.Add_TextChanged($updateSearchPlaceholder)
 $null = $txtScan.Add_GotFocus($updateSearchPlaceholder)
 $null = $txtScan.Add_LostFocus($updateSearchPlaceholder)
