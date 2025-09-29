@@ -112,6 +112,16 @@ if ($searchTextBox) {
       try { Do-Lookup } catch {}
     }
   })
+  $searchTextBox.Add_GotKeyboardFocus({
+    try {
+      if ($script:UpdateScanPlaceholderAction) { $script:UpdateScanPlaceholderAction.Invoke() }
+    } catch {}
+  })
+  $searchTextBox.Add_LostKeyboardFocus({
+    try {
+      if ($script:UpdateScanPlaceholderAction) { $script:UpdateScanPlaceholderAction.Invoke() }
+    } catch {}
+  })
   try { Focus-ScanInput } catch {}
 }
 
