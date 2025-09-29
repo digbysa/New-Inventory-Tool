@@ -1136,6 +1136,7 @@ $($out)","Save") | Out-Null
 $LEFT_COL_PERCENT   = 46
 $RIGHT_COL_PERCENT  = 54
 $GAP                = 6
+$CARD_SPACING       = 10
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Inventory Assoc Finder - OMI"
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
@@ -1225,19 +1226,15 @@ $tlpMain.RowStyles.Clear()
 $tlpMain.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 function New-L($t,$x,$y){$l=New-Object System.Windows.Forms.Label;$l.Text=$t;$l.AutoSize=$true;$l.Location=New-Object System.Drawing.Point($x,$y);$l}
 function New-RO($x,$y,$w){$t=New-Object System.Windows.Forms.TextBox;$t.Location="$x,$y";$t.Size="$w,24";$t.ReadOnly=$true;$t.BackColor='White';$t}
-# Left column stack
-$tlpLeft = New-Object System.Windows.Forms.TableLayoutPanel
-$tlpLeft.Dock = 'Fill'
-$tlpLeft.ColumnCount = 1
-$tlpLeft.RowCount = 2
-$tlpLeft.Margin = New-Object System.Windows.Forms.Padding($GAP, $GAP, 3, $GAP)
-$tlpLeft.Padding = New-Object System.Windows.Forms.Padding($GAP)
-$tlpLeft.RowStyles.Clear()
-$tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
-$tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
+# Left column stack (panel with top-docked group boxes)
+$leftColumn = New-Object System.Windows.Forms.Panel
+$leftColumn.Dock = 'Fill'
+$leftColumn.AutoScroll = $true
+$leftColumn.Margin = New-Object System.Windows.Forms.Padding(0, $GAP, $CARD_SPACING, $GAP)
+$leftColumn.Padding = New-Object System.Windows.Forms.Padding(0)
 # Device Summary
-$grpSummary = New-Object System.Windows.Forms.GroupBox; $grpSummary.Text="Device Summary"; $grpSummary.Dock='Fill'
-$grpSummary.Margin = New-Object System.Windows.Forms.Padding($GAP)
+$grpSummary = New-Object System.Windows.Forms.GroupBox; $grpSummary.Text="Device Summary"; $grpSummary.Dock='Top'
+$grpSummary.Margin = New-Object System.Windows.Forms.Padding(0,0,0,$CARD_SPACING)
 $grpSummary.Padding = New-Object System.Windows.Forms.Padding($GAP)
 
 $tlpSummary = New-Object System.Windows.Forms.TableLayoutPanel
@@ -1334,8 +1331,8 @@ $tlpSummary.Controls.Add($txtRound, 0, $rowIndex)
 
 $grpSummary.Controls.Add($tlpSummary)
 # Device Location (with City)
-$grpLoc = New-Object System.Windows.Forms.GroupBox; $grpLoc.Text="Device Location"; $grpLoc.Dock='Fill'
-$grpLoc.Margin = New-Object System.Windows.Forms.Padding($GAP)
+$grpLoc = New-Object System.Windows.Forms.GroupBox; $grpLoc.Text="Device Location"; $grpLoc.Dock='Top'
+$grpLoc.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 $grpLoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
 
 $tlpLoc = New-Object System.Windows.Forms.TableLayoutPanel
@@ -1473,21 +1470,17 @@ $tlpLoc.RowCount++
 $cmbCity.Visible=$false; $cmbLocation.Visible=$false; $cmbBuilding.Visible=$false; $cmbFloor.Visible=$false; $cmbRoom.Visible=$false; $cmbDept.Visible=$false
 Populate-Department-Combo ''
 # Left/Right compose
-$tlpLeft.Controls.Add($grpSummary,0,0)
-$tlpLeft.Controls.Add($grpLoc,0,1)
+$leftColumn.Controls.Add($grpLoc)
+$leftColumn.Controls.Add($grpSummary)
 # Right column stack
-$tlpRight = New-Object System.Windows.Forms.TableLayoutPanel
-$tlpRight.Dock = 'Fill'
-$tlpRight.ColumnCount = 1
-$tlpRight.RowCount = 2
-$tlpRight.Margin = New-Object System.Windows.Forms.Padding(3, $GAP, $GAP, $GAP)
-$tlpRight.Padding = New-Object System.Windows.Forms.Padding($GAP)
-$tlpRight.RowStyles.Clear()
-$tlpRight.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
-$tlpRight.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
+$rightColumn = New-Object System.Windows.Forms.Panel
+$rightColumn.Dock = 'Fill'
+$rightColumn.AutoScroll = $true
+$rightColumn.Margin = New-Object System.Windows.Forms.Padding($CARD_SPACING, $GAP, 0, $GAP)
+$rightColumn.Padding = New-Object System.Windows.Forms.Padding(0)
 # Associated devices (right column, top)
-$grpAssoc = New-Object System.Windows.Forms.GroupBox; $grpAssoc.Text="Associated Devices"; $grpAssoc.Dock='Fill'
-$grpAssoc.Margin = New-Object System.Windows.Forms.Padding($GAP)
+$grpAssoc = New-Object System.Windows.Forms.GroupBox; $grpAssoc.Text="Associated Devices"; $grpAssoc.Dock='Top'
+$grpAssoc.Margin = New-Object System.Windows.Forms.Padding(0,0,0,$CARD_SPACING)
 $grpAssoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tlpAssoc = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpAssoc.Dock = 'Fill'
@@ -1607,8 +1600,8 @@ $tlpAssoc.Controls.Add($assocToolbarPanel,0,0)
 $tlpAssoc.Controls.Add($assocGridPanel,0,1)
 $grpAssoc.Controls.Add($tlpAssoc)
 # Rounding group
-$grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Fill'
-$grpMaint.Margin = New-Object System.Windows.Forms.Padding($GAP)
+$grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Top'
+$grpMaint.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 $grpMaint.Padding = New-Object System.Windows.Forms.Padding(12)
 
 $lblMaintType=New-Object System.Windows.Forms.Label; $lblMaintType.Text='Maintenance Type'; $lblMaintType.AutoSize=$true
@@ -1656,7 +1649,7 @@ $btnManualRound.BackColor = $secondaryBlue
 $btnManualRound.ForeColor = [System.Drawing.Color]::White
 
 $lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 10
-$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=11; $txtComments.WordWrap = $true
+$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Anchor='Top,Left,Right,Bottom'; $txtComments.TabIndex=11; $txtComments.WordWrap = $true
 
 $layoutMaint = New-Object System.Windows.Forms.TableLayoutPanel
 $layoutMaint.Dock = 'Fill'
@@ -1764,10 +1757,10 @@ $txtComments.Add_SizeChanged({
   }
 })
 # Compose columns
-$tlpRight.Controls.Add($grpAssoc,0,0)
-$tlpRight.Controls.Add($grpMaint,0,1)
-$tlpMain.Controls.Add($tlpLeft, 0, 0)
-$tlpMain.Controls.Add($tlpRight,1, 0)
+$rightColumn.Controls.Add($grpMaint)
+$rightColumn.Controls.Add($grpAssoc)
+$tlpMain.Controls.Add($leftColumn, 0, 0)
+$tlpMain.Controls.Add($rightColumn,1, 0)
 # StatusStrip
 # Add to form
 $form.SuspendLayout()
@@ -1784,15 +1777,27 @@ $form.Controls.Add($statusStrip)    # Bottom
 $form.ResumeLayout($true)
 $form.PerformLayout()
 # -------- Responsive row sizing (DPI aware) --------
+function Set-GroupCardHeight([System.Windows.Forms.GroupBox]$group, [int]$height){
+  if(-not $group){ return }
+  if($height -le 0){ return }
+  try {
+    $group.SuspendLayout()
+    if($group.Height -ne $height){ $group.Height = $height }
+    if($group.MinimumSize.Height -ne $height){
+      $group.MinimumSize = New-Object System.Drawing.Size(0, $height)
+    }
+  } catch { }
+  finally {
+    try { $group.ResumeLayout($true) } catch { }
+  }
+}
 function Apply-ResponsiveHeights {
   try {
     # Fixed heights derived from preferred content sizes, with sensible minimums
     $minSummary  = [Math]::Max($grpSummary.PreferredSize.Height, 280)
     $minLocation = [Math]::Max($grpLoc.PreferredSize.Height, 200)
-    $tlpLeft.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Absolute
-    $tlpLeft.RowStyles[0].Height   = $minSummary
-    $tlpLeft.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
-    $tlpLeft.RowStyles[1].Height   = $minLocation
+    Set-GroupCardHeight $grpSummary $minSummary
+    Set-GroupCardHeight $grpLoc $minLocation
     $rowsShown = [Math]::Max($dgv.Rows.Count, 1)
     $assocInfo = Size-AssocForRows $rowsShown
     $assocTarget = 0
@@ -1810,10 +1815,8 @@ function Apply-ResponsiveHeights {
     $assocPadding = $grpAssoc.Padding.Vertical + $grpAssoc.Margin.Vertical + $tlpAssoc.Margin.Vertical + $tlpAssoc.Padding.Vertical + $assocToolbarPanel.Margin.Vertical + $assocToolbarPanel.Padding.Vertical + $assocGridPanel.Margin.Vertical + $assocGridPanel.Padding.Vertical
     $minAssoc   = [Math]::Max($assocTarget + $stripHeight + $assocPadding, 220)
     $minRound   = [Math]::Max($grpMaint.PreferredSize.Height, 220)
-    $tlpRight.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Absolute
-    $tlpRight.RowStyles[0].Height   = $minAssoc
-    $tlpRight.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
-    $tlpRight.RowStyles[1].Height   = $minRound
+    Set-GroupCardHeight $grpAssoc $minAssoc
+    Set-GroupCardHeight $grpMaint $minRound
   } catch { }
 }
 function Update-RoundingCommentsLayout {
