@@ -1607,9 +1607,15 @@ $grpAssoc.Controls.Add($tlpAssoc)
 # Rounding group
 $grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Fill'
 $grpMaint.Margin = New-Object System.Windows.Forms.Padding($GAP)
-$grpMaint.Padding = New-Object System.Windows.Forms.Padding($GAP)
-$lblChkStatus=New-Object System.Windows.Forms.Label; $lblChkStatus.Text="Check Status:"; $lblChkStatus.AutoSize=$true; $lblChkStatus.Location='330,28'
-$cmbChkStatus=New-Object System.Windows.Forms.ComboBox; $cmbChkStatus.Location='420,25'; $cmbChkStatus.Size='220,24'; $cmbChkStatus.DropDownStyle='DropDownList'
+$grpMaint.Padding = New-Object System.Windows.Forms.Padding(12)
+
+$lblMaintType=New-Object System.Windows.Forms.Label; $lblMaintType.Text='Maintenance Type'; $lblMaintType.AutoSize=$true
+$cmbMaintType=New-Object System.Windows.Forms.ComboBox; $cmbMaintType.DropDownStyle='DropDownList'; $cmbMaintType.Dock='Fill'
+$cmbMaintType.Items.AddRange(@('Excluded','General Rounding','Mobile Cart','Critical Clinical'))
+$cmbMaintType.TabIndex = 0
+
+$lblChkStatus=New-Object System.Windows.Forms.Label; $lblChkStatus.Text="Check Status"; $lblChkStatus.AutoSize=$true
+$cmbChkStatus=New-Object System.Windows.Forms.ComboBox; $cmbChkStatus.DropDownStyle='DropDownList'; $cmbChkStatus.Dock='Fill'
 $cmbChkStatus.Items.AddRange(@(
   "Complete",
   "Inaccessible - Asset not found",
@@ -1624,33 +1630,127 @@ $cmbChkStatus.Items.AddRange(@(
   "Inaccessible - User working at home",
   "Pending Repair"
 )); $cmbChkStatus.SelectedIndex=0
-$lblTime=New-Object System.Windows.Forms.Label; $lblTime.Text="Rounding Time (min):"; $lblTime.AutoSize=$true; $lblTime.Location='12,60'
-$lblMaintType=New-Object System.Windows.Forms.Label; $lblMaintType.Text='Maintenance Type:'; $lblMaintType.AutoSize=$true; $lblMaintType.Location='12,28'
-$cmbMaintType=New-Object System.Windows.Forms.ComboBox; $cmbMaintType.Location='120,25'; $cmbMaintType.Size='200,24'; $cmbMaintType.DropDownStyle='DropDownList'
-$cmbMaintType.Items.AddRange(@('Excluded','General Rounding','Mobile Cart','Critical Clinical'))
-$cmbMaintType.TabIndex = 0
 $cmbChkStatus.TabIndex = 1
-$numTime=New-Object System.Windows.Forms.NumericUpDown; $numTime.Location='160,58'; $numTime.Size='80,24'; $numTime.Minimum=0; $numTime.Maximum=120; $numTime.Value=3
+
+$lblTime=New-Object System.Windows.Forms.Label; $lblTime.Text="Rounding Time (min)"; $lblTime.AutoSize=$true
+$numTime=New-Object System.Windows.Forms.NumericUpDown; $numTime.Minimum=1; $numTime.Maximum=120; $numTime.Value=3; $numTime.Width=120
 $numTime.TabIndex = 2
-$chkCable=New-Object System.Windows.Forms.CheckBox; $chkCable.Text="Validate Cable Management"; $chkCable.Location='12,96'; $chkCable.AutoSize=$true
-$chkCable.TabIndex = 3
-$chkCart=New-Object System.Windows.Forms.CheckBox; $chkCart.Text="Check Physical Cart Is Working"; $chkCart.Location='320,96'; $chkCart.AutoSize=$true
-$chkCart.TabIndex = 4
-$chkLabels=New-Object System.Windows.Forms.CheckBox; $chkLabels.Text="Ensure monitor appropriately labelled"; $chkLabels.Location='12,124'; $chkLabels.AutoSize=$true
-$chkLabels.TabIndex = 5
-$chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate peripherals are connected and working"; $chkPeriph.Location='320,124'; $chkPeriph.AutoSize=$true
-$chkPeriph.TabIndex = 6
-$btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Location='12,160'; $btnCheckComplete.Size='180,30'
-$btnCheckComplete.TabIndex = 7
-$btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Location='204,160'; $btnSave.Size='180,30'
-$btnSave.TabIndex = 8
-$btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Location='396,160'; $btnManualRound.Size='180,30'; $btnManualRound.Enabled=$false
-$btnManualRound.TabIndex = 9
-$lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments:'; $lblComments.AutoSize=$true; $lblComments.Location='12,202'
-$lblComments.TabIndex = 10
-$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Location='12,222'; $txtComments.Size='564,72'; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='None'; $txtComments.Anchor='Top,Left,Right'; $txtComments.TabIndex=11
-$txtComments.WordWrap = $true
-$grpMaint.Controls.AddRange(@($lblMaintType,$cmbMaintType,$lblChkStatus,$cmbChkStatus,$lblTime,$numTime,$chkCable,$chkCart,$chkLabels,$chkPeriph,$btnCheckComplete,$btnSave,$btnManualRound,$lblComments,$txtComments))
+
+$chkCable=New-Object System.Windows.Forms.CheckBox; $chkCable.Text="Validate Cable Management"; $chkCable.AutoSize=$true; $chkCable.TabIndex = 3
+$chkCart=New-Object System.Windows.Forms.CheckBox; $chkCart.Text="Check Physical Cart Is Working"; $chkCart.AutoSize=$true; $chkCart.TabIndex = 4
+$chkLabels=New-Object System.Windows.Forms.CheckBox; $chkLabels.Text="Ensure monitor appropriately labelled"; $chkLabels.AutoSize=$true; $chkLabels.TabIndex = 5
+$chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate peripherals are connected and working"; $chkPeriph.AutoSize=$true; $chkPeriph.TabIndex = 6
+
+$btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Size='150,36'; $btnCheckComplete.TabIndex = 7
+$btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Size='132,36'; $btnSave.TabIndex = 8
+$btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 9
+
+$btnCheckComplete.BackColor = $script:ThemeColors.Accent
+$btnCheckComplete.ForeColor = [System.Drawing.Color]::White
+$secondaryBlue = [System.Drawing.Color]::FromArgb(0, 102, 189)
+$btnSave.BackColor = $secondaryBlue
+$btnSave.ForeColor = [System.Drawing.Color]::White
+$btnManualRound.BackColor = $secondaryBlue
+$btnManualRound.ForeColor = [System.Drawing.Color]::White
+
+$lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 10
+$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=11; $txtComments.WordWrap = $true
+
+$layoutMaint = New-Object System.Windows.Forms.TableLayoutPanel
+$layoutMaint.Dock = 'Fill'
+$layoutMaint.ColumnCount = 1
+$layoutMaint.RowCount = 6
+$layoutMaint.ColumnStyles.Clear()
+$layoutMaint.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$layoutMaint.RowStyles.Clear()
+$layoutMaint.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$layoutMaint.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$layoutMaint.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$layoutMaint.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$layoutMaint.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$layoutMaint.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+
+$rowCombos = New-Object System.Windows.Forms.TableLayoutPanel
+$rowCombos.Dock = 'Fill'
+$rowCombos.AutoSize = $true
+$rowCombos.AutoSizeMode = 'GrowAndShrink'
+$rowCombos.ColumnCount = 4
+$rowCombos.RowCount = 1
+$rowCombos.ColumnStyles.Clear()
+$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
+$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
+$rowCombos.Controls.Add($lblMaintType,0,0)
+$rowCombos.Controls.Add($cmbMaintType,1,0)
+$rowCombos.Controls.Add($lblChkStatus,2,0)
+$rowCombos.Controls.Add($cmbChkStatus,3,0)
+$lblMaintType.Margin = New-Object System.Windows.Forms.Padding(0,0,6,0)
+$cmbMaintType.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
+$lblChkStatus.Margin = New-Object System.Windows.Forms.Padding(0,0,6,0)
+$cmbChkStatus.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+
+$rowTime = New-Object System.Windows.Forms.TableLayoutPanel
+$rowTime.Dock = 'Fill'
+$rowTime.AutoSize = $true
+$rowTime.AutoSizeMode = 'GrowAndShrink'
+$rowTime.ColumnCount = 2
+$rowTime.ColumnStyles.Clear()
+$rowTime.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$rowTime.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$rowTime.Controls.Add($lblTime,0,0)
+$rowTime.Controls.Add($numTime,1,0)
+$rowTime.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
+$lblTime.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
+$numTime.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+
+$rowChecks = New-Object System.Windows.Forms.TableLayoutPanel
+$rowChecks.Dock = 'Fill'
+$rowChecks.AutoSize = $true
+$rowChecks.AutoSizeMode = 'GrowAndShrink'
+$rowChecks.ColumnCount = 2
+$rowChecks.RowCount = 2
+$rowChecks.ColumnStyles.Clear()
+$rowChecks.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
+$rowChecks.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
+$rowChecks.RowStyles.Clear()
+$rowChecks.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$rowChecks.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$rowChecks.Controls.Add($chkCable,0,0)
+$rowChecks.Controls.Add($chkCart,1,0)
+$rowChecks.Controls.Add($chkLabels,0,1)
+$rowChecks.Controls.Add($chkPeriph,1,1)
+$rowChecks.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
+$chkCable.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
+$chkLabels.Margin = New-Object System.Windows.Forms.Padding(0,6,12,0)
+$chkCart.Margin = New-Object System.Windows.Forms.Padding(12,0,0,0)
+$chkPeriph.Margin = New-Object System.Windows.Forms.Padding(12,6,0,0)
+
+$actionsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
+$actionsPanel.Dock = 'Fill'
+$actionsPanel.AutoSize = $true
+$actionsPanel.AutoSizeMode = 'GrowAndShrink'
+$actionsPanel.WrapContents = $false
+$actionsPanel.FlowDirection = 'LeftToRight'
+$actionsPanel.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
+$btnCheckComplete.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
+$btnSave.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
+$btnManualRound.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+$actionsPanel.Controls.Add($btnCheckComplete)
+$actionsPanel.Controls.Add($btnSave)
+$actionsPanel.Controls.Add($btnManualRound)
+
+$lblComments.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
+$txtComments.Margin = New-Object System.Windows.Forms.Padding(0,4,0,0)
+
+$layoutMaint.Controls.Add($rowCombos,0,0)
+$layoutMaint.Controls.Add($rowTime,0,1)
+$layoutMaint.Controls.Add($rowChecks,0,2)
+$layoutMaint.Controls.Add($actionsPanel,0,3)
+$layoutMaint.Controls.Add($lblComments,0,4)
+$layoutMaint.Controls.Add($txtComments,0,5)
+
+$grpMaint.Controls.Add($layoutMaint)
 $txtComments.Add_TextChanged({
   if(Get-Command Update-RoundingCommentsLayout -ErrorAction SilentlyContinue){
     Update-RoundingCommentsLayout
@@ -1661,7 +1761,6 @@ $txtComments.Add_SizeChanged({
     Update-RoundingCommentsLayout
   }
 })
-$grpMaint.Controls.Add($lblMaintType); $grpMaint.Controls.Add($cmbMaintType)
 # Compose columns
 $tlpRight.Controls.Add($grpAssoc,0,0)
 $tlpRight.Controls.Add($grpMaint,0,1)
@@ -1720,6 +1819,10 @@ function Apply-ResponsiveHeights {
 function Update-RoundingCommentsLayout {
   try {
     if(-not $txtComments){ return }
+    if($txtComments.Dock -eq [System.Windows.Forms.DockStyle]::Fill){
+      Apply-ResponsiveHeights
+      return
+    }
     $width = [int][Math]::Max($txtComments.ClientSize.Width, 100)
     if($width -le 0){ $width = [Math]::Max($txtComments.Width - 8, 100) }
     $measureSize = New-Object System.Drawing.Size($width, 0)
