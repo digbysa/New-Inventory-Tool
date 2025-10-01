@@ -1241,12 +1241,13 @@ $tlpSummary.RowStyles.Clear()
 function New-SummaryLabel {
   param(
     [string]$text,
-    [bool]$isFirst = $false
+    [bool]$isFirst = $false,
+    [int]$topMargin = 10
   )
   $label = New-Object System.Windows.Forms.Label
   $label.Text = $text
   $label.AutoSize = $true
-  $label.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(0,0,8,0) } else { New-Object System.Windows.Forms.Padding(0,10,8,0) }
+  $label.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(0,0,8,0) } else { New-Object System.Windows.Forms.Padding(0,$topMargin,8,0) }
   $label.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
   return $label
 }
@@ -1275,11 +1276,12 @@ function Add-SummaryRow {
   param(
     [string]$LabelText,
     [System.Windows.Forms.Control]$Control,
-    [bool]$IsFirst = $false
+    [bool]$IsFirst = $false,
+    [int]$LabelTopMargin = 10
   )
   $row = $tlpSummary.RowCount
   $tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-  $tlpSummary.Controls.Add((New-SummaryLabel $LabelText $IsFirst), 0, $row)
+  $tlpSummary.Controls.Add((New-SummaryLabel $LabelText $IsFirst $LabelTopMargin), 0, $row)
   $tlpSummary.Controls.Add($Control, 1, $row)
   $tlpSummary.RowCount++
 }
@@ -1318,7 +1320,8 @@ $tlpSummary.Controls.Add($nameRow, 1, $tlpSummary.RowCount)
 $tlpSummary.RowCount++
 
 $txtAT = New-SummaryTextBox
-Add-SummaryRow -LabelText 'Asset Tag:' -Control $txtAT
+$txtAT.Margin = New-Object System.Windows.Forms.Padding(12,4,0,0)
+Add-SummaryRow -LabelText 'Asset Tag:' -Control $txtAT -LabelTopMargin 6
 
 $txtSN = New-SummaryTextBox
 Add-SummaryRow -LabelText 'Serial:' -Control $txtSN
