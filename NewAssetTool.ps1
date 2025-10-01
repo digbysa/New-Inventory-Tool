@@ -1512,19 +1512,12 @@ $tlpRight.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windo
 $grpAssoc = New-Object System.Windows.Forms.GroupBox; $grpAssoc.Text="Associated Devices"; $grpAssoc.Dock='Fill'
 $grpAssoc.Margin = New-Object System.Windows.Forms.Padding($GROUP_MARGIN)
 $grpAssoc.Padding = New-Object System.Windows.Forms.Padding($GROUP_PADDING)
-$tlpAssoc = New-Object System.Windows.Forms.TableLayoutPanel
-$tlpAssoc.Dock = 'Fill'
-$tlpAssoc.ColumnCount = 1
-$tlpAssoc.RowCount = 2
-$tlpAssoc.Margin = '0,0,0,0'
-$tlpAssoc.Padding = '0,0,0,0'
-$tlpAssoc.ColumnStyles.Clear()
-$tlpAssoc.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
-$tlpAssoc.RowStyles.Clear()
-$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
-$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 200)) )
+$assocContainerPanel = New-Object System.Windows.Forms.Panel
+$assocContainerPanel.Dock = 'Fill'
+$assocContainerPanel.Margin = '0,0,0,0'
+$assocContainerPanel.Padding = '0,0,0,0'
 $assocToolbarPanel = New-Object System.Windows.Forms.Panel
-$assocToolbarPanel.Dock = 'Fill'
+$assocToolbarPanel.Dock = 'Top'
 $assocToolbarPanel.AutoSize = $false
 $assocToolbarPanel.Margin = '0,0,0,6'
 $assocToolbarPanel.Padding = '0,0,0,0'
@@ -1626,9 +1619,9 @@ $assocGridPanel.Controls.Add($dgv)
 $cards = New-Object System.Windows.Forms.FlowLayoutPanel
 $cards.AutoScroll=$true; $cards.WrapContents=$true; $cards.FlowDirection='LeftToRight'
 $cards.Visible = $false
-$tlpAssoc.Controls.Add($assocToolbarPanel,0,0)
-$tlpAssoc.Controls.Add($assocGridPanel,0,1)
-$grpAssoc.Controls.Add($tlpAssoc)
+$assocContainerPanel.Controls.Add($assocToolbarPanel)
+$assocContainerPanel.Controls.Add($assocGridPanel)
+$grpAssoc.Controls.Add($assocContainerPanel)
 # Rounding group
 $grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Fill'
 $grpMaint.Margin = New-Object System.Windows.Forms.Padding($GROUP_MARGIN)
