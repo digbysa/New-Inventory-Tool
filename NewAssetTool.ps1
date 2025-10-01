@@ -1231,47 +1231,66 @@ $tlpSummary = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpSummary.Dock = 'Fill'
 $tlpSummary.Margin = New-Object System.Windows.Forms.Padding(0)
 $tlpSummary.Padding = New-Object System.Windows.Forms.Padding(0)
-$tlpSummary.ColumnCount = 1
-$tlpSummary.RowCount = 16
+$tlpSummary.ColumnCount = 2
+$tlpSummary.RowCount = 0
 $tlpSummary.ColumnStyles.Clear()
+$tlpSummary.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $tlpSummary.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $tlpSummary.RowStyles.Clear()
-for($i = 0; $i -lt 16; $i++){
-  $tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-}
 
-$rowIndex = 0
-
-function New-SummaryLabel([string]$text){
+function New-SummaryLabel {
+  param(
+    [string]$text,
+    [bool]$isFirst = $false
+  )
   $label = New-Object System.Windows.Forms.Label
   $label.Text = $text
   $label.AutoSize = $true
-  $label.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+  $label.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(0,0,8,0) } else { New-Object System.Windows.Forms.Padding(0,10,8,0) }
+  $label.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
   return $label
 }
 
-function New-SummaryTextBox([bool]$readOnly=$true, [bool]$isLast=$false){
+function New-SummaryTextBox {
+  param(
+    [bool]$IsFirst = $false,
+    [bool]$IsLast = $false,
+    [bool]$ReadOnly = $true
+  )
   $box = New-Object System.Windows.Forms.TextBox
   $box.Anchor = 'Top,Left,Right'
-  $box.Margin = if($isLast){ New-Object System.Windows.Forms.Padding(0,6,0,0) } else { New-Object System.Windows.Forms.Padding(0,6,0,6) }
+  $topMargin = if($IsFirst){ 0 } else { 8 }
+  $bottomMargin = if($IsLast){ 0 } else { 0 }
+  $box.Margin = New-Object System.Windows.Forms.Padding(12,$topMargin,0,$bottomMargin)
   $box.MinimumSize = New-Object System.Drawing.Size(0,24)
   $box.Height = 24
-  if($readOnly){
+  if($ReadOnly){
     $box.ReadOnly = $true
     $box.BackColor = [System.Drawing.Color]::White
   }
   return $box
 }
 
-$tlpSummary.Controls.Add((New-SummaryLabel "Detected Type:"), 0, $rowIndex); $rowIndex++
-$txtType = New-SummaryTextBox
-$tlpSummary.Controls.Add($txtType, 0, $rowIndex); $rowIndex++
+function Add-SummaryRow {
+  param(
+    [string]$LabelText,
+    [System.Windows.Forms.Control]$Control,
+    [bool]$IsFirst = $false
+  )
+  $row = $tlpSummary.RowCount
+  $tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $tlpSummary.Controls.Add((New-SummaryLabel $LabelText $IsFirst), 0, $row)
+  $tlpSummary.Controls.Add($Control, 1, $row)
+  $tlpSummary.RowCount++
+}
 
-$tlpSummary.Controls.Add((New-SummaryLabel "Name:"), 0, $rowIndex); $rowIndex++
+$txtType = New-SummaryTextBox -IsFirst $true
+Add-SummaryRow -LabelText 'Detected Type:' -Control $txtType -IsFirst $true
+
 $nameRow = New-Object System.Windows.Forms.TableLayoutPanel
 $nameRow.ColumnCount = 2
 $nameRow.RowCount = 1
-$nameRow.Margin = New-Object System.Windows.Forms.Padding(0,6,0,6)
+$nameRow.Margin = New-Object System.Windows.Forms.Padding(12,8,0,0)
 $nameRow.ColumnStyles.Clear()
 $nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
@@ -1293,31 +1312,28 @@ $btnFixName.Margin = New-Object System.Windows.Forms.Padding(6,0,0,0)
 $btnFixName.Enabled = $false
 $nameRow.Controls.Add($btnFixName,1,0)
 
-$tlpSummary.Controls.Add($nameRow, 0, $rowIndex); $rowIndex++
+$tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$tlpSummary.Controls.Add((New-SummaryLabel 'Name:'), 0, $tlpSummary.RowCount)
+$tlpSummary.Controls.Add($nameRow, 1, $tlpSummary.RowCount)
+$tlpSummary.RowCount++
 
-$tlpSummary.Controls.Add((New-SummaryLabel "Asset Tag:"), 0, $rowIndex); $rowIndex++
 $txtAT = New-SummaryTextBox
-$tlpSummary.Controls.Add($txtAT, 0, $rowIndex); $rowIndex++
+Add-SummaryRow -LabelText 'Asset Tag:' -Control $txtAT
 
-$tlpSummary.Controls.Add((New-SummaryLabel "Serial:"), 0, $rowIndex); $rowIndex++
 $txtSN = New-SummaryTextBox
-$tlpSummary.Controls.Add($txtSN, 0, $rowIndex); $rowIndex++
+Add-SummaryRow -LabelText 'Serial:' -Control $txtSN
 
-$tlpSummary.Controls.Add((New-SummaryLabel "Parent:"), 0, $rowIndex); $rowIndex++
 $txtParent = New-SummaryTextBox
-$tlpSummary.Controls.Add($txtParent, 0, $rowIndex); $rowIndex++
+Add-SummaryRow -LabelText 'Parent:' -Control $txtParent
 
-$tlpSummary.Controls.Add((New-SummaryLabel "PO RITM:"), 0, $rowIndex); $rowIndex++
 $txtRITM = New-SummaryTextBox
-$tlpSummary.Controls.Add($txtRITM, 0, $rowIndex); $rowIndex++
+Add-SummaryRow -LabelText 'PO RITM:' -Control $txtRITM
 
-$tlpSummary.Controls.Add((New-SummaryLabel "Retire Date:"), 0, $rowIndex); $rowIndex++
 $txtRetire = New-SummaryTextBox
-$tlpSummary.Controls.Add($txtRetire, 0, $rowIndex); $rowIndex++
+Add-SummaryRow -LabelText 'Retire Date:' -Control $txtRetire
 
-$tlpSummary.Controls.Add((New-SummaryLabel "Last Rounded:"), 0, $rowIndex); $rowIndex++
-$txtRound = New-SummaryTextBox -isLast $true
-$tlpSummary.Controls.Add($txtRound, 0, $rowIndex)
+$txtRound = New-SummaryTextBox -IsLast $true
+Add-SummaryRow -LabelText 'Last Rounded:' -Control $txtRound
 
 $grpSummary.Controls.Add($tlpSummary)
 # Device Location (with City)
