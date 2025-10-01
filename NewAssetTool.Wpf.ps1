@@ -85,6 +85,68 @@ if (-not $windowsFormsHost) {
 $windowsFormsHost.Child = $form
 $form.Visible = $true
 
+function Get-FirstWinFormsTabControl {
+  param([System.Windows.Forms.Control]$parent)
+  if (-not $parent) { return $null }
+  if ($parent -is [System.Windows.Forms.TabControl]) { return $parent }
+  foreach ($child in $parent.Controls) {
+    $found = Get-FirstWinFormsTabControl -parent $child
+    if ($found) { return $found }
+  }
+  return $null
+}
+
+$topTabs = $window.FindName('TopTabs')
+$embeddedTabControl = Get-FirstWinFormsTabControl -parent $form
+if ($topTabs -and $embeddedTabControl) {
+  try { $embeddedTabControl.Appearance = [System.Windows.Forms.TabAppearance]::Buttons } catch {}
+  try { $embeddedTabControl.SizeMode = [System.Windows.Forms.TabSizeMode]::Fixed } catch {}
+  try { $embeddedTabControl.ItemSize = New-Object System.Drawing.Size -ArgumentList 0,1 } catch {}
+  try { $embeddedTabControl.Padding = New-Object System.Drawing.Point -ArgumentList 0,0 } catch {}
+  try { $embeddedTabControl.TabStop = $false } catch {}
+
+  $script:__tabSyncInProgress = $false
+
+  $syncAction = {
+    param($setWpf,$index)
+    if ($setWpf) {
+      if ($index -ge 0 -and $index -lt $topTabs.Items.Count) {
+        if ($topTabs.SelectedIndex -ne $index) { $topTabs.SelectedIndex = $index }
+      }
+    } else {
+      if ($index -ge 0 -and $index -lt $embeddedTabControl.TabPages.Count) {
+        if ($embeddedTabControl.SelectedIndex -ne $index) { $embeddedTabControl.SelectedIndex = $index }
+      }
+    }
+  }
+
+  $setIndexSafely = {
+    param($isWpf, $index)
+    if ($script:__tabSyncInProgress) { return }
+    $script:__tabSyncInProgress = $true
+    try {
+      & $syncAction $isWpf $index
+    } catch {}
+    $script:__tabSyncInProgress = $false
+  }
+
+  try {
+    & $setIndexSafely $true $embeddedTabControl.SelectedIndex
+  } catch {}
+
+  $topTabs.Add_SelectionChanged({
+    param($sender,$args)
+    if (-not $sender) { return }
+    & $setIndexSafely $false $sender.SelectedIndex
+  })
+
+  $embeddedTabControl.add_SelectedIndexChanged({
+    param($sender,$eventArgs)
+    if (-not $sender) { return }
+    & $setIndexSafely $true $sender.SelectedIndex
+  })
+}
+
 $searchTextBox = $window.FindName('SearchTextBox')
 if ($searchTextBox) {
   try { Set-ScanSearchControl $searchTextBox } catch {}
