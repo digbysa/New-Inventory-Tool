@@ -1141,6 +1141,8 @@ $($out)","Save") | Out-Null
 $LEFT_COL_PERCENT   = 46
 $RIGHT_COL_PERCENT  = 54
 $GAP                = 6
+$GROUP_MARGIN       = 8
+$GROUP_PADDING      = 12
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Inventory Assoc Finder - OMI"
 $lblPaths = New-Object System.Windows.Forms.Label
@@ -1220,12 +1222,12 @@ $tlpLeft.RowCount = 2
 $tlpLeft.Margin = New-Object System.Windows.Forms.Padding($GAP, $GAP, 3, $GAP)
 $tlpLeft.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tlpLeft.RowStyles.Clear()
-$tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
-$tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
+$tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
+$tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 # Device Summary
 $grpSummary = New-Object System.Windows.Forms.GroupBox; $grpSummary.Text="Device Summary"; $grpSummary.Dock='Fill'
-$grpSummary.Margin = New-Object System.Windows.Forms.Padding($GAP)
-$grpSummary.Padding = New-Object System.Windows.Forms.Padding($GAP)
+$grpSummary.Margin = New-Object System.Windows.Forms.Padding($GROUP_MARGIN)
+$grpSummary.Padding = New-Object System.Windows.Forms.Padding($GROUP_PADDING)
 
 $tlpSummary = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpSummary.Dock = 'Fill'
@@ -1322,8 +1324,8 @@ $tlpSummary.Controls.Add($txtRound, 0, $rowIndex)
 $grpSummary.Controls.Add($tlpSummary)
 # Device Location (with City)
 $grpLoc = New-Object System.Windows.Forms.GroupBox; $grpLoc.Text="Device Location"; $grpLoc.Dock='Fill'
-$grpLoc.Margin = New-Object System.Windows.Forms.Padding($GAP)
-$grpLoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
+$grpLoc.Margin = New-Object System.Windows.Forms.Padding($GROUP_MARGIN)
+$grpLoc.Padding = New-Object System.Windows.Forms.Padding($GROUP_PADDING)
 
 $tlpLoc = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpLoc.Dock = 'Fill'
@@ -1470,12 +1472,12 @@ $tlpRight.RowCount = 2
 $tlpRight.Margin = New-Object System.Windows.Forms.Padding(3, $GAP, $GAP, $GAP)
 $tlpRight.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tlpRight.RowStyles.Clear()
-$tlpRight.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
-$tlpRight.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
+$tlpRight.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
+$tlpRight.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 # Associated devices (right column, top)
 $grpAssoc = New-Object System.Windows.Forms.GroupBox; $grpAssoc.Text="Associated Devices"; $grpAssoc.Dock='Fill'
-$grpAssoc.Margin = New-Object System.Windows.Forms.Padding($GAP)
-$grpAssoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
+$grpAssoc.Margin = New-Object System.Windows.Forms.Padding($GROUP_MARGIN)
+$grpAssoc.Padding = New-Object System.Windows.Forms.Padding($GROUP_PADDING)
 $tlpAssoc = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpAssoc.Dock = 'Fill'
 $tlpAssoc.ColumnCount = 1
@@ -1595,8 +1597,8 @@ $tlpAssoc.Controls.Add($assocGridPanel,0,1)
 $grpAssoc.Controls.Add($tlpAssoc)
 # Rounding group
 $grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Fill'
-$grpMaint.Margin = New-Object System.Windows.Forms.Padding($GAP)
-$grpMaint.Padding = New-Object System.Windows.Forms.Padding(12)
+$grpMaint.Margin = New-Object System.Windows.Forms.Padding($GROUP_MARGIN)
+$grpMaint.Padding = New-Object System.Windows.Forms.Padding($GROUP_PADDING)
 
 $lblMaintType=New-Object System.Windows.Forms.Label; $lblMaintType.Text='Maintenance Type'; $lblMaintType.AutoSize=$true
 $cmbMaintType=New-Object System.Windows.Forms.ComboBox; $cmbMaintType.DropDownStyle='DropDownList'; $cmbMaintType.Dock='Fill'
