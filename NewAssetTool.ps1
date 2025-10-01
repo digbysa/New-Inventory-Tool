@@ -1442,11 +1442,12 @@ $grpLoc.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
 
 $tlpLoc = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpLoc.Dock = 'Fill'
-$tlpLoc.ColumnCount = 1
+$tlpLoc.ColumnCount = 2
 $tlpLoc.RowCount = 0
 $tlpLoc.Margin = New-Object System.Windows.Forms.Padding(0)
 $tlpLoc.Padding = New-Object System.Windows.Forms.Padding(0)
 $tlpLoc.ColumnStyles.Clear()
+$tlpLoc.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $tlpLoc.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $tlpLoc.RowStyles.Clear()
 $grpLoc.Controls.Add($tlpLoc)
@@ -1455,7 +1456,8 @@ function Add-LocLabel([string]$text, [bool]$isFirst){
   $label = New-Object System.Windows.Forms.Label
   $label.Text = $text
   $label.AutoSize = $true
-  $label.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(0,0,0,0) } else { New-Object System.Windows.Forms.Padding(0,8,0,0) }
+  $label.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(0,0,8,0) } else { New-Object System.Windows.Forms.Padding(0,8,8,0) }
+  $label.Anchor = [System.Windows.Forms.AnchorStyles]::Left
   return $label
 }
 
@@ -1464,7 +1466,8 @@ function New-LocTextBox {
   $box.ReadOnly = $true
   $box.BackColor = [System.Drawing.Color]::White
   $box.Dock = 'Fill'
-  $box.Margin = New-Object System.Windows.Forms.Padding(0,6,0,0)
+  $box.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+  $box.Padding = New-Object System.Windows.Forms.Padding(0)
   $box.MinimumSize = New-Object System.Drawing.Size(0,24)
   $box.Height = 24
   $box.TabStop = $false
@@ -1474,7 +1477,7 @@ function New-LocTextBox {
 function New-LocCombo {
   $combo = New-Object System.Windows.Forms.ComboBox
   $combo.Dock = 'Fill'
-  $combo.Margin = New-Object System.Windows.Forms.Padding(0,6,0,0)
+  $combo.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
   $combo.Visible = $false
   $combo.DropDownStyle = 'DropDown'
   return $combo
@@ -1483,74 +1486,74 @@ function New-LocCombo {
 # City
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $tlpLoc.Controls.Add((Add-LocLabel 'City:' $true), 0, $tlpLoc.RowCount)
-$tlpLoc.RowCount++
 $cityRowIndex = $tlpLoc.RowCount
-$tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$txtCity = New-LocTextBox
-$tlpLoc.Controls.Add($txtCity, 0, $cityRowIndex)
 $tlpLoc.RowCount++
+$txtCity = New-LocTextBox
+$txtCity.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tlpLoc.Controls.Add($txtCity, 1, $cityRowIndex)
 $cmbCity = New-LocCombo
-$tlpLoc.Controls.Add($cmbCity, 0, $cityRowIndex)
+$cmbCity.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tlpLoc.Controls.Add($cmbCity, 1, $cityRowIndex)
 
 # Location
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $tlpLoc.Controls.Add((Add-LocLabel 'Location:' $false), 0, $tlpLoc.RowCount)
-$tlpLoc.RowCount++
 $locationRowIndex = $tlpLoc.RowCount
-$tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$txtLocation = New-LocTextBox
-$tlpLoc.Controls.Add($txtLocation, 0, $locationRowIndex)
 $tlpLoc.RowCount++
+$txtLocation = New-LocTextBox
+$txtLocation.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tlpLoc.Controls.Add($txtLocation, 1, $locationRowIndex)
 $cmbLocation = New-LocCombo
-$tlpLoc.Controls.Add($cmbLocation, 0, $locationRowIndex)
+$cmbLocation.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tlpLoc.Controls.Add($cmbLocation, 1, $locationRowIndex)
 
 # Building
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $tlpLoc.Controls.Add((Add-LocLabel 'Building:' $false), 0, $tlpLoc.RowCount)
-$tlpLoc.RowCount++
 $buildingRowIndex = $tlpLoc.RowCount
-$tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$txtBldg = New-LocTextBox
-$tlpLoc.Controls.Add($txtBldg, 0, $buildingRowIndex)
 $tlpLoc.RowCount++
+$txtBldg = New-LocTextBox
+$txtBldg.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tlpLoc.Controls.Add($txtBldg, 1, $buildingRowIndex)
 $cmbBuilding = New-LocCombo
-$tlpLoc.Controls.Add($cmbBuilding, 0, $buildingRowIndex)
+$cmbBuilding.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tlpLoc.Controls.Add($cmbBuilding, 1, $buildingRowIndex)
 
 # Floor
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $tlpLoc.Controls.Add((Add-LocLabel 'Floor:' $false), 0, $tlpLoc.RowCount)
-$tlpLoc.RowCount++
 $floorRowIndex = $tlpLoc.RowCount
-$tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$txtFloor = New-LocTextBox
-$tlpLoc.Controls.Add($txtFloor, 0, $floorRowIndex)
 $tlpLoc.RowCount++
+$txtFloor = New-LocTextBox
+$txtFloor.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tlpLoc.Controls.Add($txtFloor, 1, $floorRowIndex)
 $cmbFloor = New-LocCombo
-$tlpLoc.Controls.Add($cmbFloor, 0, $floorRowIndex)
+$cmbFloor.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tlpLoc.Controls.Add($cmbFloor, 1, $floorRowIndex)
 
 # Room
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $tlpLoc.Controls.Add((Add-LocLabel 'Room:' $false), 0, $tlpLoc.RowCount)
-$tlpLoc.RowCount++
 $roomRowIndex = $tlpLoc.RowCount
-$tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$txtRoom = New-LocTextBox
-$tlpLoc.Controls.Add($txtRoom, 0, $roomRowIndex)
 $tlpLoc.RowCount++
+$txtRoom = New-LocTextBox
+$txtRoom.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tlpLoc.Controls.Add($txtRoom, 1, $roomRowIndex)
 $cmbRoom = New-LocCombo
-$tlpLoc.Controls.Add($cmbRoom, 0, $roomRowIndex)
+$cmbRoom.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tlpLoc.Controls.Add($cmbRoom, 1, $roomRowIndex)
 
 # Department
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $tlpLoc.Controls.Add((Add-LocLabel 'Department:' $false), 0, $tlpLoc.RowCount)
-$tlpLoc.RowCount++
 $deptRowIndex = $tlpLoc.RowCount
-$tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$txtDept = New-LocTextBox
-$tlpLoc.Controls.Add($txtDept, 0, $deptRowIndex)
 $tlpLoc.RowCount++
+$txtDept = New-LocTextBox
+$txtDept.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tlpLoc.Controls.Add($txtDept, 1, $deptRowIndex)
 $cmbDept = New-LocCombo
-$tlpLoc.Controls.Add($cmbDept, 0, $deptRowIndex)
+$cmbDept.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tlpLoc.Controls.Add($cmbDept, 1, $deptRowIndex)
 
 # Spacer and edit button
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
@@ -1559,6 +1562,7 @@ $locSpacer.Dock = 'Fill'
 $locSpacer.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 $locSpacer.BackColor = [System.Drawing.Color]::Transparent
 $tlpLoc.Controls.Add($locSpacer, 0, $tlpLoc.RowCount)
+$tlpLoc.SetColumnSpan($locSpacer, 2)
 $tlpLoc.RowCount++
 
 if(-not $btnEditLoc){
@@ -1570,6 +1574,7 @@ $btnEditLoc.Anchor = 'Bottom,Right'
 $btnEditLoc.Margin = New-Object System.Windows.Forms.Padding(0,8,0,0)
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $tlpLoc.Controls.Add($btnEditLoc, 0, $tlpLoc.RowCount)
+$tlpLoc.SetColumnSpan($btnEditLoc, 2)
 $tlpLoc.RowCount++
 
 # Editable combos
