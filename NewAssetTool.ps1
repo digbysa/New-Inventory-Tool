@@ -1277,7 +1277,7 @@ function Add-SummaryRow {
     [string]$LabelText,
     [System.Windows.Forms.Control]$Control,
     [bool]$IsFirst = $false,
-    [int]$LabelTopMargin = 10
+    [int]$LabelTopMargin = 8
   )
   $row = $tlpSummary.RowCount
   $tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
@@ -1321,7 +1321,7 @@ $tlpSummary.RowCount++
 
 $txtAT = New-SummaryTextBox
 $txtAT.Margin = New-Object System.Windows.Forms.Padding(12,8,0,0)
-Add-SummaryRow -LabelText 'Asset Tag:' -Control $txtAT -LabelTopMargin 10
+Add-SummaryRow -LabelText 'Asset Tag:' -Control $txtAT
 
 $txtSN = New-SummaryTextBox
 Add-SummaryRow -LabelText 'Serial:' -Control $txtSN
