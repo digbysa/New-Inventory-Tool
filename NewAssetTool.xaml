@@ -16,7 +16,9 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Background="#FFFFFFFF">
+                Background="#FFFFFFFF"
+                BorderBrush="Black"
+                BorderThickness="1">
             <Grid Margin="24,0"
                   VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
@@ -45,7 +47,7 @@
                 Margin="24,0"
                 Height="42"
                 Background="#FFFDFDFE"
-                BorderBrush="#FFE0E3E9"
+                BorderBrush="Black"
                 BorderThickness="1"
                 CornerRadius="6"
                 VerticalAlignment="Center">
