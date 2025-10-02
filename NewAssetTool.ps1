@@ -1234,19 +1234,16 @@ $txtScan.Visible = $false
 $panelTop.Controls.Add($flpTop)
 # ---------- END HEADER ----------
 # Main 2-col table
-$tlpMain = New-Object System.Windows.Forms.TableLayoutPanel
 $LEFT_COL_WIDTH  = 520
-$tlpMain.Dock = 'Fill'
-$tlpMain.ColumnCount = 2
-$tlpMain.RowCount = 1
-$tlpMain.Padding = New-Object System.Windows.Forms.Padding(16)
-$tlpMain.CellBorderStyle = [System.Windows.Forms.TableLayoutPanelCellBorderStyle]::None
-$tlpMain.BackColor = [System.Drawing.Color]::White
-$tlpMain.ColumnStyles.Clear()
-$tlpMain.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, $LEFT_COL_WIDTH)) )
-$tlpMain.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
-$tlpMain.RowStyles.Clear()
-$tlpMain.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
+$splitter = New-Object System.Windows.Forms.SplitContainer
+$splitter.Dock = 'Fill'
+$splitter.Orientation = [System.Windows.Forms.Orientation]::Vertical
+$splitter.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel1
+$splitter.SplitterDistance = $LEFT_COL_WIDTH
+$splitter.SplitterWidth = 6
+$splitter.IsSplitterFixed = $false
+$splitter.Padding = New-Object System.Windows.Forms.Padding(16)
+$splitter.BackColor = [System.Drawing.Color]::White
 function New-L($t,$x,$y){$l=New-Object System.Windows.Forms.Label;$l.Text=$t;$l.AutoSize=$true;$l.Location=New-Object System.Drawing.Point($x,$y);$l}
 function New-RO($x,$y,$w){$t=New-Object System.Windows.Forms.TextBox;$t.Location="$x,$y";$t.Size="$w,24";$t.ReadOnly=$true;$t.BackColor='White';$t}
 # Left column stack
@@ -1802,14 +1799,14 @@ $txtComments.Add_SizeChanged({
 # Compose columns
 $tlpRight.Controls.Add($grpAssoc,0,0)
 $tlpRight.Controls.Add($grpMaint,0,1)
-$tlpMain.Controls.Add($tlpLeft, 0, 0)
-$tlpMain.Controls.Add($tlpRight,1, 0)
+$splitter.Panel1.Controls.Add($tlpLeft)
+$splitter.Panel2.Controls.Add($tlpRight)
 # StatusStrip
 $status=New-Object System.Windows.Forms.StatusStrip
 $statusLabel=New-Object System.Windows.Forms.ToolStripStatusLabel; $status.Items.Add($statusLabel) | Out-Null; $statusLabel.Text="Ready"
 # Add to form
 $form.SuspendLayout()
-$form.Controls.Add($tlpMain)   # Fill
+$form.Controls.Add($splitter)   # Fill
 $form.Add_Shown({
   foreach($c in @($cmbDept,$cmbDepartment,$ddlDept,$ddlDepartment)){ if ($c) { $c.Visible = $false } }
   foreach($t in @($txtDept,$txtDepartment)){ if ($t) { $t.Visible = $true } }
@@ -3482,8 +3479,8 @@ $pageMain = New-Object System.Windows.Forms.Panel
 $pageMain.Dock = 'Fill'
 # Re-parent header + main table into panel
 $form.Controls.Remove($panelTop)
-$form.Controls.Remove($tlpMain)
-$pageMain.Controls.Add($tlpMain); $tlpMain.Dock='Fill'
+$form.Controls.Remove($splitter)
+$pageMain.Controls.Add($splitter); $splitter.Dock='Fill'
 $pageMain.Controls.Add($panelTop); $panelTop.Dock='Top'
 $tabPageMain.Controls.Add($pageMain)
 # Compose Nearby page
@@ -3786,7 +3783,7 @@ try {
   $status.ForeColor = $script:ThemeColors.Text
 } catch {}
 try {
-  $tlpMain.BackColor = $script:ThemeColors.Background
+  $splitter.BackColor = $script:ThemeColors.Background
   $pageMain.BackColor = $script:ThemeColors.Background
   $nearPage.BackColor = $script:ThemeColors.Background
   $tabPageMain.BackColor = $script:ThemeColors.Background
