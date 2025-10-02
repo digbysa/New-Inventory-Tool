@@ -1181,11 +1181,12 @@ $GAP                = 6
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Inventory Assoc Finder - OMI"
 $lblPaths = New-Object System.Windows.Forms.Label
-$lblPaths.AutoSize = $true
-$lblPaths.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Right
-$lblPaths.TextAlign = "MiddleRight"
-$lblPaths.Location = New-Object System.Drawing.Point(($form.ClientSize.Width - 720), ($form.ClientSize.Height - 20))
-$lblPaths.Size = New-Object System.Drawing.Size(560, 18)
+$lblPaths.AutoSize = $false
+$lblPaths.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+$lblPaths.TextAlign = "MiddleLeft"
+$lblPaths.AutoEllipsis = $true
+$lblPaths.Location = New-Object System.Drawing.Point($GAP, ($form.ClientSize.Height - 28))
+$lblPaths.Size = New-Object System.Drawing.Size([Math]::Max(0, $form.ClientSize.Width - (2 * $GAP)), 18)
 $form.Controls.Add($lblPaths)
 $form.StartPosition="CenterScreen"
 $form.WindowState='Maximized'
