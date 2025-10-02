@@ -1325,7 +1325,7 @@ function New-SummaryTextBox {
   $box = New-Object System.Windows.Forms.TextBox
   $box.Anchor = 'Top,Left,Right'
   $topMargin = if($IsFirst){ 0 } else { 8 }
-  $bottomMargin = if($IsLast){ 0 } else { 0 }
+  $bottomMargin = if($IsLast){ $GAP } else { 0 }
   $box.Margin = New-Object System.Windows.Forms.Padding(12,$topMargin,0,$bottomMargin)
   $box.MinimumSize = New-Object System.Drawing.Size(0,24)
   $box.Height = 24
