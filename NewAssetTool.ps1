@@ -2649,10 +2649,27 @@ function Get-ValidLocationSelection {
   return $null
 }
 
-function Populate-Location-Combos([string]$city,[string]$loc,[string]$b,[string]$f,[string]$r,[switch]$PreserveInvalidSelections){
+function Populate-Location-Combos {
+  param(
+    [string]$city,
+    [string]$loc,
+    [string]$b,
+    [string]$f,
+    [string]$r,
+    [switch]$PreserveInvalidSelections,
+    [ValidateSet('City','Location','Building','Floor','Room')]
+    [string]$ChangedLevel
+  )
   $script:IsPopulatingLocationCombos = $true
   try {
     $cmbCity.Items.Clear(); $cmbLocation.Items.Clear(); $cmbBuilding.Items.Clear(); $cmbFloor.Items.Clear(); $cmbRoom.Items.Clear()
+
+    switch ($ChangedLevel) {
+      'City'      { $loc = $null; $b = $null; $f = $null; $r = $null }
+      'Location'  { $b = $null; $f = $null; $r = $null }
+      'Building'  { $f = $null; $r = $null }
+      'Floor'     { $r = $null }
+    }
 
     # City
     $cities = $script:LocationRows | ForEach-Object { Get-LocVal $_ 'City' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
@@ -2753,19 +2770,19 @@ function Toggle-EditLocation(){
 }
 $cmbCity.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
-  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'City'
 })
 $cmbLocation.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
-  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Location'
 })
 $cmbBuilding.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
-  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Building'
 })
 $cmbFloor.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
-  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Floor'
 })
 # ---- Actions ----
 function Focus-ScanInput(){
