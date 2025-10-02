@@ -329,7 +329,7 @@ function Set-ModernTheme {
         $ctl.BackColor = $accent
         $ctl.ForeColor = [System.Drawing.Color]::White
         if ($ctl -is [ModernUI.RoundedButton]) {
-          $ctl.CornerRadius = 14
+          $ctl.CornerRadius = 4
         } else {
           Set-RoundedCorners $ctl 12
         }
@@ -350,7 +350,7 @@ function Set-ModernTheme {
         $ctl.ForeColor = $fgText
       }
       'System\.Windows\.Forms\.ComboBox' {
-        $ctl.FlatStyle = 'Flat'
+        $ctl.FlatStyle = 'Standard'
         $ctl.BackColor = [System.Drawing.Color]::White
         $ctl.ForeColor = $fgText
         if (-not $ctl.DropDownStyle -or $ctl.DropDownStyle -ne 'DropDownList') { $ctl.DropDownStyle = 'DropDownList' }
@@ -1454,16 +1454,6 @@ $tlpLoc.Controls.Add($txtDept, 1, $deptRowIndex)
 $cmbDept = New-LocCombo
 $tlpLoc.Controls.Add($cmbDept, 1, $deptRowIndex)
 $tlpLoc.RowCount++
-
-<# # Spacer and edit button
-$tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$locSpacer = New-Object System.Windows.Forms.Panel
-$locSpacer.Dock = 'Fill'
-$locSpacer.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
-$locSpacer.BackColor = [System.Drawing.Color]::Transparent
-$tlpLoc.Controls.Add($locSpacer, 0, $tlpLoc.RowCount)
-$tlpLoc.SetColumnSpan($locSpacer, 2)
-$tlpLoc.RowCount++ #>
 
 if(-not $btnEditLoc){
   $btnEditLoc = New-Object ModernUI.RoundedButton
@@ -3186,7 +3176,7 @@ $btnNearbyShowAll.Add_Click({
 $btnSetStatus = New-Object ModernUI.RoundedButton
 $btnSetStatus.Text = 'Multi-Status'
 $btnSetStatus.Width = 110
-$btnSetStatus.Height = 24
+# $btnSetStatus.Height = 24
 $btnSetStatus.Location = '560,4'
 $nearToolbar.Controls.Add($btnSetStatus)
 if (-not $menuStatus) { $menuStatus = New-Object System.Windows.Forms.ContextMenuStrip }
