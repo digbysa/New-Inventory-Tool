@@ -491,8 +491,18 @@ function Normalize-Scan([string]$raw){
 }
 function Extract-RITM([string]$po){
   if([string]::IsNullOrWhiteSpace($po)){ return "" }
-  $m = [regex]::Match($po, '(RITM\d+)')
-  if($m.Success){ return $m.Groups[1].Value } else { return $po.Trim() }
+  $trimmed = $po.Trim()
+  $m = [regex]::Match($trimmed, '(RITM\d+)')
+  if($m.Success){ return $m.Groups[1].Value }
+  $trpMatch = [regex]::Match($trimmed, 'TRP(?<date>\d{8})')
+  if($trpMatch.Success){
+    $dateDigits = $trpMatch.Groups['date'].Value
+    try {
+      $dt = [datetime]::ParseExact($dateDigits, 'yyyyMMdd', [System.Globalization.CultureInfo]::InvariantCulture)
+      return "TRP - " + $dt.ToString('dd MMM yyyy', [System.Globalization.CultureInfo]::InvariantCulture)
+    } catch {}
+  }
+  return $trimmed
 }
 function Parse-DateLoose([string]$s){
   if([string]::IsNullOrWhiteSpace($s)){ return $null }
