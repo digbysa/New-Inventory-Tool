@@ -3308,9 +3308,13 @@ $btnNearbyShowAll.Add_Click({
 # --- Multi-Status (apply one status to selected rows) ---
 $btnSetStatus = New-Object ModernUI.RoundedButton
 $btnSetStatus.Text = 'Multi-Status'
-$btnSetStatus.Width = 110
-# $btnSetStatus.Height = 24
-$btnSetStatus.Location = '560,4'
+$btnSetStatus.AutoSize = $true
+$multiStatusPreferred = $btnSetStatus.PreferredSize
+$clearPreferred = $btnClearScopes.PreferredSize
+$btnSetStatus.AutoSize = $false
+$desiredWidth = [Math]::Max($multiStatusPreferred.Width, $clearPreferred.Width)
+$btnSetStatus.Size = New-Object System.Drawing.Size($desiredWidth, $clearPreferred.Height)
+$btnSetStatus.Location = New-Object System.Drawing.Point(560, $btnClearScopes.Location.Y)
 $nearToolbar.Controls.Add($btnSetStatus)
 if (-not $menuStatus) { $menuStatus = New-Object System.Windows.Forms.ContextMenuStrip }
 $btnSetStatus.Add_Click({
