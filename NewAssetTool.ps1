@@ -2607,41 +2607,114 @@ function Populate-UI($displayRec,$parentRec){
   Update-FixNameButton $displayRec $parentRec
 }
 # ---- Location cascading (City > Location > Building > Floor > Room) ----
-function Populate-Location-Combos([string]$city,[string]$loc,[string]$b,[string]$f,[string]$r){
-  $cmbCity.Items.Clear(); $cmbLocation.Items.Clear(); $cmbBuilding.Items.Clear(); $cmbFloor.Items.Clear(); $cmbRoom.Items.Clear()
-  # City
-  $cities = $script:LocationRows | ForEach-Object { Get-LocVal $_ 'City' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
-  $cmbCity.Items.AddRange(@($cities))
-  if($city){ $cmbCity.Text = $city }
-  # Location (filtered by City if present)
-  $locRows = $script:LocationRows
-  if($cmbCity.Text){
-    $locRows = $locRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'City')) -eq (Normalize-Field $cmbCity.Text) }
+$script:IsPopulatingLocationCombos = $false
+
+function Filter-LocationRows {
+  param(
+    [string]$city,
+    [string]$location,
+    [string]$building,
+    [string]$floor
+  )
+  $rows = $script:LocationRows
+  if($city){
+    $nCity = Normalize-Field $city
+    $rows = $rows | Where-Object { (Normalize-Field (Get-LocVal $_ 'City')) -eq $nCity }
   }
-  $locs = $locRows | ForEach-Object { Get-LocVal $_ 'Location' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
-  $cmbLocation.Items.AddRange(@($locs))
-  if($loc){ $cmbLocation.Text=$loc }
-  if($cmbLocation.Text){
-    $blds = $script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'Location')) -eq (Normalize-Field $cmbLocation.Text) -and ( -not $cmbCity.Text -or (Normalize-Field (Get-LocVal $_ 'City')) -eq (Normalize-Field $cmbCity.Text) ) } | ForEach-Object { Get-LocVal $_ 'Building' } | Select-Object -Unique | Sort-Object
+  if($location){
+    $nLocation = Normalize-Field $location
+    $rows = $rows | Where-Object { (Normalize-Field (Get-LocVal $_ 'Location')) -eq $nLocation }
+  }
+  if($building){
+    $nBuilding = Normalize-Field $building
+    $rows = $rows | Where-Object { (Normalize-Field (Get-LocVal $_ 'Building')) -eq $nBuilding }
+  }
+  if($floor){
+    $nFloor = Normalize-Field $floor
+    $rows = $rows | Where-Object { (Normalize-Field (Get-LocVal $_ 'Floor')) -eq $nFloor }
+  }
+  return @($rows)
+}
+
+function Get-ValidLocationSelection {
+  param(
+    [string]$value,
+    [object[]]$options
+  )
+  if(-not $value){ return $null }
+  $norm = Normalize-Field $value
+  foreach($opt in $options){
+    if((Normalize-Field $opt) -eq $norm){ return $value }
+  }
+  return $null
+}
+
+function Populate-Location-Combos([string]$city,[string]$loc,[string]$b,[string]$f,[string]$r,[switch]$PreserveInvalidSelections){
+  $script:IsPopulatingLocationCombos = $true
+  try {
+    $cmbCity.Items.Clear(); $cmbLocation.Items.Clear(); $cmbBuilding.Items.Clear(); $cmbFloor.Items.Clear(); $cmbRoom.Items.Clear()
+
+    # City
+    $cities = $script:LocationRows | ForEach-Object { Get-LocVal $_ 'City' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
+    $cmbCity.Items.AddRange(@($cities))
+    $cmbCity.Text = if($city){ $city } else { '' }
+    $validCity = Get-ValidLocationSelection $cmbCity.Text $cities
+    if(-not $validCity -and -not $PreserveInvalidSelections){ $cmbCity.Text = '' }
+    $filterCity = if($validCity){ $validCity } else { $null }
+
+    # Location (filtered by City if present)
+    $locRows = Filter-LocationRows $filterCity $null $null $null
+    $locs = $locRows | ForEach-Object { Get-LocVal $_ 'Location' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
+    $cmbLocation.Items.AddRange(@($locs))
+    $cmbLocation.Text = if($loc){ $loc } else { '' }
+    $validLocation = Get-ValidLocationSelection $cmbLocation.Text $locs
+    if(-not $validLocation -and -not $PreserveInvalidSelections){ $cmbLocation.Text = '' }
+    $filterLocation = if($validLocation){ $validLocation } else { $null }
+
+    # Building
+    $blds = @()
+    if($filterLocation){
+      $bldRows = Filter-LocationRows $filterCity $filterLocation $null $null
+      $blds = $bldRows | ForEach-Object { Get-LocVal $_ 'Building' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
+    }
     $cmbBuilding.Items.AddRange(@($blds))
+    $cmbBuilding.Text = if($b){ $b } else { '' }
+    $validBuilding = Get-ValidLocationSelection $cmbBuilding.Text $blds
+    if(-not $validBuilding -and -not $PreserveInvalidSelections){ $cmbBuilding.Text = '' }
+    $filterBuilding = if($validBuilding){ $validBuilding } else { $null }
+
+    # Floor
+    $floors = @()
+    if($filterLocation -and $filterBuilding){
+      $floorRows = Filter-LocationRows $filterCity $filterLocation $filterBuilding $null
+      $floors = $floorRows | ForEach-Object { Get-LocVal $_ 'Floor' } | Where-Object { $_ } | Select-Object -Unique
+      $floors = Sort-Floors $floors
+    }
+    $cmbFloor.Items.AddRange(@($floors))
+    $cmbFloor.Text = if($f){ $f } else { '' }
+    $validFloor = Get-ValidLocationSelection $cmbFloor.Text $floors
+    if(-not $validFloor -and -not $PreserveInvalidSelections){ $cmbFloor.Text = '' }
+    $filterFloor = if($validFloor){ $validFloor } else { $null }
+
+    # Room
+    $rooms = @()
+    if($filterLocation -and $filterBuilding -and $filterFloor){
+      $roomRows = Filter-LocationRows $filterCity $filterLocation $filterBuilding $filterFloor
+      $rooms = $roomRows | ForEach-Object { Get-LocVal $_ 'Room' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
+    }
+    $cmbRoom.Items.AddRange(@($rooms))
+    $cmbRoom.Text = if($r){ $r } else { '' }
+    $validRoom = Get-ValidLocationSelection $cmbRoom.Text $rooms
+    if(-not $validRoom -and -not $PreserveInvalidSelections){ $cmbRoom.Text = '' }
   }
-  if($b){ $cmbBuilding.Text=$b }
-  if($cmbLocation.Text -and $cmbBuilding.Text){
-    $fls = $script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'Location')) -eq (Normalize-Field $cmbLocation.Text) -and (Normalize-Field (Get-LocVal $_ 'Building')) -eq (Normalize-Field $cmbBuilding.Text) } | ForEach-Object { Get-LocVal $_ 'Floor' } | Select-Object -Unique
-    $fls = Sort-Floors $fls
-    $cmbFloor.Items.AddRange(@($fls))
+  finally {
+    $script:IsPopulatingLocationCombos = $false
   }
-  if($f){ $cmbFloor.Text=$f }
-  if($cmbLocation.Text -and $cmbBuilding.Text -and $cmbFloor.Text){
-    $rms = $script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'Location')) -eq (Normalize-Field $cmbLocation.Text) -and (Normalize-Field (Get-LocVal $_ 'Building')) -eq (Normalize-Field $cmbBuilding.Text) -and (Normalize-Field (Get-LocVal $_ 'Floor')) -eq (Normalize-Field $cmbFloor.Text) } | ForEach-Object { Get-LocVal $_ 'Room' } | Select-Object -Unique | Sort-Object
-    $cmbRoom.Items.AddRange(@($rms))
-  }
-  if($r){ $cmbRoom.Text=$r }
 }
 function Toggle-EditLocation(){
   $script:editing = -not $script:editing
   if($script:editing){
-    Populate-Location-Combos $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text
+    Populate-Location-Combos $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text -PreserveInvalidSelections
     try { Populate-Department-Combo ($txtDept.Text) } catch {}
     $cmbCity.Visible=$true; $cmbLocation.Visible=$true; $cmbBuilding.Visible=$true; $cmbFloor.Visible=$true; $cmbRoom.Visible=$true
     $txtCity.Visible=$false; $txtLocation.Visible=$false; $txtBldg.Visible=$false; $txtFloor.Visible=$false; $txtRoom.Visible=$false
@@ -2679,35 +2752,20 @@ function Toggle-EditLocation(){
   }
 }
 $cmbCity.Add_TextChanged({
-  $cmbLocation.Items.Clear(); $cmbBuilding.Items.Clear(); $cmbFloor.Items.Clear(); $cmbRoom.Items.Clear()
-  $locRows = $script:LocationRows
-  if($cmbCity.Text){ $locRows = $locRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'City')) -eq (Normalize-Field $cmbCity.Text) } }
-  $locs = $locRows | ForEach-Object { Get-LocVal $_ 'Location' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
-  $cmbLocation.Items.AddRange(@($locs))
+  if($script:IsPopulatingLocationCombos){ return }
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text
 })
 $cmbLocation.Add_TextChanged({
-  $cmbBuilding.Items.Clear(); $cmbFloor.Items.Clear(); $cmbRoom.Items.Clear()
-  if($cmbLocation.Text){
-    $blds = $script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'Location')) -eq (Normalize-Field $cmbLocation.Text) -and ( -not $cmbCity.Text -or (Normalize-Field (Get-LocVal $_ 'City')) -eq (Normalize-Field $cmbCity.Text) ) } | ForEach-Object { Get-LocVal $_ 'Building' } | Select-Object -Unique | Sort-Object
-    $cmbBuilding.Items.AddRange(@($blds))
-  }
+  if($script:IsPopulatingLocationCombos){ return }
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text
 })
 $cmbBuilding.Add_TextChanged({
-  $cmbFloor.Items.Clear(); $cmbRoom.Items.Clear()
-  if($cmbLocation.Text -and $cmbBuilding.Text){
-    $fls = $script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'Location')) -eq (Normalize-Field $cmbLocation.Text) -and (Normalize-Field (Get-LocVal $_ 'Building')) -eq (Normalize-Field $cmbBuilding.Text) } | ForEach-Object { Get-LocVal $_ 'Floor' } | Select-Object -Unique
-    $fls = Sort-Floors $fls
-    $cmbFloor.Items.AddRange(@($fls))
-    # Force user to pick a valid Floor/Room for the new Building
-    $cmbFloor.Text=''; $cmbRoom.Text=''
-  }
+  if($script:IsPopulatingLocationCombos){ return }
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text
 })
 $cmbFloor.Add_TextChanged({
-  $cmbRoom.Items.Clear()
-  if($cmbLocation.Text -and $cmbBuilding.Text -and $cmbFloor.Text){
-    $rms = $script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'Location')) -eq (Normalize-Field $cmbLocation.Text) -and (Normalize-Field (Get-LocVal $_ 'Building')) -eq (Normalize-Field $cmbBuilding.Text) -and (Normalize-Field (Get-LocVal $_ 'Floor')) -eq (Normalize-Field $cmbFloor.Text) } | ForEach-Object { Get-LocVal $_ 'Room' } | Select-Object -Unique | Sort-Object
-    $cmbRoom.Items.AddRange(@($rms))
-  }
+  if($script:IsPopulatingLocationCombos){ return }
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text
 })
 # ---- Actions ----
 function Focus-ScanInput(){
