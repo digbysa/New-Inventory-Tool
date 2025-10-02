@@ -353,7 +353,34 @@ function Set-ModernTheme {
         $ctl.FlatStyle = 'Standard'
         $ctl.BackColor = [System.Drawing.Color]::White
         $ctl.ForeColor = $fgText
-        if (-not $ctl.DropDownStyle -or $ctl.DropDownStyle -ne 'DropDownList') { $ctl.DropDownStyle = 'DropDownList' }
+        $tagValues = @()
+        try {
+          $tag = $ctl.Tag
+          if ($null -ne $tag) {
+            if ($tag -is [string]) {
+              $tagValues = @($tag)
+            } elseif ($tag -is [System.Collections.IEnumerable]) {
+              foreach ($tagItem in $tag) { if ($null -ne $tagItem) { $tagValues += $tagItem } }
+            } else {
+              $tagValues = @($tag)
+            }
+          }
+        } catch {}
+
+        $allowsEditableInput = $false
+        foreach ($tagValue in $tagValues) {
+          if ($null -eq $tagValue) { continue }
+          $tagText = $tagValue.ToString()
+          if ($tagText -match '(?i)(AllowEditableInput|AllowDropDown|AllowTyping|AllowTextInput)') { $allowsEditableInput = $true; break }
+        }
+
+        $styleName = ''
+        try { $styleName = $ctl.DropDownStyle.ToString() } catch {}
+        $isEditableStyle = $styleName -in @('DropDown','Simple')
+
+        if (-not $allowsEditableInput -and -not $isEditableStyle) {
+          if (-not $ctl.DropDownStyle -or $styleName -ne 'DropDownList') { $ctl.DropDownStyle = 'DropDownList' }
+        }
       }
       'System\.Windows\.Forms\.CheckBox|System\.Windows\.Forms\.RadioButton' {
         $ctl.ForeColor = $fgText; $ctl.BackColor = [System.Drawing.Color]::Transparent
@@ -1402,6 +1429,7 @@ function New-LocCombo {
   $combo.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(12,0,0,0) } else { New-Object System.Windows.Forms.Padding(12,8,0,0) }
   $combo.Visible = $false
   $combo.DropDownStyle = 'DropDown'
+  $combo.Tag = 'AllowDropDown'
   return $combo
 }
 
