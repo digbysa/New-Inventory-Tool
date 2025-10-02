@@ -3773,6 +3773,11 @@ function Get-StatusOptionsFromGrid {
 
 Apply-ModernThemeToForm -Form $form
 
+# The theming utility enforces single-selection on all DataGridViews. Restore
+# multi-selection for the Nearby grid so Shift/Ctrl selection works as
+# intended.
+try { if ($dgvNearby) { $dgvNearby.MultiSelect = $true } } catch {}
+
 $form.BackColor = $script:ThemeColors.Background
 try {
   $panelTop.BackColor = $script:ThemeColors.Header
