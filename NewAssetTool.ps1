@@ -3312,7 +3312,10 @@ $btnSetStatus.AutoSize = $true
 $multiStatusPreferred = $btnSetStatus.PreferredSize
 $clearPreferred = $btnClearScopes.PreferredSize
 $btnSetStatus.AutoSize = $false
-$desiredWidth = [Math]::Max($multiStatusPreferred.Width, $clearPreferred.Width)
+$btnSetStatus.AutoEllipsis = $false
+$extraWidth = 12
+$desiredWidth = [Math]::Max($multiStatusPreferred.Width + $extraWidth, $clearPreferred.Width)
+$btnSetStatus.MinimumSize = New-Object System.Drawing.Size($multiStatusPreferred.Width, $clearPreferred.Height)
 $btnSetStatus.Size = New-Object System.Drawing.Size($desiredWidth, $clearPreferred.Height)
 $btnSetStatus.Location = New-Object System.Drawing.Point(560, $btnClearScopes.Location.Y)
 $nearToolbar.Controls.Add($btnSetStatus)
