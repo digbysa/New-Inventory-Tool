@@ -1235,17 +1235,38 @@ $panelTop.Controls.Add($flpTop)
 # ---------- END HEADER ----------
 # Main 2-col table
 $LEFT_COL_WIDTH  = 520
+$PANEL2_MIN_WIDTH = 400
 $splitter = New-Object System.Windows.Forms.SplitContainer
 $splitter.Dock = 'Fill'
 $splitter.Orientation = [System.Windows.Forms.Orientation]::Vertical
 $splitter.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel1
-$splitter.Panel1MinSize = 520
-$splitter.Panel2MinSize = 400
+
+function Set-SplitterMinimums {
+  param(
+    [System.Windows.Forms.SplitContainer]$target,
+    [int]$panel1Desired,
+    [int]$panel2Desired
+  )
+
+  $available = [Math]::Max(0, $target.Width - $target.Padding.Horizontal - $target.SplitterWidth)
+  $panel1Min = [Math]::Min($panel1Desired, $available)
+  $panel2Available = [Math]::Max(0, $available - $panel1Min)
+  $panel2Min = [Math]::Min($panel2Desired, $panel2Available)
+
+  $target.Panel1MinSize = $panel1Min
+  $target.Panel2MinSize = $panel2Min
+}
+
+Set-SplitterMinimums -target $splitter -panel1Desired $LEFT_COL_WIDTH -panel2Desired $PANEL2_MIN_WIDTH
+$splitter.Add_SizeChanged({ Set-SplitterMinimums -target $splitter -panel1Desired $LEFT_COL_WIDTH -panel2Desired $PANEL2_MIN_WIDTH })
+$form.Add_Shown({ Set-SplitterMinimums -target $splitter -panel1Desired $LEFT_COL_WIDTH -panel2Desired $PANEL2_MIN_WIDTH })
+
 $splitter.SplitterDistance = $LEFT_COL_WIDTH
 $splitter.SplitterWidth = 6
 $splitter.IsSplitterFixed = $false
 $splitter.Padding = New-Object System.Windows.Forms.Padding(16)
 $splitter.BackColor = [System.Drawing.Color]::White
+Set-SplitterMinimums -target $splitter -panel1Desired $LEFT_COL_WIDTH -panel2Desired $PANEL2_MIN_WIDTH
 function New-L($t,$x,$y){$l=New-Object System.Windows.Forms.Label;$l.Text=$t;$l.AutoSize=$true;$l.Location=New-Object System.Drawing.Point($x,$y);$l}
 function New-RO($x,$y,$w){$t=New-Object System.Windows.Forms.TextBox;$t.Location="$x,$y";$t.Size="$w,24";$t.ReadOnly=$true;$t.BackColor='White';$t}
 # Left column stack
