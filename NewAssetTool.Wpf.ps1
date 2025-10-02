@@ -85,6 +85,36 @@ if (-not $windowsFormsHost) {
 $windowsFormsHost.Child = $form
 $form.Visible = $true
 
+$searchTextBox = $window.FindName('SearchTextBox')
+if ($searchTextBox) {
+  try { Set-ScanSearchControl $searchTextBox } catch {}
+  if ($txtScan) {
+    if ($searchTextBox.Text -ne $txtScan.Text) { $searchTextBox.Text = $txtScan.Text }
+    $txtScan.Add_TextChanged({
+      param($sender,$eventArgs)
+      $target = $script:NewAssetToolSearchTextBox
+      if ($target -and $target.Text -ne $sender.Text) {
+        $target.Text = $sender.Text
+        try { $target.CaretIndex = $target.Text.Length } catch {}
+      }
+    })
+  }
+  $searchTextBox.Add_TextChanged({
+    param($sender,$eventArgs)
+    if ($txtScan -and $txtScan.Text -ne $sender.Text) {
+      $txtScan.Text = $sender.Text
+    }
+  })
+  $searchTextBox.Add_KeyDown({
+    param($sender,$eventArgs)
+    if ($eventArgs.Key -eq [System.Windows.Input.Key]::Enter) {
+      $eventArgs.Handled = $true
+      try { Do-Lookup } catch {}
+    }
+  })
+  try { Focus-ScanInput } catch {}
+}
+
 $app = [System.Windows.Application]::Current
 if (-not $app) { $app = New-Object System.Windows.Application }
 $app.ShutdownMode = [System.Windows.ShutdownMode]::OnMainWindowClose

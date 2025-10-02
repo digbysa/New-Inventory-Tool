@@ -20,63 +20,10 @@ $script:ThemeColors = @{
   AltRow     = [System.Drawing.Color]::FromArgb(250, 252, 255)
   Selection  = [System.Drawing.Color]::FromArgb(229, 241, 251)
 }
-$script:CardPadding = 16
-
-function Get-DarkerColor {
-  param(
-    [Parameter(Mandatory)] [System.Drawing.Color] $Color,
-    [double] $Amount = 0.12
-  )
-
-  $factor = [Math]::Min([Math]::Max($Amount, 0), 1)
-  $scale  = 1 - $factor
-  return [System.Drawing.Color]::FromArgb(
-    $Color.A,
-    [Math]::Max([int][Math]::Round($Color.R * $scale), 0),
-    [Math]::Max([int][Math]::Round($Color.G * $scale), 0),
-    [Math]::Max([int][Math]::Round($Color.B * $scale), 0)
-  )
-}
-
-if (-not ('Win32.NativeMethods' -as [Type])) {
-  Add-Type -TypeDefinition @"
-using System;
-using System.Runtime.InteropServices;
-using System.Windows.Forms;
-
-namespace Win32
-{
-    public static class NativeMethods
-    {
-        private const int EM_SETCUEBANNER = 0x1501;
-
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, string lParam);
-
-        public static void SetCueBanner(TextBox box, string text)
-        {
-            if (box == null)
-            {
-                return;
-            }
-
-            SendMessage(box.Handle, EM_SETCUEBANNER, IntPtr.Zero, text ?? string.Empty);
-        }
-    }
-}
-"@ -ReferencedAssemblies System.Windows.Forms
-}
-
-function Set-CueBanner {
-  param(
-    [System.Windows.Forms.TextBox] $TextBox,
-    [string] $Text
-  )
-
-  if (-not $TextBox) { return }
-  try {
-    [Win32.NativeMethods]::SetCueBanner($TextBox, $Text)
-  } catch {}
+$script:NewAssetToolSearchTextBox = $null
+function Set-ScanSearchControl {
+  param([object]$control)
+  $script:NewAssetToolSearchTextBox = $control
 }
 # ===== Script directory resolver (robust, PS 5.1-safe) =====
 function Get-OwnScriptDir {
@@ -360,18 +307,7 @@ function Set-ModernTheme {
       'System\.Windows\.Forms\.StatusStrip|System\.Windows\.Forms\.ToolStrip|System\.Windows\.Forms\.MenuStrip|System\.Windows\.Forms\.ContextMenuStrip' {
         $ctl.BackColor = $bgHeader; $ctl.ForeColor = $fgText
       }
-      'System\.Windows\.Forms\.GroupBox' {
-        $ctl.BackColor = $bgPane
-        try { $ctl.ForeColor = $script:ThemeColors.MutedText } catch { $ctl.ForeColor = $fgText }
-        try { $ctl.Font = $script:ThemeFontSemibold } catch {}
-        try {
-          $targetPadding = [System.Windows.Forms.Padding]::new($script:CardPadding)
-          if (-not $ctl.Padding -or $ctl.Padding.Left -ne $targetPadding.Left -or $ctl.Padding.Top -ne $targetPadding.Top -or $ctl.Padding.Right -ne $targetPadding.Right -or $ctl.Padding.Bottom -ne $targetPadding.Bottom) {
-            $ctl.Padding = $targetPadding
-          }
-        } catch {}
-      }
-      'System\.Windows\.Forms\.(Panel|TableLayoutPanel|FlowLayoutPanel)' {
+      'System\.Windows\.Forms\.(Panel|GroupBox|TableLayoutPanel|FlowLayoutPanel)' {
         $ctl.BackColor = $bgPane; $ctl.ForeColor = $fgText
       }
       'System\.Windows\.Forms\.TabControl' {
@@ -390,37 +326,23 @@ function Set-ModernTheme {
       'System\.Windows\.Forms\.Button|ModernUI\.RoundedButton' {
         try { $ctl.FlatStyle = 'Flat' } catch {}
         try { $ctl.FlatAppearance.BorderSize = 0 } catch {}
-        try { $ctl.Cursor = [System.Windows.Forms.Cursors]::Hand } catch {}
-        $baseColor = $null
-        try {
-          $baseColor = $ctl.BackColor
-        } catch {}
-        if (-not $baseColor -or $baseColor.IsEmpty -or $baseColor.A -eq 0 -or $baseColor.ToArgb() -eq [System.Drawing.SystemColors]::Control.ToArgb()) {
-          $baseColor = $accent
-        }
-        $hoverColor = Get-DarkerColor -Color $baseColor
-        $ctl.BackColor = $baseColor
-        try {
-          $brightness = $baseColor.GetBrightness()
-          if ($brightness -lt 0.65) { $ctl.ForeColor = [System.Drawing.Color]::White } else { $ctl.ForeColor = $fgText }
-        } catch { $ctl.ForeColor = [System.Drawing.Color]::White }
+        $ctl.BackColor = $accent
+        $ctl.ForeColor = [System.Drawing.Color]::White
         if ($ctl -is [ModernUI.RoundedButton]) {
           $ctl.CornerRadius = 14
         } else {
           Set-RoundedCorners $ctl 12
         }
-        try {
-          $ctl.MinimumSize = New-Object System.Drawing.Size($ctl.MinimumSize.Width, [Math]::Max(32, $ctl.MinimumSize.Height))
-        } catch {}
-        if ($ctl.Height -lt 32) { $ctl.Height = 32 }
-        $mouseEnterHandler = ({ param($s,$e) $s.BackColor = $hoverColor }).GetNewClosure()
-        $mouseLeaveHandler = ({ param($s,$e) if (-not $s.Focused) { $s.BackColor = $baseColor } }).GetNewClosure()
-        $focusHandler      = ({ param($s,$e) $s.BackColor = $hoverColor }).GetNewClosure()
-        $blurHandler       = ({ param($s,$e) $s.BackColor = $baseColor }).GetNewClosure()
-        $ctl.Add_MouseEnter($mouseEnterHandler)
-        $ctl.Add_MouseLeave($mouseLeaveHandler)
-        $ctl.Add_GotFocus($focusHandler)
-        $ctl.Add_LostFocus($blurHandler)
+        $accentCopy = $accent
+        $accentHover = $accentHv
+        $ctl.Add_MouseEnter(({
+          param($s,$e)
+          $s.BackColor = $accentHover
+        }).GetNewClosure())
+        $ctl.Add_MouseLeave(({
+          param($s,$e)
+          $s.BackColor = $accentCopy
+        }).GetNewClosure())
       }
       'System\.Windows\.Forms\.TextBox' {
         $ctl.BorderStyle = 'FixedSingle'
@@ -1219,19 +1141,15 @@ $($out)","Save") | Out-Null
 $LEFT_COL_PERCENT   = 46
 $RIGHT_COL_PERCENT  = 54
 $GAP                = 6
-$CARD_SPACING       = 10
-$ASSOC_GRID_HEIGHT  = 260
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Inventory Assoc Finder - OMI"
-$statusStrip = New-Object System.Windows.Forms.StatusStrip
-$statusStrip.Dock = [System.Windows.Forms.DockStyle]::Bottom
-$statusStrip.SizingGrip = $false
-$statusStrip.BackColor = [System.Drawing.ColorTranslator]::FromHtml('#F6F7F9')
-$statusStrip.Padding = New-Object System.Windows.Forms.Padding(12, 4, 12, 4)
-$statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
-$statusLabel.Spring = $true
-$statusLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
-$statusStrip.Items.Add($statusLabel) | Out-Null
+$lblPaths = New-Object System.Windows.Forms.Label
+$lblPaths.AutoSize = $true
+$lblPaths.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Right
+$lblPaths.TextAlign = "MiddleRight"
+$lblPaths.Location = New-Object System.Drawing.Point(($form.ClientSize.Width - 720), ($form.ClientSize.Height - 20))
+$lblPaths.Size = New-Object System.Drawing.Size(560, 18)
+$form.Controls.Add($lblPaths)
 $form.StartPosition="CenterScreen"
 $form.WindowState='Maximized'
 $form.BackColor=[System.Drawing.Color]::White
@@ -1248,7 +1166,7 @@ $panelTop = New-Object System.Windows.Forms.Panel
 $panelTop.Dock = 'Top'
 $panelTop.AutoSize = $true
 $panelTop.AutoSizeMode = 'GrowAndShrink'
-$panelTop.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding, $script:CardPadding, $script:CardPadding, 0)
+$panelTop.Padding = New-Object System.Windows.Forms.Padding($GAP, $GAP, $GAP, 0)
 $panelTop.BackColor = $script:ThemeColors.Header
 # Row 1: Paths + counters
 $flpTop = New-Object System.Windows.Forms.FlowLayoutPanel
@@ -1272,43 +1190,10 @@ $lblDataStatus.Text = "Computers: 0 | Monitors: 0 | Mics: 0 | Scanners: 0 | Cart
 $lblDataStatus.AutoSize = $true
 $lblDataStatus.Margin = '0,6,0,0'
 $flpTop.Visible = $false  # moved to status bar
-# Row 2: Scan box
-$grpScan = New-Object System.Windows.Forms.GroupBox
-$grpScan.Text="Scan / enter Name, SN# or Asset Tag"
-$grpScan.Dock='Top'
-$grpScan.Margin = '0,6,0,0'
-$grpScan.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
-$grpScan.AutoSize = $true
-$grpScan.AutoSizeMode = 'GrowAndShrink'
+# Row 2: Scan box logic (UI hosted in WPF shell)
 $txtScan = New-Object System.Windows.Forms.TextBox
-$txtScan.Dock = 'Fill'
-$txtScan.Margin = New-Object System.Windows.Forms.Padding(0,0,8,0)
-try { $txtScan.MinimumSize = New-Object System.Drawing.Size(0,32) } catch {}
-$txtScan.Height = 32
-$btnLookup = New-Object ModernUI.RoundedButton
-$btnLookup.Text="Lookup"
-$btnLookup.AutoSize = $false
-$btnLookup.Dock = 'Fill'
-$btnLookup.Margin = New-Object System.Windows.Forms.Padding(0)
-try { $btnLookup.MinimumSize = New-Object System.Drawing.Size(110,32) } catch {}
-$btnLookup.Size='110,32'
-$scanLayout = New-Object System.Windows.Forms.TableLayoutPanel
-$scanLayout.Dock = 'Fill'
-$scanLayout.ColumnCount = 2
-$scanLayout.RowCount = 1
-$scanLayout.Margin = New-Object System.Windows.Forms.Padding(0)
-$scanLayout.Padding = New-Object System.Windows.Forms.Padding(0)
-$scanLayout.ColumnStyles.Clear()
-$scanLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$scanLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$scanLayout.RowStyles.Clear()
-$scanLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$scanLayout.Controls.Add($txtScan,0,0)
-$scanLayout.Controls.Add($btnLookup,1,0)
-$grpScan.Controls.Add($scanLayout)
-Set-CueBanner -TextBox $txtScan -Text 'Scan / enter Name, SN# or Asset Tag'
-# Add SCAN first, then TOP row second so the TOP row ends up above the scan row
-$panelTop.Controls.Add($grpScan)
+$txtScan.Visible = $false
+# Maintain layout order even though scan UI is hosted externally
 $panelTop.Controls.Add($flpTop)
 # ---------- END HEADER ----------
 # Main 2-col table
@@ -1317,7 +1202,7 @@ $LEFT_COL_WIDTH  = 520
 $tlpMain.Dock = 'Fill'
 $tlpMain.ColumnCount = 2
 $tlpMain.RowCount = 1
-$tlpMain.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
+$tlpMain.Padding = New-Object System.Windows.Forms.Padding(16)
 $tlpMain.CellBorderStyle = [System.Windows.Forms.TableLayoutPanelCellBorderStyle]::None
 $tlpMain.BackColor = [System.Drawing.Color]::White
 $tlpMain.ColumnStyles.Clear()
@@ -1326,18 +1211,21 @@ $tlpMain.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.
 $tlpMain.RowStyles.Clear()
 $tlpMain.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 function New-L($t,$x,$y){$l=New-Object System.Windows.Forms.Label;$l.Text=$t;$l.AutoSize=$true;$l.Location=New-Object System.Drawing.Point($x,$y);$l}
-function New-RO($x,$y,$w){$t=New-Object System.Windows.Forms.TextBox;$t.Location="$x,$y";$t.Size="$w,24";$t.ReadOnly=$true;$t.BackColor='White';$t.TabStop=$false;$t}
-# Left column stack (panel with top-docked group boxes)
-$leftColumn = New-Object System.Windows.Forms.Panel
-$leftColumn.Dock = 'Fill'
-$leftColumn.AutoScroll = $true
-$leftColumn.Margin = New-Object System.Windows.Forms.Padding(0, $GAP, $CARD_SPACING, $GAP)
-$leftColumn.Padding = New-Object System.Windows.Forms.Padding(0)
-try { $leftColumn.MinimumSize = New-Object System.Drawing.Size($LEFT_COL_WIDTH, 0) } catch {}
+function New-RO($x,$y,$w){$t=New-Object System.Windows.Forms.TextBox;$t.Location="$x,$y";$t.Size="$w,24";$t.ReadOnly=$true;$t.BackColor='White';$t}
+# Left column stack
+$tlpLeft = New-Object System.Windows.Forms.TableLayoutPanel
+$tlpLeft.Dock = 'Fill'
+$tlpLeft.ColumnCount = 1
+$tlpLeft.RowCount = 2
+$tlpLeft.Margin = New-Object System.Windows.Forms.Padding($GAP, $GAP, 3, $GAP)
+$tlpLeft.Padding = New-Object System.Windows.Forms.Padding($GAP)
+$tlpLeft.RowStyles.Clear()
+$tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
+$tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
 # Device Summary
-$grpSummary = New-Object System.Windows.Forms.GroupBox; $grpSummary.Text="Device Summary"; $grpSummary.Dock='Top'
-$grpSummary.Margin = New-Object System.Windows.Forms.Padding(0,0,0,$CARD_SPACING)
-$grpSummary.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
+$grpSummary = New-Object System.Windows.Forms.GroupBox; $grpSummary.Text="Device Summary"; $grpSummary.Dock='Fill'
+$grpSummary.Margin = New-Object System.Windows.Forms.Padding($GAP)
+$grpSummary.Padding = New-Object System.Windows.Forms.Padding($GAP)
 
 $tlpSummary = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpSummary.Dock = 'Fill'
@@ -1350,55 +1238,68 @@ $tlpSummary.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([Syste
 $tlpSummary.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $tlpSummary.RowStyles.Clear()
 
-$rowIndex = 0
-
-function New-SummaryLabel([string]$text, [bool]$isFirst=$false){
+function New-SummaryLabel {
+  param(
+    [string]$text,
+    [bool]$isFirst = $false,
+    [int]$topMargin = 10
+  )
   $label = New-Object System.Windows.Forms.Label
   $label.Text = $text
   $label.AutoSize = $true
-  $label.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(0,0,8,0) } else { New-Object System.Windows.Forms.Padding(0,8,8,0) }
-  $label.Anchor = [System.Windows.Forms.AnchorStyles]::Left
+  $label.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(0,0,8,0) } else { New-Object System.Windows.Forms.Padding(0,$topMargin,8,0) }
+  $label.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
   return $label
 }
 
-function New-SummaryTextBox([bool]$readOnly=$true, [bool]$isFirst=$false, [bool]$isLast=$false){
+function New-SummaryTextBox {
+  param(
+    [bool]$IsFirst = $false,
+    [bool]$IsLast = $false,
+    [bool]$ReadOnly = $true
+  )
   $box = New-Object System.Windows.Forms.TextBox
-  $box.Dock = 'Fill'
-  $topMargin = if($isFirst){ 0 } else { 6 }
-  $bottomMargin = if($isLast){ 0 } else { 0 }
-  $box.Margin = New-Object System.Windows.Forms.Padding(8,$topMargin,0,$bottomMargin)
+  $box.Anchor = 'Top,Left,Right'
+  $topMargin = if($IsFirst){ 0 } else { 8 }
+  $bottomMargin = if($IsLast){ 0 } else { 0 }
+  $box.Margin = New-Object System.Windows.Forms.Padding(12,$topMargin,0,$bottomMargin)
   $box.MinimumSize = New-Object System.Drawing.Size(0,24)
   $box.Height = 24
-  if($readOnly){
+  if($ReadOnly){
     $box.ReadOnly = $true
     $box.BackColor = [System.Drawing.Color]::White
-    $box.TabStop = $false
-  } else {
-    $box.TabStop = $true
   }
   return $box
 }
 
-$tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpSummary.RowCount = $rowIndex + 1
-$tlpSummary.Controls.Add((New-SummaryLabel "Detected Type:" $true), 0, $rowIndex)
-$txtType = New-SummaryTextBox -isFirst $true
-$tlpSummary.Controls.Add($txtType, 1, $rowIndex)
-$rowIndex++
+function Add-SummaryRow {
+  param(
+    [string]$LabelText,
+    [System.Windows.Forms.Control]$Control,
+    [bool]$IsFirst = $false,
+    [int]$LabelTopMargin = 8
+  )
+  $row = $tlpSummary.RowCount
+  $tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $tlpSummary.Controls.Add((New-SummaryLabel $LabelText $IsFirst $LabelTopMargin), 0, $row)
+  $tlpSummary.Controls.Add($Control, 1, $row)
+  $tlpSummary.RowCount++
+}
 
-$tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpSummary.RowCount = $rowIndex + 1
-$tlpSummary.Controls.Add((New-SummaryLabel "Name:"), 0, $rowIndex)
+$txtType = New-SummaryTextBox -IsFirst $true
+Add-SummaryRow -LabelText 'Detected Type:' -Control $txtType -IsFirst $true
+
 $nameRow = New-Object System.Windows.Forms.TableLayoutPanel
 $nameRow.ColumnCount = 2
 $nameRow.RowCount = 1
-$nameRow.Margin = New-Object System.Windows.Forms.Padding(8,6,0,0)
+$nameRow.Margin = New-Object System.Windows.Forms.Padding(12,8,0,0)
 $nameRow.ColumnStyles.Clear()
 $nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $nameRow.RowStyles.Clear()
 $nameRow.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$nameRow.Dock = 'Fill'
+$nameRow.Dock = 'Top'
+$nameRow.Anchor = 'Top,Left,Right'
 
 $txtHost = New-SummaryTextBox
 $txtHost.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
@@ -1413,55 +1314,35 @@ $btnFixName.Margin = New-Object System.Windows.Forms.Padding(6,0,0,0)
 $btnFixName.Enabled = $false
 $nameRow.Controls.Add($btnFixName,1,0)
 
-$tlpSummary.Controls.Add($nameRow, 1, $rowIndex)
-$rowIndex++
-
 $tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpSummary.RowCount = $rowIndex + 1
-$tlpSummary.Controls.Add((New-SummaryLabel "Asset Tag:"), 0, $rowIndex)
+$tlpSummary.Controls.Add((New-SummaryLabel 'Name:'), 0, $tlpSummary.RowCount)
+$tlpSummary.Controls.Add($nameRow, 1, $tlpSummary.RowCount)
+$tlpSummary.RowCount++
+
 $txtAT = New-SummaryTextBox
-$tlpSummary.Controls.Add($txtAT, 1, $rowIndex)
-$rowIndex++
+$txtAT.Margin = New-Object System.Windows.Forms.Padding(12,8,0,0)
+Add-SummaryRow -LabelText 'Asset Tag:' -Control $txtAT
 
-$tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpSummary.RowCount = $rowIndex + 1
-$tlpSummary.Controls.Add((New-SummaryLabel "Serial:"), 0, $rowIndex)
 $txtSN = New-SummaryTextBox
-$tlpSummary.Controls.Add($txtSN, 1, $rowIndex)
-$rowIndex++
+Add-SummaryRow -LabelText 'Serial:' -Control $txtSN
 
-$tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpSummary.RowCount = $rowIndex + 1
-$tlpSummary.Controls.Add((New-SummaryLabel "Parent:"), 0, $rowIndex)
 $txtParent = New-SummaryTextBox
-$tlpSummary.Controls.Add($txtParent, 1, $rowIndex)
-$rowIndex++
+Add-SummaryRow -LabelText 'Parent:' -Control $txtParent
 
-$tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpSummary.RowCount = $rowIndex + 1
-$tlpSummary.Controls.Add((New-SummaryLabel "PO RITM:"), 0, $rowIndex)
 $txtRITM = New-SummaryTextBox
-$tlpSummary.Controls.Add($txtRITM, 1, $rowIndex)
-$rowIndex++
+Add-SummaryRow -LabelText 'PO RITM:' -Control $txtRITM
 
-$tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpSummary.RowCount = $rowIndex + 1
-$tlpSummary.Controls.Add((New-SummaryLabel "Retire Date:"), 0, $rowIndex)
 $txtRetire = New-SummaryTextBox
-$tlpSummary.Controls.Add($txtRetire, 1, $rowIndex)
-$rowIndex++
+Add-SummaryRow -LabelText 'Retire Date:' -Control $txtRetire
 
-$tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpSummary.RowCount = $rowIndex + 1
-$tlpSummary.Controls.Add((New-SummaryLabel "Last Rounded:"), 0, $rowIndex)
-$txtRound = New-SummaryTextBox -isLast $true
-$tlpSummary.Controls.Add($txtRound, 1, $rowIndex)
+$txtRound = New-SummaryTextBox -IsLast $true
+Add-SummaryRow -LabelText 'Last Rounded:' -Control $txtRound
 
 $grpSummary.Controls.Add($tlpSummary)
 # Device Location (with City)
-$grpLoc = New-Object System.Windows.Forms.GroupBox; $grpLoc.Text="Device Location"; $grpLoc.Dock='Top'
-$grpLoc.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
-$grpLoc.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
+$grpLoc = New-Object System.Windows.Forms.GroupBox; $grpLoc.Text="Device Location"; $grpLoc.Dock='Fill'
+$grpLoc.Margin = New-Object System.Windows.Forms.Padding($GAP)
+$grpLoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
 
 $tlpLoc = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpLoc.Dock = 'Fill'
@@ -1479,28 +1360,28 @@ function Add-LocLabel([string]$text, [bool]$isFirst){
   $label = New-Object System.Windows.Forms.Label
   $label.Text = $text
   $label.AutoSize = $true
-  $label.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(0,0,8,0) } else { New-Object System.Windows.Forms.Padding(0,8,8,0) }
-  $label.Anchor = [System.Windows.Forms.AnchorStyles]::Left
+  $label.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(0,0,0,0) } else { New-Object System.Windows.Forms.Padding(0,8,0,0) }
+  $label.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
   return $label
 }
 
 function New-LocTextBox {
+  param([bool]$isFirst = $false)
   $box = New-Object System.Windows.Forms.TextBox
   $box.ReadOnly = $true
   $box.BackColor = [System.Drawing.Color]::White
   $box.Dock = 'Fill'
-  $box.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
-  $box.Padding = New-Object System.Windows.Forms.Padding(0)
+  $box.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(12,0,0,0) } else { New-Object System.Windows.Forms.Padding(12,8,0,0) }
   $box.MinimumSize = New-Object System.Drawing.Size(0,24)
   $box.Height = 24
-  $box.TabStop = $false
   return $box
 }
 
 function New-LocCombo {
+  param([bool]$isFirst = $false)
   $combo = New-Object System.Windows.Forms.ComboBox
   $combo.Dock = 'Fill'
-  $combo.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+  $combo.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(12,0,0,0) } else { New-Object System.Windows.Forms.Padding(12,8,0,0) }
   $combo.Visible = $false
   $combo.DropDownStyle = 'DropDown'
   return $combo
@@ -1508,75 +1389,63 @@ function New-LocCombo {
 
 # City
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpLoc.Controls.Add((Add-LocLabel 'City:' $true), 0, $tlpLoc.RowCount)
 $cityRowIndex = $tlpLoc.RowCount
-$tlpLoc.RowCount++
-$txtCity = New-LocTextBox
-$txtCity.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tlpLoc.Controls.Add((Add-LocLabel 'City:' $true), 0, $cityRowIndex)
+$txtCity = New-LocTextBox -isFirst $true
 $tlpLoc.Controls.Add($txtCity, 1, $cityRowIndex)
-$cmbCity = New-LocCombo
-$cmbCity.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$cmbCity = New-LocCombo -isFirst $true
 $tlpLoc.Controls.Add($cmbCity, 1, $cityRowIndex)
+$tlpLoc.RowCount++
 
 # Location
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpLoc.Controls.Add((Add-LocLabel 'Location:' $false), 0, $tlpLoc.RowCount)
 $locationRowIndex = $tlpLoc.RowCount
-$tlpLoc.RowCount++
+$tlpLoc.Controls.Add((Add-LocLabel 'Location:' $false), 0, $locationRowIndex)
 $txtLocation = New-LocTextBox
-$txtLocation.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
 $tlpLoc.Controls.Add($txtLocation, 1, $locationRowIndex)
 $cmbLocation = New-LocCombo
-$cmbLocation.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
 $tlpLoc.Controls.Add($cmbLocation, 1, $locationRowIndex)
+$tlpLoc.RowCount++
 
 # Building
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpLoc.Controls.Add((Add-LocLabel 'Building:' $false), 0, $tlpLoc.RowCount)
 $buildingRowIndex = $tlpLoc.RowCount
-$tlpLoc.RowCount++
+$tlpLoc.Controls.Add((Add-LocLabel 'Building:' $false), 0, $buildingRowIndex)
 $txtBldg = New-LocTextBox
-$txtBldg.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
 $tlpLoc.Controls.Add($txtBldg, 1, $buildingRowIndex)
 $cmbBuilding = New-LocCombo
-$cmbBuilding.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
 $tlpLoc.Controls.Add($cmbBuilding, 1, $buildingRowIndex)
+$tlpLoc.RowCount++
 
 # Floor
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpLoc.Controls.Add((Add-LocLabel 'Floor:' $false), 0, $tlpLoc.RowCount)
 $floorRowIndex = $tlpLoc.RowCount
-$tlpLoc.RowCount++
+$tlpLoc.Controls.Add((Add-LocLabel 'Floor:' $false), 0, $floorRowIndex)
 $txtFloor = New-LocTextBox
-$txtFloor.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
 $tlpLoc.Controls.Add($txtFloor, 1, $floorRowIndex)
 $cmbFloor = New-LocCombo
-$cmbFloor.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
 $tlpLoc.Controls.Add($cmbFloor, 1, $floorRowIndex)
+$tlpLoc.RowCount++
 
 # Room
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpLoc.Controls.Add((Add-LocLabel 'Room:' $false), 0, $tlpLoc.RowCount)
 $roomRowIndex = $tlpLoc.RowCount
-$tlpLoc.RowCount++
+$tlpLoc.Controls.Add((Add-LocLabel 'Room:' $false), 0, $roomRowIndex)
 $txtRoom = New-LocTextBox
-$txtRoom.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
 $tlpLoc.Controls.Add($txtRoom, 1, $roomRowIndex)
 $cmbRoom = New-LocCombo
-$cmbRoom.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
 $tlpLoc.Controls.Add($cmbRoom, 1, $roomRowIndex)
+$tlpLoc.RowCount++
 
 # Department
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpLoc.Controls.Add((Add-LocLabel 'Department:' $false), 0, $tlpLoc.RowCount)
 $deptRowIndex = $tlpLoc.RowCount
-$tlpLoc.RowCount++
+$tlpLoc.Controls.Add((Add-LocLabel 'Department:' $false), 0, $deptRowIndex)
 $txtDept = New-LocTextBox
-$txtDept.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
 $tlpLoc.Controls.Add($txtDept, 1, $deptRowIndex)
 $cmbDept = New-LocCombo
-$cmbDept.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
 $tlpLoc.Controls.Add($cmbDept, 1, $deptRowIndex)
+$tlpLoc.RowCount++
 
 # Spacer and edit button
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
@@ -1604,18 +1473,22 @@ $tlpLoc.RowCount++
 $cmbCity.Visible=$false; $cmbLocation.Visible=$false; $cmbBuilding.Visible=$false; $cmbFloor.Visible=$false; $cmbRoom.Visible=$false; $cmbDept.Visible=$false
 Populate-Department-Combo ''
 # Left/Right compose
-$leftColumn.Controls.Add($grpLoc)
-$leftColumn.Controls.Add($grpSummary)
+$tlpLeft.Controls.Add($grpSummary,0,0)
+$tlpLeft.Controls.Add($grpLoc,0,1)
 # Right column stack
-$rightColumn = New-Object System.Windows.Forms.Panel
-$rightColumn.Dock = 'Fill'
-$rightColumn.AutoScroll = $true
-$rightColumn.Margin = New-Object System.Windows.Forms.Padding($CARD_SPACING, $GAP, 0, $GAP)
-$rightColumn.Padding = New-Object System.Windows.Forms.Padding(0)
+$tlpRight = New-Object System.Windows.Forms.TableLayoutPanel
+$tlpRight.Dock = 'Fill'
+$tlpRight.ColumnCount = 1
+$tlpRight.RowCount = 2
+$tlpRight.Margin = New-Object System.Windows.Forms.Padding(3, $GAP, $GAP, $GAP)
+$tlpRight.Padding = New-Object System.Windows.Forms.Padding($GAP)
+$tlpRight.RowStyles.Clear()
+$tlpRight.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
+$tlpRight.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
 # Associated devices (right column, top)
-$grpAssoc = New-Object System.Windows.Forms.GroupBox; $grpAssoc.Text="Associated Devices"; $grpAssoc.Dock='Top'
-$grpAssoc.Margin = New-Object System.Windows.Forms.Padding(0,0,0,$CARD_SPACING)
-$grpAssoc.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
+$grpAssoc = New-Object System.Windows.Forms.GroupBox; $grpAssoc.Text="Associated Devices"; $grpAssoc.Dock='Fill'
+$grpAssoc.Margin = New-Object System.Windows.Forms.Padding($GAP)
+$grpAssoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tlpAssoc = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpAssoc.Dock = 'Fill'
 $tlpAssoc.ColumnCount = 1
@@ -1626,8 +1499,7 @@ $tlpAssoc.ColumnStyles.Clear()
 $tlpAssoc.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 $tlpAssoc.RowStyles.Clear()
 $tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) )
-$assocGridRowStyle = New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, $ASSOC_GRID_HEIGHT)
-$tlpAssoc.RowStyles.Add($assocGridRowStyle)
+$tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 200)) )
 $assocToolbarPanel = New-Object System.Windows.Forms.Panel
 $assocToolbarPanel.Dock = 'Fill'
 $assocToolbarPanel.AutoSize = $false
@@ -1656,7 +1528,7 @@ $assocButtonsPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndSh
 $assocButtonsPanel.WrapContents = $false
 $assocButtonsPanel.FlowDirection = 'LeftToRight'
 $assocButtonsPanel.Margin = '0,0,0,0'
-$assocButtonsPanel.Padding = '0,6,0,0'
+$assocButtonsPanel.Padding = '0,4,0,0'
 $assocButtonsPanel.Controls.Add($btnAddPeripheral)
 $assocButtonsPanel.Controls.Add($btnRemove)
 $assocToolbarPanel.Controls.Add($assocButtonsPanel)
@@ -1664,8 +1536,6 @@ $assocGridPanel = New-Object System.Windows.Forms.Panel
 $assocGridPanel.Dock = 'Fill'
 $assocGridPanel.Margin = '0,0,0,0'
 $assocGridPanel.Padding = '0,0,0,0'
-try { $assocGridPanel.MinimumSize = New-Object System.Drawing.Size(0, $ASSOC_GRID_HEIGHT) } catch {}
-try { $assocGridPanel.MaximumSize = New-Object System.Drawing.Size([System.Int32]::MaxValue, $ASSOC_GRID_HEIGHT) } catch {}
 $dgv = New-Object System.Windows.Forms.DataGridView
 $dgv.Dock='Fill'; $dgv.AutoGenerateColumns=$false; $dgv.AllowUserToAddRows=$false; $dgv.ReadOnly=$true
 $dgv.SelectionMode=[System.Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
@@ -1737,9 +1607,9 @@ $tlpAssoc.Controls.Add($assocToolbarPanel,0,0)
 $tlpAssoc.Controls.Add($assocGridPanel,0,1)
 $grpAssoc.Controls.Add($tlpAssoc)
 # Rounding group
-$grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Top'
-$grpMaint.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
-$grpMaint.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
+$grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Fill'
+$grpMaint.Margin = New-Object System.Windows.Forms.Padding($GAP)
+$grpMaint.Padding = New-Object System.Windows.Forms.Padding(12)
 
 $lblMaintType=New-Object System.Windows.Forms.Label; $lblMaintType.Text='Maintenance Type'; $lblMaintType.AutoSize=$true
 $cmbMaintType=New-Object System.Windows.Forms.ComboBox; $cmbMaintType.DropDownStyle='DropDownList'; $cmbMaintType.Dock='Fill'
@@ -1873,7 +1743,7 @@ $actionsPanel.Controls.Add($btnSave)
 $actionsPanel.Controls.Add($btnManualRound)
 
 $lblComments.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
-$txtComments.Margin = New-Object System.Windows.Forms.Padding(0,6,0,0)
+$txtComments.Margin = New-Object System.Windows.Forms.Padding(0,4,0,0)
 
 $layoutMaint.Controls.Add($rowCombos,0,0)
 $layoutMaint.Controls.Add($rowTime,0,1)
@@ -1894,11 +1764,13 @@ $txtComments.Add_SizeChanged({
   }
 })
 # Compose columns
-$rightColumn.Controls.Add($grpMaint)
-$rightColumn.Controls.Add($grpAssoc)
-$tlpMain.Controls.Add($leftColumn, 0, 0)
-$tlpMain.Controls.Add($rightColumn,1, 0)
+$tlpRight.Controls.Add($grpAssoc,0,0)
+$tlpRight.Controls.Add($grpMaint,0,1)
+$tlpMain.Controls.Add($tlpLeft, 0, 0)
+$tlpMain.Controls.Add($tlpRight,1, 0)
 # StatusStrip
+$status=New-Object System.Windows.Forms.StatusStrip
+$statusLabel=New-Object System.Windows.Forms.ToolStripStatusLabel; $status.Items.Add($statusLabel) | Out-Null; $statusLabel.Text="Ready"
 # Add to form
 $form.SuspendLayout()
 $form.Controls.Add($tlpMain)   # Fill
@@ -1907,34 +1779,22 @@ $form.Add_Shown({
   foreach($t in @($txtDept,$txtDepartment)){ if ($t) { $t.Visible = $true } }
   if ($cmbDept) { $cmbDept.Visible = $false }
   if ($txtDept) { $txtDept.Visible = $true }
-  $statusLabel.Text = "Data: $DataFolder | Output: $OutputFolder"
+  $lblPaths.Text = "Data: " + $DataFolder + "    |    Output: " + $OutputFolder
 })
 $form.Controls.Add($panelTop)  # Top
-$form.Controls.Add($statusStrip)    # Bottom
+$form.Controls.Add($status)    # Bottom
 $form.ResumeLayout($true)
 $form.PerformLayout()
 # -------- Responsive row sizing (DPI aware) --------
-function Set-GroupCardHeight([System.Windows.Forms.GroupBox]$group, [int]$height){
-  if(-not $group){ return }
-  if($height -le 0){ return }
-  try {
-    $group.SuspendLayout()
-    if($group.Height -ne $height){ $group.Height = $height }
-    if($group.MinimumSize.Height -ne $height){
-      $group.MinimumSize = New-Object System.Drawing.Size(0, $height)
-    }
-  } catch { }
-  finally {
-    try { $group.ResumeLayout($true) } catch { }
-  }
-}
 function Apply-ResponsiveHeights {
   try {
     # Fixed heights derived from preferred content sizes, with sensible minimums
     $minSummary  = [Math]::Max($grpSummary.PreferredSize.Height, 280)
     $minLocation = [Math]::Max($grpLoc.PreferredSize.Height, 200)
-    Set-GroupCardHeight $grpSummary $minSummary
-    Set-GroupCardHeight $grpLoc $minLocation
+    $tlpLeft.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Absolute
+    $tlpLeft.RowStyles[0].Height   = $minSummary
+    $tlpLeft.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
+    $tlpLeft.RowStyles[1].Height   = $minLocation
     $rowsShown = [Math]::Max($dgv.Rows.Count, 1)
     $assocInfo = Size-AssocForRows $rowsShown
     $assocTarget = 0
@@ -1952,8 +1812,10 @@ function Apply-ResponsiveHeights {
     $assocPadding = $grpAssoc.Padding.Vertical + $grpAssoc.Margin.Vertical + $tlpAssoc.Margin.Vertical + $tlpAssoc.Padding.Vertical + $assocToolbarPanel.Margin.Vertical + $assocToolbarPanel.Padding.Vertical + $assocGridPanel.Margin.Vertical + $assocGridPanel.Padding.Vertical
     $minAssoc   = [Math]::Max($assocTarget + $stripHeight + $assocPadding, 220)
     $minRound   = [Math]::Max($grpMaint.PreferredSize.Height, 220)
-    Set-GroupCardHeight $grpAssoc $minAssoc
-    Set-GroupCardHeight $grpMaint $minRound
+    $tlpRight.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Absolute
+    $tlpRight.RowStyles[0].Height   = $minAssoc
+    $tlpRight.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
+    $tlpRight.RowStyles[1].Height   = $minRound
   } catch { }
 }
 function Update-RoundingCommentsLayout {
@@ -1985,10 +1847,36 @@ function Get-AssocSizing([int]$rows){
   try{
     if($rows -lt 1){ $rows = 1 }
     $result.Rows = $rows
-    $gridH = [Math]::Max([int]$ASSOC_GRID_HEIGHT, 0)
+    $visibleHeight = 0
+    $visibleCount  = 0
+    foreach($row in $dgv.Rows){
+      if($null -eq $row){ continue }
+      if($row.IsNewRow){ continue }
+      if(-not $row.Visible){ continue }
+      $visibleHeight += [int][Math]::Max($row.Height, 0)
+      $visibleCount++
+      if($visibleCount -ge $rows){ break }
+    }
+    if($visibleCount -lt $rows){
+      $rowH = [Math]::Max($dgv.RowTemplate.Height, 22)
+      $visibleHeight += ($rows - $visibleCount) * $rowH
+    }
+    $hdrH = 0
+    if($dgv.ColumnHeadersVisible){
+      $hdrH = [Math]::Max($dgv.ColumnHeadersHeight, 24)
+    }
+    $gridH = $visibleHeight + $hdrH
+    $gridH += [Math]::Max([System.Windows.Forms.SystemInformation]::BorderSize.Height * 2, 2)
+    $totalColW = 0
+    foreach($c in $dgv.Columns){ if($c.Visible){ $totalColW += [int]$c.Width } }
+    $clientW = [Math]::Max($dgv.ClientSize.Width, $dgv.DisplayRectangle.Width)
+    if($clientW -le 0){ $clientW = $dgv.Width }
+    if($totalColW -gt $clientW){
+      $gridH += [System.Windows.Forms.SystemInformation]::HorizontalScrollBarHeight
+    }
     $target = $gridH + $dgv.Margin.Vertical + $tlpAssoc.Padding.Vertical + $assocGridPanel.Padding.Vertical
     $result.Target = [Math]::Max([int]$target, 0)
-    $result.Grid   = $gridH
+    $result.Grid   = [Math]::Max([int]$gridH, 0)
   } catch { }
   return $result
 }
@@ -1998,9 +1886,8 @@ function Size-AssocForRows([int]$rows){
     if($info.Target -gt 0){
       $tlpAssoc.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::AutoSize
       $tlpAssoc.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
-      $tlpAssoc.RowStyles[1].Height   = $ASSOC_GRID_HEIGHT
-      try { $assocGridPanel.MinimumSize = New-Object System.Drawing.Size(0, [Math]::Max([int]$ASSOC_GRID_HEIGHT, 0)) } catch {}
-      try { $assocGridPanel.MaximumSize = New-Object System.Drawing.Size([System.Int32]::MaxValue, [Math]::Max([int]$ASSOC_GRID_HEIGHT, 0)) } catch {}
+      $tlpAssoc.RowStyles[1].Height   = $info.Grid
+      try { $assocGridPanel.MinimumSize = New-Object System.Drawing.Size(0, [Math]::Max([int]$info.Grid, 0)) } catch {}
     }
   } catch { }
   return $info
@@ -2424,7 +2311,7 @@ function Show-AddPeripheralDialog($parentRec){
   $dialog.ShowIcon = $false
   $dialog.AutoSize = $true
   $dialog.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
-  $dialog.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
+  $dialog.Padding = New-Object System.Windows.Forms.Padding(12)
 
   $layout = New-Object System.Windows.Forms.TableLayoutPanel
   $layout.Dock = 'Fill'
@@ -2449,11 +2336,10 @@ function Show-AddPeripheralDialog($parentRec){
   $lblSearch = New-Object System.Windows.Forms.Label
   $lblSearch.Text = 'Universal Search:'
   $lblSearch.AutoSize = $true
-  $lblSearch.Margin = '0,0,0,6'
+  $lblSearch.Margin = '0,0,0,2'
   $txtSearch = New-Object System.Windows.Forms.TextBox
   $txtSearch.Width = 260
-  $txtSearch.Margin = '0,6,0,6'
-  Set-CueBanner -TextBox $txtSearch -Text 'Search name, asset tag or serial'
+  $txtSearch.Margin = '0,0,0,4'
   $lblHint = New-Object System.Windows.Forms.Label
   $lblHint.Text = 'Press Enter to search.'
   $lblHint.AutoSize = $true
@@ -2469,7 +2355,7 @@ function Show-AddPeripheralDialog($parentRec){
   $grpPreview.AutoSize = $true
   $grpPreview.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $grpPreview.Dock = 'Top'
-  $grpPreview.Padding = New-Object System.Windows.Forms.Padding($script:CardPadding)
+  $grpPreview.Padding = New-Object System.Windows.Forms.Padding(10)
   $tblPreview = New-Object System.Windows.Forms.TableLayoutPanel
   $tblPreview.AutoSize = $true
   $tblPreview.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
@@ -2487,13 +2373,13 @@ function Show-AddPeripheralDialog($parentRec){
     $lbl = New-Object System.Windows.Forms.Label
     $lbl.Text = $text
     $lbl.AutoSize = $true
-    $lbl.Margin = '0,0,6,6'
+    $lbl.Margin = '0,0,6,4'
     return $lbl
   }
   $createValue = {
     $lbl = New-Object System.Windows.Forms.Label
     $lbl.AutoSize = $true
-    $lbl.Margin = '0,0,0,6'
+    $lbl.Margin = '0,0,0,4'
     return $lbl
   }
 
@@ -2816,6 +2702,13 @@ $cmbFloor.Add_TextChanged({
   }
 })
 # ---- Actions ----
+function Focus-ScanInput(){
+  if ($script:NewAssetToolSearchTextBox) {
+    try { [void]$script:NewAssetToolSearchTextBox.Focus() } catch {}
+  } elseif ($txtScan) {
+    try { $txtScan.Focus() } catch {}
+  }
+}
 function Do-Lookup(){
   $raw = Find-RecordRaw $txtScan.Text
   if(-not $raw){ $statusLabel.Text=("No match for '" + $txtScan.Text + "'"); return }
@@ -2855,7 +2748,6 @@ function Clear-UI(){
   Size-AssocForRows(1) | Out-Null
 }
 # ---- Events ----
-$btnLookup.Add_Click({ Do-Lookup })
 $txtScan.Add_KeyDown({ if($_.KeyCode -eq 'Enter'){ Do-Lookup; $_.SuppressKeyPress=$true } })
 $txtScan.Add_TextChanged({ if([string]::IsNullOrWhiteSpace($txtScan.Text)){ Clear-UI } })
 $btnEditLoc.Add_Click({ Toggle-EditLocation })
@@ -2971,7 +2863,7 @@ $pc.serial_number}else{$null}
   $cmbChkStatus.SelectedIndex = 0
   $txtScan.Clear()
   Clear-UI
-  $txtScan.Focus()
+  Focus-ScanInput
   # -- Nearby: add Location-only scope and rebuild
   try {
     if ($row -and $row.Location) {
