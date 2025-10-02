@@ -6,7 +6,7 @@
         Width="1400"
         Background="#FFF8F9FB"
         FontFamily="Segoe UI"
-        FontSize="10"
+        FontSize="15"
         WindowStartupLocation="CenterScreen">
     <Grid>
         <Grid.RowDefinitions>
@@ -19,14 +19,14 @@
                 Height="42"
                 Background="#FFFDFDFE"
                 BorderBrush="Black"
-                BorderThickness="1"
+                BorderThickness="0.5"
                 CornerRadius="6"
                 VerticalAlignment="Center">
             <Grid>
                 <TextBox x:Name="SearchTextBox"
                          Background="Transparent"
                          BorderThickness="0"
-                         FontSize="14"
+                         FontSize="16"
                          Padding="12,10"
                          VerticalContentAlignment="Center"/>
                 <TextBlock Text="Scan / Enter Name, SN# or Asset Tag ⌕"

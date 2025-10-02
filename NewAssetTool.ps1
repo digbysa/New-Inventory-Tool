@@ -1225,7 +1225,7 @@ $tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Window
 # Device Summary
 $grpSummary = New-Object System.Windows.Forms.GroupBox; $grpSummary.Text="Device Summary"; $grpSummary.Dock='Fill'
 $grpSummary.Margin = New-Object System.Windows.Forms.Padding($GAP)
-$grpSummary.Padding = New-Object System.Windows.Forms.Padding($GAP)
+$grpSummary.Padding = New-Object System.Windows.Forms.Padding($GAP, 2, $GAP ,$GAP)
 
 $tlpSummary = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpSummary.Dock = 'Fill'
@@ -1287,9 +1287,11 @@ function Add-SummaryRow {
 }
 
 $txtType = New-SummaryTextBox -IsFirst $true
-Add-SummaryRow -LabelText 'Detected Type:' -Control $txtType -IsFirst $true
+Add-SummaryRow -LabelText 'Detected Type:' -Control $txtType -IsFirst $true -LabelTopMargin 0
 
 $nameRow = New-Object System.Windows.Forms.TableLayoutPanel
+$nameRow.AutoSize = $true
+$nameRow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $nameRow.ColumnCount = 2
 $nameRow.RowCount = 1
 $nameRow.Margin = New-Object System.Windows.Forms.Padding(12,8,0,0)
@@ -1298,8 +1300,7 @@ $nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.W
 $nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $nameRow.RowStyles.Clear()
 $nameRow.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$nameRow.Dock = 'Top'
-$nameRow.Anchor = 'Top,Left,Right'
+$nameRow.Dock = 'Fill'
 
 $txtHost = New-SummaryTextBox
 $txtHost.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
