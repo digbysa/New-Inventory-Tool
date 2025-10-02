@@ -1223,14 +1223,21 @@ $tlpLeft.RowStyles.Clear()
 $tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
 $tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
 # Device Summary
-$grpSummary = New-Object System.Windows.Forms.GroupBox; $grpSummary.Text="Device Summary"; $grpSummary.Dock='Fill'
+
+$grpSummary = New-Object System.Windows.Forms.GroupBox; $grpSummary.Text="Device Summary"
+$grpSummary.AutoSize = $true
+$grpSummary.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+$grpSummary.Dock = 'Top'
 $grpSummary.Margin = New-Object System.Windows.Forms.Padding($GAP)
-$grpSummary.Padding = New-Object System.Windows.Forms.Padding($GAP, 2, $GAP ,$GAP)
+$grpSummary.Padding = New-Object System.Windows.Forms.Padding($GAP)
 
 $tlpSummary = New-Object System.Windows.Forms.TableLayoutPanel
-$tlpSummary.Dock = 'Fill'
+$tlpSummary.AutoSize = $true
+$tlpSummary.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+$tlpSummary.Dock = 'Top'
 $tlpSummary.Margin = New-Object System.Windows.Forms.Padding(0)
 $tlpSummary.Padding = New-Object System.Windows.Forms.Padding(0)
+
 $tlpSummary.ColumnCount = 2
 $tlpSummary.RowCount = 0
 $tlpSummary.ColumnStyles.Clear()
@@ -1448,7 +1455,7 @@ $cmbDept = New-LocCombo
 $tlpLoc.Controls.Add($cmbDept, 1, $deptRowIndex)
 $tlpLoc.RowCount++
 
-# Spacer and edit button
+<# # Spacer and edit button
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $locSpacer = New-Object System.Windows.Forms.Panel
 $locSpacer.Dock = 'Fill'
@@ -1456,14 +1463,14 @@ $locSpacer.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 $locSpacer.BackColor = [System.Drawing.Color]::Transparent
 $tlpLoc.Controls.Add($locSpacer, 0, $tlpLoc.RowCount)
 $tlpLoc.SetColumnSpan($locSpacer, 2)
-$tlpLoc.RowCount++
+$tlpLoc.RowCount++ #>
 
 if(-not $btnEditLoc){
   $btnEditLoc = New-Object ModernUI.RoundedButton
   $btnEditLoc.Text = 'Edit Location'
   $btnEditLoc.Size = '120,26'
 }
-$btnEditLoc.Anchor = 'Bottom,Right'
+$btnEditLoc.Anchor = 'Top,Right'
 $btnEditLoc.Margin = New-Object System.Windows.Forms.Padding(0,8,0,0)
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $tlpLoc.Controls.Add($btnEditLoc, 0, $tlpLoc.RowCount)
