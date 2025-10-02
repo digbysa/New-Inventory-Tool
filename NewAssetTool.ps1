@@ -1180,14 +1180,7 @@ $RIGHT_COL_PERCENT  = 54
 $GAP                = 6
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Inventory Assoc Finder - OMI"
-$lblPaths = New-Object System.Windows.Forms.Label
-$lblPaths.AutoSize = $false
-$lblPaths.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
-$lblPaths.TextAlign = "MiddleLeft"
-$lblPaths.AutoEllipsis = $true
-$lblPaths.Location = New-Object System.Drawing.Point($GAP, ($form.ClientSize.Height - 28))
-$lblPaths.Size = New-Object System.Drawing.Size([Math]::Max(0, $form.ClientSize.Width - (2 * $GAP)), 18)
-$form.Controls.Add($lblPaths)
+$statusPathLabelDefault = "Data: (not set)    |    Output: (not set)"
 $form.StartPosition="CenterScreen"
 $form.WindowState='Maximized'
 $form.BackColor=[System.Drawing.Color]::White
@@ -1826,8 +1819,18 @@ $tlpRight.Controls.Add($grpMaint,0,1)
 $splitter.Panel1.Controls.Add($tlpLeft)
 $splitter.Panel2.Controls.Add($tlpRight)
 # StatusStrip
-$status=New-Object System.Windows.Forms.StatusStrip
-$statusLabel=New-Object System.Windows.Forms.ToolStripStatusLabel; $status.Items.Add($statusLabel) | Out-Null; $statusLabel.Text="Ready"
+$status = New-Object System.Windows.Forms.StatusStrip
+$statusPathLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
+$statusPathLabel.Spring = $true
+$statusPathLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+$statusPathLabel.Margin = New-Object System.Windows.Forms.Padding(6,3,6,3)
+$statusPathLabel.Text = $statusPathLabelDefault
+$status.Items.Add($statusPathLabel) | Out-Null
+$statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
+$statusLabel.Alignment = [System.Windows.Forms.ToolStripItemAlignment]::Right
+$statusLabel.Margin = New-Object System.Windows.Forms.Padding(6,3,6,3)
+$statusLabel.Text = "Ready"
+$status.Items.Add($statusLabel) | Out-Null
 # Add to form
 $form.SuspendLayout()
 $form.Controls.Add($splitter)   # Fill
@@ -1836,7 +1839,9 @@ $form.Add_Shown({
   foreach($t in @($txtDept,$txtDepartment)){ if ($t) { $t.Visible = $true } }
   if ($cmbDept) { $cmbDept.Visible = $false }
   if ($txtDept) { $txtDept.Visible = $true }
-  $lblPaths.Text = "Data: " + $DataFolder + "    |    Output: " + $OutputFolder
+  if ($statusPathLabel) {
+    $statusPathLabel.Text = "Data: " + $DataFolder + "    |    Output: " + $OutputFolder
+  }
 })
 $form.Controls.Add($panelTop)  # Top
 $form.Controls.Add($status)    # Bottom
@@ -3031,10 +3036,16 @@ Create a 'Data' folder next to the script and add your CSVs."
   Update-Counters
   try { Populate-Department-Combo ($txtDept.Text) } catch {}
   $lblDataPath.Visible=$false; $lblOutputPath.Visible=$false; $lblDataStatus.Visible=$false; $statusLabel.Text = ("Data: " + $script:DataFolder + " | Output: " + $script:OutputFolder); $statusLabel.ForeColor=[System.Drawing.Color]::DarkGreen
+  if ($statusPathLabel) {
+    $statusPathLabel.Text = "Data: " + $script:DataFolder + "    |    Output: " + $script:OutputFolder
+  }
   $lblOutputPath.Text = "Output: " + $script:OutputFolder
   $statusLabel.Text   = "Data OK"; $statusLabel.ForeColor=[System.Drawing.Color]::DarkGreen
 } catch {
   $lblDataPath.Visible=$false; $lblOutputPath.Visible=$false; $lblDataStatus.Visible=$false; $statusLabel.Text = "Data files missing or error"; $statusLabel.ForeColor=[System.Drawing.Color]::Crimson
+  if ($statusPathLabel) {
+    $statusPathLabel.Text = "Data: " + ($(if($script:DataFolder){$script:DataFolder}else{'(not set)'})) + "    |    Output: " + ($(if($script:OutputFolder){$script:OutputFolder}else{'(not set)'}))
+  }
   $lblOutputPath.Text = "Output: " + ($(if($script:OutputFolder){$script:OutputFolder}else{'(not set)'}))
   $statusLabel.Text   = "Failed to load Data folder. See error dialog."
   $err = $_.Exception
