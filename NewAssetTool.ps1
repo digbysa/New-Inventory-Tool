@@ -529,6 +529,17 @@ function Extract-RITM([string]$po){
       return "TRP - " + $dt.ToString('dd MMM yyyy', [System.Globalization.CultureInfo]::InvariantCulture)
     } catch {}
   }
+  $trpMatchSix = [regex]::Match($trimmed, 'TRP(?<date>\d{6})(?!\d)')
+  if($trpMatchSix.Success){
+    $dateDigits = $trpMatchSix.Groups['date'].Value
+    try {
+      $month = [int]$dateDigits.Substring(0,2)
+      $day = [int]$dateDigits.Substring(2,2)
+      $year = 2000 + [int]$dateDigits.Substring(4,2)
+      $dt = New-Object System.DateTime($year, $month, $day)
+      return "TRP - " + $dt.ToString('dd MMM yyyy', [System.Globalization.CultureInfo]::InvariantCulture)
+    } catch {}
+  }
   return $trimmed
 }
 function Parse-DateLoose([string]$s){
