@@ -63,6 +63,43 @@ if (-not $form -or -not ($form -is [System.Windows.Forms.Form])) {
   throw "NewAssetTool.ps1 did not expose a main form instance."
 }
 
+$script:__newAssetToolDesignDpi = $form.AutoScaleDimensions
+if (-not $script:__newAssetToolDesignDpi -or $script:__newAssetToolDesignDpi.Width -le 0 -or $script:__newAssetToolDesignDpi.Height -le 0) {
+  $script:__newAssetToolDesignDpi = New-Object System.Drawing.SizeF(96.0, 96.0)
+}
+$script:__newAssetToolLastDpi = $script:__newAssetToolDesignDpi
+
+function Invoke-NewAssetToolWinFormsDpiUpdate {
+  param(
+    [double]$DpiX,
+    [double]$DpiY
+  )
+
+  if (-not $form) { return }
+
+  if ($DpiX -le 0) { $DpiX = $script:__newAssetToolDesignDpi.Width }
+  if ($DpiY -le 0) { $DpiY = $script:__newAssetToolDesignDpi.Height }
+
+  $previous = $script:__newAssetToolLastDpi
+  if (-not $previous -or $previous.Width -le 0 -or $previous.Height -le 0) {
+    $previous = $script:__newAssetToolDesignDpi
+  }
+
+  try { $form.SuspendLayout() } catch {}
+  try { $form.AutoScaleDimensions = New-Object System.Drawing.SizeF($DpiX, $DpiY) } catch {}
+  try { $form.PerformAutoScale() } catch {}
+
+  $scaleX = if ($previous.Width -gt 0) { $DpiX / $previous.Width } else { 1 }
+  $scaleY = if ($previous.Height -gt 0) { $DpiY / $previous.Height } else { 1 }
+  if ($scaleX -le 0) { $scaleX = 1 }
+  if ($scaleY -le 0) { $scaleY = 1 }
+
+  try { $form.Scale($scaleX, $scaleY) } catch {}
+  try { $form.ResumeLayout($true) } catch {}
+
+  $script:__newAssetToolLastDpi = New-Object System.Drawing.SizeF($DpiX, $DpiY)
+}
+
 $form.TopLevel = $false
 $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
 $form.Dock = [System.Windows.Forms.DockStyle]::Fill
@@ -83,6 +120,70 @@ if (-not $windowsFormsHost) {
   throw "Could not locate the WindowsFormsHost named 'WinFormsHost' in XAML."
 }
 $windowsFormsHost.Child = $form
+$window.Add_SourceInitialized({
+  param($sender, $eventArgs)
+
+  $dpiX = 96.0
+  $dpiY = 96.0
+  try {
+    $hwndSource = [System.Windows.Interop.HwndSource]::FromVisual($sender)
+    if ($hwndSource -and $hwndSource.CompositionTarget) {
+      $transform = $hwndSource.CompositionTarget.TransformToDevice
+      if ($transform) {
+        $dpiX = 96.0 * $transform.M11
+        $dpiY = 96.0 * $transform.M22
+      }
+    }
+  } catch {}
+
+  try { Invoke-NewAssetToolWinFormsDpiUpdate -DpiX $dpiX -DpiY $dpiY } catch {}
+})
+$window.Add_DpiChanged({
+  param($sender, $args)
+
+  $dpiX = $null
+  $dpiY = $null
+
+  try {
+    if ($args -and $args.NewDpi) {
+      $dpiX = $args.NewDpi.PixelsPerInchX
+      $dpiY = $args.NewDpi.PixelsPerInchY
+    }
+  } catch {}
+
+  if (-not $dpiX -or $dpiX -le 0 -or -not $dpiY -or $dpiY -le 0) {
+    try {
+      $hwndSource = [System.Windows.Interop.HwndSource]::FromVisual($sender)
+      if ($hwndSource -and $hwndSource.CompositionTarget) {
+        $transform = $hwndSource.CompositionTarget.TransformToDevice
+        if ($transform) {
+          $dpiX = 96.0 * $transform.M11
+          $dpiY = 96.0 * $transform.M22
+        }
+      }
+    } catch {}
+  }
+
+  try { Invoke-NewAssetToolWinFormsDpiUpdate -DpiX $dpiX -DpiY $dpiY } catch {}
+})
+$null = $window.Dispatcher.BeginInvoke(
+  [System.Action]{
+    $dpiX = 96.0
+    $dpiY = 96.0
+    try {
+      $presentationSource = [System.Windows.Media.PresentationSource]::FromVisual($window)
+      if ($presentationSource -and $presentationSource.CompositionTarget) {
+        $transform = $presentationSource.CompositionTarget.TransformToDevice
+        if ($transform) {
+          $dpiX = 96.0 * $transform.M11
+          $dpiY = 96.0 * $transform.M22
+        }
+      }
+    } catch {}
+
+    try { Invoke-NewAssetToolWinFormsDpiUpdate -DpiX $dpiX -DpiY $dpiY } catch {}
+  },
+  [System.Windows.Threading.DispatcherPriority]::Loaded)
 $form.Visible = $true
 
 $searchTextBox = $window.FindName('SearchTextBox')
