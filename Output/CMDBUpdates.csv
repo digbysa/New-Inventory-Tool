@@ -1,0 +1,4 @@
+﻿"Timestamp","Action","DeviceType","AssetTag","OldParent","NewParent","OldName","NewName"
+"2025-10-03 10:15:05","Rename","Monitor","HSS-1985376","PC077412","PC077412","PC077412LEG","PC077412"
+"2025-10-03 10:17:23","Rename","Monitor","HSS-8080377","PC033075","PC033075","PC033075TRP","PC033075"
+"2025-10-03 10:21:12","Rename","Monitor","HSS-8080376","PC049838","PC049838","PC049838TRP","PC049838"
