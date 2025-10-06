@@ -85,6 +85,25 @@ if (-not $windowsFormsHost) {
 $windowsFormsHost.Child = $form
 $form.Visible = $true
 
+if ($window) {
+  if ($window.WindowState -ne [System.Windows.WindowState]::Normal) {
+    $window.WindowState = [System.Windows.WindowState]::Normal
+  }
+  if ($window.SizeToContent -ne [System.Windows.SizeToContent]::Height) {
+    $window.SizeToContent = [System.Windows.SizeToContent]::Height
+  }
+  $sizeLockApplied = $false
+  $window.Add_ContentRendered({
+    param($sender, $eventArgs)
+    if (-not $sizeLockApplied) {
+      if ($sender.SizeToContent -ne [System.Windows.SizeToContent]::Manual) {
+        $sender.SizeToContent = [System.Windows.SizeToContent]::Manual
+      }
+      $sizeLockApplied = $true
+    }
+  })
+}
+
 $searchTextBox = $window.FindName('SearchTextBox')
 if ($searchTextBox) {
   try { Set-ScanSearchControl $searchTextBox } catch {}

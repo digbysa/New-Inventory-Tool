@@ -5,9 +5,11 @@
         Background="#FFF8F9FB"
         FontFamily="Segoe UI"
         FontSize="15"
-        WindowState="Maximized"
+        WindowState="Normal"
+        ResizeMode="CanResize"
+        SizeToContent="Height"
         MinWidth="1024"
-        MinHeight="768"
+        MinHeight="640"
         WindowStartupLocation="CenterScreen">
     <Grid>
         <Grid.RowDefinitions>
