@@ -2925,9 +2925,26 @@ function Toggle-EditLocation(){
     }
     if($txtDept){ $txtDept.Text = $dept }
     if($cmbDept){ $cmbDept.Text = $dept }
-    $tmp=[pscustomobject]@{location=$loc;u_building=$b;u_floor=$f;u_room=$r;u_department_location=$dept;Department=$dept}
+    $targets = New-Object System.Collections.ArrayList
+    foreach($cand in @($script:CurrentParent,$script:CurrentDisplay)){
+      if(-not $cand){ continue }
+      if(-not $targets.Contains($cand)){ [void]$targets.Add($cand) }
+    }
+    foreach($tgt in $targets){
+      try { $tgt | Add-Member -NotePropertyName location -NotePropertyValue $loc -Force } catch {}
+      try { $tgt | Add-Member -NotePropertyName u_building -NotePropertyValue $b -Force } catch {}
+      try { $tgt | Add-Member -NotePropertyName u_floor -NotePropertyValue $f -Force } catch {}
+      try { $tgt | Add-Member -NotePropertyName u_room -NotePropertyValue $r -Force } catch {}
+      try { $tgt | Add-Member -NotePropertyName u_department_location -NotePropertyValue $dept -Force } catch {}
+      try { $tgt | Add-Member -NotePropertyName Department -NotePropertyValue $dept -Force } catch {}
+    }
     $script:editing = $false
-    Validate-Location $tmp
+    if($targets.Count -gt 0){
+      Validate-Location $targets[0]
+    } else {
+      $tmp=[pscustomobject]@{location=$loc;u_building=$b;u_floor=$f;u_room=$r;u_department_location=$dept;Department=$dept}
+      Validate-Location $tmp
+    }
     $cmbCity.Visible=$false; $cmbLocation.Visible=$false; $cmbBuilding.Visible=$false; $cmbFloor.Visible=$false; $cmbRoom.Visible=$false
     $txtCity.Visible=$true; $txtLocation.Visible=$true; $txtBldg.Visible=$true; $txtFloor.Visible=$true; $txtRoom.Visible=$true
     if ($cmbDept) { $cmbDept.Visible=$false }
