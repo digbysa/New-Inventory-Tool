@@ -1861,13 +1861,11 @@ $form.PerformLayout()
 # -------- Responsive row sizing (DPI aware) --------
 function Apply-ResponsiveHeights {
   try {
-    # Fixed heights derived from preferred content sizes, with sensible minimums
-    $minSummary  = [Math]::Max($grpSummary.PreferredSize.Height, 280)
-    $minLocation = [Math]::Max($grpLoc.PreferredSize.Height, 200)
-    $tlpLeft.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::Absolute
-    $tlpLeft.RowStyles[0].Height   = $minSummary
-    $tlpLeft.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::Absolute
-    $tlpLeft.RowStyles[1].Height   = $minLocation
+    # Let the left column size itself to its content while keeping the right column responsive
+    $tlpLeft.RowStyles[0].SizeType = [System.Windows.Forms.SizeType]::AutoSize
+    $tlpLeft.RowStyles[0].Height   = 0
+    $tlpLeft.RowStyles[1].SizeType = [System.Windows.Forms.SizeType]::AutoSize
+    $tlpLeft.RowStyles[1].Height   = 0
     $rowsShown = [Math]::Max($dgv.Rows.Count, 1)
     $assocInfo = Size-AssocForRows $rowsShown
     $assocTarget = 0
