@@ -1,17 +1,6 @@
-Add-Type -AssemblyName System.Windows.Forms
+﻿Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-$highDpiModeApplied = $false
-try {
-  if ([System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.HighDpiMode]::PerMonitorV2)) {
-    $highDpiModeApplied = $true
-    Write-Verbose "[DPI] Application.SetHighDpiMode(PerMonitorV2) succeeded." -Verbose
-  }
-} catch {
-  Write-Verbose "[DPI] Application.SetHighDpiMode(PerMonitorV2) threw: $($_.Exception.Message)" -Verbose
-}
-if (-not $highDpiModeApplied) {
-  Write-Verbose "[DPI] Application.SetHighDpiMode(PerMonitorV2) unavailable; continuing with framework default." -Verbose
-}
+try { [System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.HighDpiMode]::PerMonitorV2) | Out-Null } catch {}
 [System.Windows.Forms.Application]::EnableVisualStyles()
 try { [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false) } catch {}
 
@@ -27,70 +16,32 @@ public static class Dpi
   [return: MarshalAs(UnmanagedType.Bool)]
   public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
 
-  [DllImport("shcore.dll")]
-  public static extern int SetProcessDpiAwareness(ProcessDpiAwareness value);
-
   [DllImport("user32.dll")]
   public static extern IntPtr GetThreadDpiAwarenessContext();
 
   [DllImport("user32.dll")]
   public static extern int GetAwarenessFromDpiAwarenessContext(IntPtr value);
 }
-
-public enum ProcessDpiAwareness
-{
-  ProcessDpiUnaware = 0,
-  ProcessSystemDpiAware = 1,
-  ProcessPerMonitorDpiAware = 2
-}
 "@ -ErrorAction Stop
   } catch {}
 }
 
 $script:NewAssetToolPerMonitorDpiContextEnabled = $false
-if (Get-Variable -Scope Global -Name NewAssetToolPerMonitorDpiContextEnabled -ErrorAction SilentlyContinue) {
-  $script:NewAssetToolPerMonitorDpiContextEnabled = [bool]$global:NewAssetToolPerMonitorDpiContextEnabled
-} else {
-  $global:NewAssetToolPerMonitorDpiContextEnabled = $false
-}
-
-if (-not $script:NewAssetToolPerMonitorDpiContextEnabled) {
+$global:NewAssetToolPerMonitorDpiContextEnabled = $false
+try {
   $perMonitorV2Context = [System.IntPtr]-4
-  try {
-    if ('NewAssetTool.NativeMethods.Dpi' -as [Type]) {
-      if ([NewAssetTool.NativeMethods.Dpi]::SetProcessDpiAwarenessContext($perMonitorV2Context)) {
-        $script:NewAssetToolPerMonitorDpiContextEnabled = $true
-        $global:NewAssetToolPerMonitorDpiContextEnabled = $true
-        Write-Verbose "[DPI] SetProcessDpiAwarenessContext to PerMonitorV2 succeeded." -Verbose
-      } else {
-        $lastError = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
-        Write-Verbose "[DPI] SetProcessDpiAwarenessContext returned false (LastError=$lastError)." -Verbose
-      }
-    }
-  } catch [System.EntryPointNotFoundException] {
-    Write-Verbose "[DPI] SetProcessDpiAwarenessContext not available; attempting fallback." -Verbose
-  } catch {
-    Write-Verbose "[DPI] Failed to set PerMonitorV2 awareness: $($_.Exception.Message)" -Verbose
-  }
-
-  if (-not $script:NewAssetToolPerMonitorDpiContextEnabled) {
-    try {
-      if ('NewAssetTool.NativeMethods.Dpi' -as [Type]) {
-        $hresult = [NewAssetTool.NativeMethods.Dpi]::SetProcessDpiAwareness([NewAssetTool.NativeMethods.ProcessDpiAwareness]::ProcessPerMonitorDpiAware)
-        if ($hresult -eq 0) {
-          $script:NewAssetToolPerMonitorDpiContextEnabled = $true
-          $global:NewAssetToolPerMonitorDpiContextEnabled = $true
-          Write-Verbose "[DPI] SetProcessDpiAwareness fallback to PerMonitor succeeded." -Verbose
-        } else {
-          Write-Verbose ("[DPI] SetProcessDpiAwareness fallback failed (HRESULT=0x{0:X8})." -f $hresult) -Verbose
-        }
-      }
-    } catch {
-      Write-Verbose "[DPI] SetProcessDpiAwareness fallback threw: $($_.Exception.Message)" -Verbose
+  if ('NewAssetTool.NativeMethods.Dpi' -as [Type]) {
+    if ([NewAssetTool.NativeMethods.Dpi]::SetProcessDpiAwarenessContext($perMonitorV2Context)) {
+      $script:NewAssetToolPerMonitorDpiContextEnabled = $true
+      $global:NewAssetToolPerMonitorDpiContextEnabled = $true
+      Write-Verbose "[DPI] SetProcessDpiAwarenessContext to PerMonitorV2 succeeded." -Verbose
+    } else {
+      $lastError = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+      Write-Verbose "[DPI] SetProcessDpiAwarenessContext returned false (LastError=$lastError). Using default DPI context." -Verbose
     }
   }
-} else {
-  Write-Verbose "[DPI] Per-monitor DPI awareness already enabled prior to WinForms initialization." -Verbose
+} catch {
+  Write-Verbose "[DPI] Failed to set PerMonitorV2 awareness: $($_.Exception.Message)" -Verbose
 }
 
 function Get-NewAssetToolDpiContextDescription {
