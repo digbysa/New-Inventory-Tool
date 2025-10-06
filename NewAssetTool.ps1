@@ -22,21 +22,6 @@ public static class Dpi
   [DllImport("user32.dll")]
   public static extern int GetAwarenessFromDpiAwarenessContext(IntPtr value);
 }
-
-if (-not ('NewAssetTool.NativeMethods.User32' -as [Type])) {
-  try {
-    Add-Type -Namespace NewAssetTool.NativeMethods -Name User32 -MemberDefinition @"
-using System;
-using System.Runtime.InteropServices;
-
-public static class User32
-{
-  [DllImport("user32.dll", CharSet = CharSet.Auto)]
-  public static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
-}
-"@ -ErrorAction Stop
-  } catch {}
-}
 "@ -ErrorAction Stop
   } catch {}
 }
@@ -1474,88 +1459,38 @@ function Add-SummaryRow {
   $tlpSummary.RowCount++
 }
 
-function Set-TextBoxLeftPadding {
-  param(
-    [System.Windows.Forms.TextBox]$TextBox,
-    [int]$Padding
-  )
-  if (-not $TextBox) { return }
-  $EM_SETMARGINS = 0xD3
-  $EC_LEFTMARGIN = 0x1
-  $applyPadding = {
-    param($target)
-    if ($target -and $target.IsHandleCreated) {
-      [NewAssetTool.NativeMethods.User32]::SendMessage($target.Handle, $EM_SETMARGINS, [System.IntPtr]$EC_LEFTMARGIN, [System.IntPtr]$Padding) | Out-Null
-    }
-  }.GetNewClosure()
-
-  if ($TextBox.IsHandleCreated) {
-    $applyPadding.Invoke($TextBox)
-  }
-
-  $TextBox.Add_HandleCreated({
-    param($sender, $args)
-    $applyPadding.Invoke($sender)
-  }.GetNewClosure())
-}
-
 $txtType = New-SummaryTextBox -IsFirst $true
 Add-SummaryRow -LabelText 'Detected Type:' -Control $txtType -IsFirst $true -LabelTopMargin 0
 
 $nameRow = New-Object System.Windows.Forms.TableLayoutPanel
 $nameRow.AutoSize = $true
 $nameRow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
-$nameRow.ColumnCount = 2
+$nameRow.ColumnCount = 3
 $nameRow.RowCount = 1
 $nameRow.Margin = New-Object System.Windows.Forms.Padding(12,8,0,0)
 $nameRow.ColumnStyles.Clear()
+$nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $nameRow.RowStyles.Clear()
 $nameRow.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $nameRow.Dock = 'Fill'
 
-
-$pnlHostContainer = New-Object System.Windows.Forms.Panel
-$pnlHostContainer.Margin = New-Object System.Windows.Forms.Padding(0)
-$pnlHostContainer.Padding = New-Object System.Windows.Forms.Padding(0)
-$pnlHostContainer.Dock = 'Fill'
-$pnlHostContainer.BackColor = [System.Drawing.Color]::Transparent
+$btnCopyHost = New-Object System.Windows.Forms.Button
+$btnCopyHost.Text = "📋"
+$btnCopyHost.Size = '28,24'
+$btnCopyHost.Margin = New-Object System.Windows.Forms.Padding(0,0,6,0)
+$btnCopyHost.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnCopyHost.FlatAppearance.BorderSize = 0
+$btnCopyHost.BackColor = [System.Drawing.Color]::FromArgb(240, 243, 247)
+$btnCopyHost.UseVisualStyleBackColor = $false
+$btnCopyHost.Cursor = [System.Windows.Forms.Cursors]::Hand
+$nameRow.Controls.Add($btnCopyHost,0,0)
 
 $txtHost = New-SummaryTextBox
-$txtHost.Margin = New-Object System.Windows.Forms.Padding(0)
+$txtHost.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 $txtHost.Dock = 'Fill'
-$pnlHostContainer.Controls.Add($txtHost)
-
-$copyIcon = New-Object System.Windows.Forms.Label
-$copyIcon.AutoSize = $false
-$copyIcon.Size = New-Object System.Drawing.Size(24,24)
-$copyIcon.Location = New-Object System.Drawing.Point(0,0)
-$copyIcon.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
-$copyIcon.Text = [char]0xE8C8
-$copyIcon.Font = New-Object System.Drawing.Font('Segoe MDL2 Assets', 12)
-$copyIcon.ForeColor = [System.Drawing.Color]::Black
-$copyIcon.BackColor = $txtHost.BackColor
-$copyIcon.Cursor = [System.Windows.Forms.Cursors]::Hand
-$copyIcon.Margin = New-Object System.Windows.Forms.Padding(0)
-$copyIcon.Anchor = 'Top,Left'
-$pnlHostContainer.Controls.Add($copyIcon)
-$copyIcon.BringToFront()
-
-$txtHost.Add_SizeChanged({
-  param($sender, $args)
-  $copyIcon.Height = $sender.Height
-  $copyIcon.Location = New-Object System.Drawing.Point(0,0)
-})
-
-$txtHost.Add_BackColorChanged({
-  param($sender, $args)
-  $copyIcon.BackColor = $sender.BackColor
-})
-
-Set-TextBoxLeftPadding -TextBox $txtHost -Padding 28
-
-$nameRow.Controls.Add($pnlHostContainer,0,0)
+$nameRow.Controls.Add($txtHost,1,0)
 
 $btnFixName = New-Object ModernUI.RoundedButton
 $btnFixName.Text = "Fix"
@@ -1563,9 +1498,9 @@ $btnFixName.Size = '60,24'
 $btnFixName.Anchor = 'Top,Right'
 $btnFixName.Margin = New-Object System.Windows.Forms.Padding(6,0,0,0)
 $btnFixName.Enabled = $false
-$nameRow.Controls.Add($btnFixName,1,0)
-$tip.SetToolTip($copyIcon, 'Copy host name to clipboard')
-$copyIcon.Add_Click({
+$nameRow.Controls.Add($btnFixName,2,0)
+$tip.SetToolTip($btnCopyHost, 'Copy host name to clipboard')
+$btnCopyHost.Add_Click({
   $textToCopy = $txtHost.Text
   if(-not [string]::IsNullOrWhiteSpace($textToCopy)){
     [System.Windows.Forms.Clipboard]::SetText($textToCopy)
