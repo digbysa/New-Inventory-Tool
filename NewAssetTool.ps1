@@ -3462,7 +3462,43 @@ $btnSetStatus.Size = New-Object System.Drawing.Size($desiredWidth, $clearPreferr
 $btnSetStatus.Location = New-Object System.Drawing.Point(560, $btnClearScopes.Location.Y)
 $nearToolbar.Controls.Add($btnSetStatus)
 if (-not $menuStatus) { $menuStatus = New-Object System.Windows.Forms.ContextMenuStrip }
-$btnSetStatus.Add_Click({
+
+function Set-NearbySelectedStatus {
+  param(
+    [string]$Value,
+    [switch]$ShowConfirmation
+  )
+  if ([string]::IsNullOrWhiteSpace($Value)) { return }
+  try {
+    $col = $dgvNearby.Columns['Status']
+    if ($col -and $col -is [System.Windows.Forms.DataGridViewComboBoxColumn]) {
+      if (-not $col.Items.Contains($Value)) { [void]$col.Items.Add($Value) }
+    }
+  } catch {}
+  $count = 0
+  foreach ($row in $dgvNearby.SelectedRows) {
+    try {
+      $cell = $row.Cells['Status']
+      if ($cell -and $cell -is [System.Windows.Forms.DataGridViewComboBoxCell]) {
+        if (-not $cell.Items.Contains($Value)) { [void]$cell.Items.Add($Value) }
+      }
+      if ($row -and $row.Cells['Status']) {
+        $row.Cells['Status'].Value = $Value
+        $count++
+      }
+    } catch {}
+  }
+  if ($ShowConfirmation) {
+    [System.Windows.Forms.MessageBox]::Show("Updated status for $count row(s).","Multi-Status",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+  }
+}
+
+function Show-NearbyStatusMenu {
+  param(
+    [System.Windows.Forms.Control]$Anchor,
+    [System.Drawing.Point]$Location,
+    [switch]$ShowConfirmation
+  )
   try {
     $menuStatus.Items.Clear()
     $options = Get-StatusOptionsFromGrid
@@ -3470,26 +3506,11 @@ $btnSetStatus.Add_Click({
       $item = New-Object System.Windows.Forms.ToolStripMenuItem($opt)
       $item.Add_Click({
         param($s,$e)
-        $chosen = $s.Text
-        # Ensure the Status column/cells include this option
-        try {
-          $col = $dgvNearby.Columns['Status']
-          if ($col -and $col -is [System.Windows.Forms.DataGridViewComboBoxColumn]) {
-            if (-not $col.Items.Contains($chosen)) { [void]$col.Items.Add($chosen) }
-          }
-        } catch {}
-        $count = 0
-        foreach ($row in $dgvNearby.SelectedRows) {
-          $cell = $row.Cells['Status']
-          if ($cell -and $cell -is [System.Windows.Forms.DataGridViewComboBoxCell]) {
-            if (-not $cell.Items.Contains($chosen)) { [void]$cell.Items.Add($chosen) }
-          }
-          if ($row -and $row.Cells['Status']) {
-            $row.Cells['Status'].Value = $chosen
-            $count++
-          }
+        if ($ShowConfirmation) {
+          Set-NearbySelectedStatus -Value $s.Text -ShowConfirmation
+        } else {
+          Set-NearbySelectedStatus -Value $s.Text
         }
-        [System.Windows.Forms.MessageBox]::Show("Updated status for $count row(s).","Multi-Status",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
       })
       [void]$menuStatus.Items.Add($item)
     }
@@ -3499,31 +3520,29 @@ $btnSetStatus.Add_Click({
       Add-Type -AssemblyName Microsoft.VisualBasic
       $val = [Microsoft.VisualBasic.Interaction]::InputBox('Enter custom status for selected rows:','Multi-Status','')
       if ([string]::IsNullOrWhiteSpace($val)) { return }
-      try {
-        $col = $dgvNearby.Columns['Status']
-        if ($col -and $col -is [System.Windows.Forms.DataGridViewComboBoxColumn]) {
-          if (-not $col.Items.Contains($val)) { [void]$col.Items.Add($val) }
-        }
-      } catch {}
-      $count = 0
-      foreach ($row in $dgvNearby.SelectedRows) {
-        $cell = $row.Cells['Status']
-        if ($cell -and $cell -is [System.Windows.Forms.DataGridViewComboBoxCell]) {
-          if (-not $cell.Items.Contains($val)) { [void]$cell.Items.Add($val) }
-        }
-        if ($row -and $row.Cells['Status']) {
-          $row.Cells['Status'].Value = $val
-          $count++
-        }
+      if ($ShowConfirmation) {
+        Set-NearbySelectedStatus -Value $val -ShowConfirmation
+      } else {
+        Set-NearbySelectedStatus -Value $val
       }
-      [System.Windows.Forms.MessageBox]::Show("Updated status for $count row(s).","Multi-Status",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
     })
     [void]$menuStatus.Items.Add($custom)
-    $pt = New-Object System.Drawing.Point(0,$btnSetStatus.Height)
-    $menuStatus.Show($btnSetStatus, $pt)
+    if (-not $Location) {
+      $Location = New-Object System.Drawing.Point(0,0)
+    }
+    if ($Anchor) {
+      $menuStatus.Show($Anchor, $Location)
+    } else {
+      $menuStatus.Show($btnSetStatus, (New-Object System.Drawing.Point(0,$btnSetStatus.Height)))
+    }
   } catch {
     [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)","Multi-Status",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
   }
+}
+
+$btnSetStatus.Add_Click({
+  $pt = New-Object System.Drawing.Point(0,$btnSetStatus.Height)
+  Show-NearbyStatusMenu $btnSetStatus $pt -ShowConfirmation
 })
 $dgvNearby = New-Object System.Windows.Forms.DataGridView
 $dgvNearby.Dock='Fill'
@@ -3534,6 +3553,22 @@ $dgvNearby.MultiSelect=$true
 $dgvNearby.RowHeadersVisible=$false
 $dgvNearby.BackgroundColor=[System.Drawing.Color]::White
 $dgvNearby.BorderStyle='FixedSingle'
+$dgvNearby.add_CellMouseClick({
+  param($sender,$e)
+  if ($e.Button -ne [System.Windows.Forms.MouseButtons]::Right) { return }
+  if ($e.RowIndex -ge 0 -and $e.RowIndex -lt $dgvNearby.Rows.Count) {
+    try {
+      $row = $dgvNearby.Rows[$e.RowIndex]
+      if ($row -and -not $row.Selected) {
+        $dgvNearby.ClearSelection()
+        $row.Selected = $true
+      }
+    } catch {}
+  }
+  if ($dgvNearby.SelectedRows.Count -le 0) { return }
+  $clientPt = $dgvNearby.PointToClient([System.Windows.Forms.Cursor]::Position)
+  Show-NearbyStatusMenu $dgvNearby $clientPt
+})
 $dgvNearby.AutoSizeColumnsMode='DisplayedCells'
 $dgvNearby.AutoGenerateColumns=$false
 try { $dgvNearby.GetType().GetProperty('DoubleBuffered', [System.Reflection.BindingFlags] 'NonPublic,Instance').SetValue($dgvNearby, $true, $null) } catch {}
