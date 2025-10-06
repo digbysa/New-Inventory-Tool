@@ -4,6 +4,64 @@ try { [System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.H
 [System.Windows.Forms.Application]::EnableVisualStyles()
 try { [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false) } catch {}
 
+if (-not ('NewAssetTool.NativeMethods.Dpi' -as [Type])) {
+  try {
+    Add-Type -Namespace NewAssetTool.NativeMethods -Name Dpi -MemberDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class Dpi
+{
+  [DllImport("user32.dll", SetLastError = true)]
+  [return: MarshalAs(UnmanagedType.Bool)]
+  public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+
+  [DllImport("user32.dll")]
+  public static extern IntPtr GetThreadDpiAwarenessContext();
+
+  [DllImport("user32.dll")]
+  public static extern int GetAwarenessFromDpiAwarenessContext(IntPtr value);
+}
+"@ -ErrorAction Stop
+  } catch {}
+}
+
+$script:NewAssetToolPerMonitorDpiContextEnabled = $false
+$global:NewAssetToolPerMonitorDpiContextEnabled = $false
+try {
+  $perMonitorV2Context = [System.IntPtr]-4
+  if ('NewAssetTool.NativeMethods.Dpi' -as [Type]) {
+    if ([NewAssetTool.NativeMethods.Dpi]::SetProcessDpiAwarenessContext($perMonitorV2Context)) {
+      $script:NewAssetToolPerMonitorDpiContextEnabled = $true
+      $global:NewAssetToolPerMonitorDpiContextEnabled = $true
+      Write-Verbose "[DPI] SetProcessDpiAwarenessContext to PerMonitorV2 succeeded." -Verbose
+    } else {
+      $lastError = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+      Write-Verbose "[DPI] SetProcessDpiAwarenessContext returned false (LastError=$lastError). Using default DPI context." -Verbose
+    }
+  }
+} catch {
+  Write-Verbose "[DPI] Failed to set PerMonitorV2 awareness: $($_.Exception.Message)" -Verbose
+}
+
+function Get-NewAssetToolDpiContextDescription {
+  try {
+    if (-not ('NewAssetTool.NativeMethods.Dpi' -as [Type])) { return 'unknown' }
+    $context = [NewAssetTool.NativeMethods.Dpi]::GetThreadDpiAwarenessContext()
+    $awareness = [NewAssetTool.NativeMethods.Dpi]::GetAwarenessFromDpiAwarenessContext($context)
+    switch ($awareness) {
+      0 { return 'DPI_AWARENESS_UNAWARE' }
+      1 { return 'DPI_AWARENESS_SYSTEM_AWARE' }
+      2 { return 'DPI_AWARENESS_PER_MONITOR_AWARE' }
+      3 { return 'DPI_AWARENESS_PER_MONITOR_AWARE_V2' }
+      4 { return 'DPI_AWARENESS_UNAWARE_GDI_SCALED' }
+      default { return "DPI_AWARENESS_UNKNOWN($awareness)" }
+    }
+  } catch {
+    return 'unknown'
+  }
+}
+
 $script:ThemeFontName = 'Segoe UI'
 $script:ThemeFontSize = 10
 $script:ThemeFont = New-Object System.Drawing.Font($script:ThemeFontName, $script:ThemeFontSize)
@@ -1190,6 +1248,39 @@ $LEFT_COL_PERCENT   = 46
 $RIGHT_COL_PERCENT  = 54
 $GAP                = 6
 $form = New-Object System.Windows.Forms.Form
+$script:NewAssetToolManualScaleFactor = 1.0
+$desiredChromeScale = 0.8
+$applyWinFormsManualScale = {
+  param([string]$Source = 'unspecified')
+
+  if (-not $global:NewAssetToolPerMonitorDpiContextEnabled) { return }
+
+  $current = $script:NewAssetToolManualScaleFactor
+  if ([Math]::Abs([double]$current) -lt [double]::Epsilon) { $current = 1.0 }
+  $ratio = $desiredChromeScale / [double]$current
+
+  $contextDescription = 'unknown'
+  try {
+    if (Get-Command Get-NewAssetToolDpiContextDescription -ErrorAction SilentlyContinue) {
+      $contextDescription = Get-NewAssetToolDpiContextDescription
+    }
+  } catch {}
+
+  if ([Math]::Abs($ratio - 1.0) -gt 0.0001) {
+    Write-Verbose (
+      "[DPI][WinForms] Scaling form by ratio {0:n3} from {1:n3} to {2:n3} ({3}) context={4}" -f 
+      $ratio, $current, $desiredChromeScale, $Source, $contextDescription
+    ) -Verbose
+    try { $form.Scale([float]$ratio) } catch {}
+  } else {
+    Write-Verbose (
+      "[DPI][WinForms] Scale already at target {0:n3} ({1}) context={2}" -f 
+      $desiredChromeScale, $Source, $contextDescription
+    ) -Verbose
+  }
+
+  $script:NewAssetToolManualScaleFactor = $desiredChromeScale
+}
 $form.Text = "Inventory Assoc Finder - OMI"
 $statusPathLabelDefault = "Data: (not set)    |    Output: (not set)"
 $form.StartPosition="CenterScreen"
@@ -1265,6 +1356,19 @@ function Set-SplitterMinimums {
 Set-SplitterMinimums -target $splitter -panel1Desired $LEFT_COL_WIDTH -panel2Desired $PANEL2_MIN_WIDTH
 $splitter.Add_SizeChanged({ Set-SplitterMinimums -target $splitter -panel1Desired $LEFT_COL_WIDTH -panel2Desired $PANEL2_MIN_WIDTH })
 $form.Add_Shown({ Set-SplitterMinimums -target $splitter -panel1Desired $LEFT_COL_WIDTH -panel2Desired $PANEL2_MIN_WIDTH })
+
+if ($global:NewAssetToolPerMonitorDpiContextEnabled) {
+  $form.Add_Shown({ & $applyWinFormsManualScale 'Form.Shown' })
+  try {
+    $form.Add_DpiChanged({
+      param($sender, $eventArgs)
+      $script:NewAssetToolManualScaleFactor = 1.0
+      & $applyWinFormsManualScale 'Form.DpiChanged'
+    })
+  } catch {
+    Write-Verbose "[DPI][WinForms] Failed to attach DpiChanged handler: $($_.Exception.Message)" -Verbose
+  }
+}
 
 $splitter.SplitterDistance = $LEFT_COL_WIDTH
 $splitter.SplitterWidth = 6

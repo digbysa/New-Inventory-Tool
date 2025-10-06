@@ -11,7 +11,12 @@
         MinWidth="1024"
         MinHeight="640"
         WindowStartupLocation="CenterScreen">
-    <Grid>
+    <Grid x:Name="RootGrid">
+        <Grid.LayoutTransform>
+            <ScaleTransform x:Name="RootScaleTransform"
+                            ScaleX="1"
+                            ScaleY="1"/>
+        </Grid.LayoutTransform>
         <Grid.RowDefinitions>
             <RowDefinition Height="42"/>
             <RowDefinition Height="*"/>
