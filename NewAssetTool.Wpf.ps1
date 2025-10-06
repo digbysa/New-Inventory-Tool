@@ -2,6 +2,89 @@ Add-Type -AssemblyName PresentationCore,PresentationFramework,WindowsBase,System
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName WindowsFormsIntegration
 
+if (-not ('NewAssetTool.NativeMethods.Dpi' -as [Type])) {
+  try {
+    Add-Type -Namespace NewAssetTool.NativeMethods -Name Dpi -MemberDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class Dpi
+{
+  [DllImport("user32.dll", SetLastError = true)]
+  [return: MarshalAs(UnmanagedType.Bool)]
+  public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+
+  [DllImport("shcore.dll")]
+  public static extern int SetProcessDpiAwareness(ProcessDpiAwareness value);
+
+  [DllImport("user32.dll")]
+  public static extern IntPtr GetThreadDpiAwarenessContext();
+
+  [DllImport("user32.dll")]
+  public static extern int GetAwarenessFromDpiAwarenessContext(IntPtr value);
+}
+
+public enum ProcessDpiAwareness
+{
+  ProcessDpiUnaware = 0,
+  ProcessSystemDpiAware = 1,
+  ProcessPerMonitorDpiAware = 2
+}
+"@ -ErrorAction Stop
+  } catch {
+    Write-Verbose "[DPI] Failed to define native DPI helpers: $($_.Exception.Message)" -Verbose
+  }
+}
+
+$script:NewAssetToolPerMonitorDpiContextEnabled = $false
+if (-not (Get-Variable -Scope Global -Name NewAssetToolPerMonitorDpiContextEnabled -ErrorAction SilentlyContinue)) {
+  $global:NewAssetToolPerMonitorDpiContextEnabled = $false
+}
+
+function Set-NewAssetToolProcessDpiAwareness {
+  $perMonitorV2Context = [System.IntPtr]-4
+  $contextEnabled = $false
+
+  if ('NewAssetTool.NativeMethods.Dpi' -as [Type]) {
+    try {
+      if ([NewAssetTool.NativeMethods.Dpi]::SetProcessDpiAwarenessContext($perMonitorV2Context)) {
+        $contextEnabled = $true
+        Write-Verbose "[DPI] Opted into PerMonitorV2 awareness via SetProcessDpiAwarenessContext." -Verbose
+      } else {
+        $lastError = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        Write-Verbose "[DPI] SetProcessDpiAwarenessContext returned false (LastError=$lastError)." -Verbose
+      }
+    } catch [System.EntryPointNotFoundException] {
+      Write-Verbose "[DPI] SetProcessDpiAwarenessContext not available; falling back." -Verbose
+    } catch {
+      Write-Verbose "[DPI] Failed to call SetProcessDpiAwarenessContext: $($_.Exception.Message)" -Verbose
+    }
+
+    if (-not $contextEnabled) {
+      try {
+        $hresult = [NewAssetTool.NativeMethods.Dpi]::SetProcessDpiAwareness([NewAssetTool.NativeMethods.ProcessDpiAwareness]::ProcessPerMonitorDpiAware)
+        if ($hresult -eq 0) {
+          $contextEnabled = $true
+          Write-Verbose "[DPI] Opted into PerMonitor awareness via SetProcessDpiAwareness fallback." -Verbose
+        } else {
+          Write-Verbose ("[DPI] SetProcessDpiAwareness fallback failed (HRESULT=0x{0:X8})." -f $hresult) -Verbose
+        }
+      } catch {
+        Write-Verbose "[DPI] Failed to call SetProcessDpiAwareness fallback: $($_.Exception.Message)" -Verbose
+      }
+    }
+  } else {
+    Write-Verbose "[DPI] Native DPI helper type unavailable; skipping opt-in." -Verbose
+  }
+
+  if ($contextEnabled) {
+    $script:NewAssetToolPerMonitorDpiContextEnabled = $true
+    $global:NewAssetToolPerMonitorDpiContextEnabled = $true
+  }
+
+  return $contextEnabled
+}
+
 function Get-LoaderScriptDir {
   try {
     if ($PSScriptRoot -and $PSScriptRoot -ne '') { return $PSScriptRoot }
@@ -26,6 +109,11 @@ if (-not (Test-Path $ps1Path)) {
 }
 if (-not (Test-Path $xamlPath)) {
   throw "Could not find NewAssetTool.xaml at '$xamlPath'."
+}
+
+$dpiAwarenessApplied = Set-NewAssetToolProcessDpiAwareness
+if (-not $dpiAwarenessApplied) {
+  Write-Verbose "[DPI] Per-monitor DPI awareness opt-in failed; continuing with default context." -Verbose
 }
 
 $previousSuppress = $null
