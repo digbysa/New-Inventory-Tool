@@ -1465,20 +1465,32 @@ Add-SummaryRow -LabelText 'Detected Type:' -Control $txtType -IsFirst $true -Lab
 $nameRow = New-Object System.Windows.Forms.TableLayoutPanel
 $nameRow.AutoSize = $true
 $nameRow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
-$nameRow.ColumnCount = 2
+$nameRow.ColumnCount = 3
 $nameRow.RowCount = 1
 $nameRow.Margin = New-Object System.Windows.Forms.Padding(12,8,0,0)
 $nameRow.ColumnStyles.Clear()
+$nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $nameRow.RowStyles.Clear()
 $nameRow.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $nameRow.Dock = 'Fill'
 
+$btnCopyHost = New-Object System.Windows.Forms.Button
+$btnCopyHost.Text = "📋"
+$btnCopyHost.Size = '28,24'
+$btnCopyHost.Margin = New-Object System.Windows.Forms.Padding(0,0,6,0)
+$btnCopyHost.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnCopyHost.FlatAppearance.BorderSize = 0
+$btnCopyHost.BackColor = [System.Drawing.Color]::FromArgb(240, 243, 247)
+$btnCopyHost.UseVisualStyleBackColor = $false
+$btnCopyHost.Cursor = [System.Windows.Forms.Cursors]::Hand
+$nameRow.Controls.Add($btnCopyHost,0,0)
+
 $txtHost = New-SummaryTextBox
 $txtHost.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 $txtHost.Dock = 'Fill'
-$nameRow.Controls.Add($txtHost,0,0)
+$nameRow.Controls.Add($txtHost,1,0)
 
 $btnFixName = New-Object ModernUI.RoundedButton
 $btnFixName.Text = "Fix"
@@ -1486,7 +1498,14 @@ $btnFixName.Size = '60,24'
 $btnFixName.Anchor = 'Top,Right'
 $btnFixName.Margin = New-Object System.Windows.Forms.Padding(6,0,0,0)
 $btnFixName.Enabled = $false
-$nameRow.Controls.Add($btnFixName,1,0)
+$nameRow.Controls.Add($btnFixName,2,0)
+$tip.SetToolTip($btnCopyHost, 'Copy host name to clipboard')
+$btnCopyHost.Add_Click({
+  $textToCopy = $txtHost.Text
+  if(-not [string]::IsNullOrWhiteSpace($textToCopy)){
+    [System.Windows.Forms.Clipboard]::SetText($textToCopy)
+  }
+})
 
 $tlpSummary.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $tlpSummary.Controls.Add((New-SummaryLabel 'Name:'), 0, $tlpSummary.RowCount)
