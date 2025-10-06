@@ -85,6 +85,44 @@ if (-not $windowsFormsHost) {
 $windowsFormsHost.Child = $form
 $form.Visible = $true
 
+$rootGrid = $window.FindName('RootGrid')
+$rootScaleTransform = $window.FindName('RootScaleTransform')
+$applyWpfScale = {
+  param([string]$Source = 'unspecified')
+
+  if (-not $global:NewAssetToolPerMonitorDpiContextEnabled) { return }
+  if (-not $rootScaleTransform) {
+    Write-Verbose "[DPI][WPF] Root scale transform not located; skipping scale." -Verbose
+    return
+  }
+
+  $contextDescription = 'unknown'
+  try {
+    if (Get-Command Get-NewAssetToolDpiContextDescription -ErrorAction SilentlyContinue) {
+      $contextDescription = Get-NewAssetToolDpiContextDescription
+    }
+  } catch {}
+
+  try {
+    $rootScaleTransform.ScaleX = 0.8
+    $rootScaleTransform.ScaleY = 0.8
+    Write-Verbose (
+      "[DPI][WPF] Applied root layout scale 0.8 ({0}) context={1}" -f $Source, $contextDescription
+    ) -Verbose
+  } catch {
+    Write-Verbose "[DPI][WPF] Failed to apply layout scale ({0}): $($_.Exception.Message)" -Verbose
+  }
+}
+
+if ($global:NewAssetToolPerMonitorDpiContextEnabled -and $window) {
+  try {
+    $window.Add_DpiChanged({ param($sender,$eventArgs) & $applyWpfScale 'Window.DpiChanged' })
+  } catch {
+    Write-Verbose "[DPI][WPF] Failed to attach DpiChanged handler: $($_.Exception.Message)" -Verbose
+  }
+  & $applyWpfScale 'Window.Initial'
+}
+
 if ($window) {
   if ($window.WindowState -ne [System.Windows.WindowState]::Normal) {
     $window.WindowState = [System.Windows.WindowState]::Normal
