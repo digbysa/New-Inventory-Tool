@@ -1,50 +1,6 @@
 Add-Type -AssemblyName PresentationCore,PresentationFramework,WindowsBase,System.Xaml
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName WindowsFormsIntegration
-Add-Type -Namespace Win32 -Name DpiAwarenessHelper -MemberDefinition @"
-using System;
-using System.Runtime.InteropServices;
-
-public static class DpiAwarenessHelper
-{
-    private static readonly IntPtr PerMonitorV2Context = new IntPtr(-4);
-
-    [DllImport("user32.dll")]
-    private static extern bool SetProcessDpiAwarenessContext(IntPtr dpiFlag);
-
-    [DllImport("shcore.dll")]
-    private static extern int SetProcessDpiAwareness(PROCESS_DPI_AWARENESS value);
-
-    private enum PROCESS_DPI_AWARENESS
-    {
-        PROCESS_DPI_UNAWARE = 0,
-        PROCESS_SYSTEM_DPI_AWARE = 1,
-        PROCESS_PER_MONITOR_DPI_AWARE = 2
-    }
-
-    public static bool TrySetPerMonitorV2()
-    {
-        try
-        {
-            if (SetProcessDpiAwarenessContext(PerMonitorV2Context))
-            {
-                return true;
-            }
-        }
-        catch (EntryPointNotFoundException) { }
-        catch (DllNotFoundException) { }
-
-        try
-        {
-            return SetProcessDpiAwareness(PROCESS_DPI_AWARENESS.PROCESS_PER_MONITOR_DPI_AWARE) == 0;
-        }
-        catch (EntryPointNotFoundException) { }
-        catch (DllNotFoundException) { }
-
-        return false;
-    }
-}
-"@
 
 function Get-LoaderScriptDir {
   try {
@@ -64,11 +20,6 @@ function Get-LoaderScriptDir {
 $scriptDir = Get-LoaderScriptDir
 $ps1Path   = Join-Path $scriptDir 'NewAssetTool.ps1'
 $xamlPath  = Join-Path $scriptDir 'NewAssetTool.xaml'
-
-$dpiAware = [Win32.DpiAwarenessHelper]::TrySetPerMonitorV2()
-if (-not $dpiAware) {
-  Write-Warning 'Failed to enable Per-Monitor V2 DPI awareness via Win32 APIs. High-DPI behavior may be degraded.'
-}
 
 if (-not (Test-Path $ps1Path)) {
   throw "Could not find NewAssetTool.ps1 at '$ps1Path'."

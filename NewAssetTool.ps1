@@ -1,14 +1,6 @@
 ﻿Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-$winFormsDpiSet = $false
-try {
-  $winFormsDpiSet = [System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.HighDpiMode]::PerMonitorV2)
-} catch {
-  Write-Warning "Failed to invoke WinForms SetHighDpiMode: $($_.Exception.Message)"
-}
-if (-not $winFormsDpiSet) {
-  Write-Warning 'WinForms HighDpiMode.PerMonitorV2 was not applied; embedded controls may be scaled at the system DPI.'
-}
+try { [System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.HighDpiMode]::PerMonitorV2) | Out-Null } catch {}
 [System.Windows.Forms.Application]::EnableVisualStyles()
 try { [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false) } catch {}
 
