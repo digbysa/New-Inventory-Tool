@@ -1104,10 +1104,36 @@ function Load-LocationMaster($folder){
   Rebuild-RoomCaches
 }
 function Save-LocationUserAdd([string]$city,[string]$loc,[string]$b,[string]$f,[string]$r){
-  if(-not $script:OutputFolder){ $script:OutputFolder = $script:DataFolder }
-  $file = Join-Path $script:OutputFolder 'LocationMaster-UserAdds.csv'
-  if(-not (Test-Path $file)){ 'City,Location,Building,Floor,Room' | Out-File -FilePath $file -Encoding UTF8 }
-  ('"{0}","{1}","{2}","{3}","{4}"' -f $city,$loc,$b,$f,$r) | Add-Content -Path $file -Encoding UTF8
+  try{
+    $file = $null
+    try {
+      if($script:DataFolder){ $file = Join-Path $script:DataFolder 'LocationMaster-UserAdds.csv' }
+    } catch {}
+    if(-not $file){
+      try {
+        $dataFolder = Join-Path $PSScriptRoot 'Data'
+        if(-not (Test-Path $dataFolder)){
+          try { New-Item -Path $dataFolder -ItemType Directory -Force | Out-Null } catch {}
+        }
+        $file = Join-Path $dataFolder 'LocationMaster-UserAdds.csv'
+      } catch {}
+    }
+    if(-not $file){
+      try { $file = 'LocationMaster-UserAdds.csv' } catch {}
+    }
+    if($file){
+      try {
+        $dir = Split-Path -Path $file -Parent
+        if($dir -and -not (Test-Path $dir)){
+          try { New-Item -Path $dir -ItemType Directory -Force | Out-Null } catch {}
+        }
+      } catch {}
+      if(-not (Test-Path $file)){
+        'City,Location,Building,Floor,Room' | Out-File -FilePath $file -Encoding UTF8
+      }
+      ('"{0}","{1}","{2}","{3}","{4}"' -f $city,$loc,$b,$f,$r) | Add-Content -Path $file -Encoding UTF8
+    }
+  } catch {}
 }
 function Load-RoundingMapping([string]$folder){
   $script:RoundingByAssetTag.Clear()
