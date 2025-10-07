@@ -521,6 +521,8 @@ $script:RoundingEventColumns = @(
   'CheckStatus','RoundingMinutes','CableMgmtOK','CablingNeeded','LabelOK','CartOK','PeripheralsOK',
   'MaintenanceType','Department','RoundingUrl','Comments'
 )
+$script:RoundingWebsiteFieldOverrides = @{}
+$script:RoundingWebsiteIgnoredColumns = @('Timestamp','RoundingUrl')
 # Tolerant header map + fast caches for Room validation
 $script:LocCols = @{}
 $script:RoomsNorm  = @()  # all normalized Room strings from LocationMaster*.csv
@@ -1150,11 +1152,36 @@ function Load-RoundingMapping([string]$folder){
     } catch {}
   }
 }
+function Load-RoundingWebsiteFieldMap([string]$folder){
+  $script:RoundingWebsiteFieldOverrides = @{}
+  if([string]::IsNullOrWhiteSpace($folder)){ return }
+  $path = $null
+  try { $path = Join-Path $folder 'RoundingWebsiteFieldMap.csv' } catch {}
+  if(-not $path -or -not (Test-Path $path)){ return }
+  try {
+    $rows = Import-Csv $path
+    foreach($row in $rows){
+      $csvColumn = ''
+      $webField  = ''
+      if($row.PSObject.Properties['CsvColumn']){ $csvColumn = [string]$row.CsvColumn }
+      if($row.PSObject.Properties['WebField']){  $webField  = [string]$row.WebField }
+      if([string]::IsNullOrWhiteSpace($csvColumn) -or [string]::IsNullOrWhiteSpace($webField)){ continue }
+      $csvColumn = $csvColumn.Trim()
+      $webField  = $webField.Trim()
+      if(-not $script:RoundingWebsiteFieldOverrides.ContainsKey($csvColumn)){
+        $script:RoundingWebsiteFieldOverrides[$csvColumn] = $webField
+      }
+    }
+  } catch {
+    Write-Warning ("Failed to load RoundingWebsiteFieldMap.csv: " + $_.Exception.Message)
+  }
+}
 function Load-DataFolder([string]$folder){
   $script:DataFolder = $folder
   if(-not $script:OutputFolder){ $script:OutputFolder = $folder }
   Load-LocationMaster $folder
   Load-RoundingMapping $folder
+  Load-RoundingWebsiteFieldMap $folder
   try { Load-DepartmentMaster } catch {}
   $cfile   = Join-Path $folder 'Computers.csv'
   $mfile   = Join-Path $folder 'Monitors.csv'
@@ -1961,6 +1988,7 @@ $chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate p
 $btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Size='150,36'; $btnCheckComplete.TabIndex = 8
 $btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Size='132,36'; $btnSave.TabIndex = 9
 $btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 10
+$btnRoundNow=New-Object ModernUI.RoundedButton; $btnRoundNow.Text="Round Now"; $btnRoundNow.Size='132,36'; $btnRoundNow.Enabled=$false; $btnRoundNow.TabIndex = 11
 
 $btnCheckComplete.BackColor = [System.Drawing.SystemColors]::Control
 $btnCheckComplete.ForeColor = [System.Drawing.SystemColors]::ControlText
@@ -1968,9 +1996,11 @@ $btnSave.BackColor = [System.Drawing.SystemColors]::Control
 $btnSave.ForeColor = [System.Drawing.SystemColors]::ControlText
 $btnManualRound.BackColor = [System.Drawing.SystemColors]::Control
 $btnManualRound.ForeColor = [System.Drawing.SystemColors]::ControlText
+$btnRoundNow.BackColor = [System.Drawing.SystemColors]::Control
+$btnRoundNow.ForeColor = [System.Drawing.SystemColors]::ControlText
 
-$lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 11
-$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=12; $txtComments.WordWrap = $true
+$lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 12
+$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=13; $txtComments.WordWrap = $true
 
 $layoutMaint = New-Object System.Windows.Forms.TableLayoutPanel
 $layoutMaint.Dock = 'Fill'
@@ -2057,10 +2087,12 @@ $actionsPanel.FlowDirection = 'LeftToRight'
 $actionsPanel.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $btnCheckComplete.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
 $btnSave.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
-$btnManualRound.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+$btnManualRound.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
+$btnRoundNow.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 $actionsPanel.Controls.Add($btnCheckComplete)
 $actionsPanel.Controls.Add($btnSave)
 $actionsPanel.Controls.Add($btnManualRound)
+$actionsPanel.Controls.Add($btnRoundNow)
 
 $lblComments.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $txtComments.Margin = New-Object System.Windows.Forms.Padding(0,4,0,0)
@@ -2340,12 +2372,235 @@ function Get-RoundingUrlForParent($pc){
   }
   return $null
 }
+function ConvertTo-WebFieldString {
+  param($Value)
+  if($null -eq $Value){ return '' }
+  if($Value -is [string]){ return $Value }
+  if($Value -is [bool]){ return (if($Value){ 'true' } else { 'false' }) }
+  if($Value -is [datetime]){ return $Value.ToString('yyyy-MM-dd HH:mm:ss') }
+  return ('' + $Value)
+}
+function Apply-WebElementValue {
+  param(
+    [Parameter(Mandatory=$true)] [System.Windows.Forms.HtmlElement] $Element,
+    $Value
+  )
+  $tag = ('' + $Element.TagName).ToLowerInvariant()
+  $type = ('' + $Element.GetAttribute('type')).ToLowerInvariant()
+  $stringValue = ConvertTo-WebFieldString $Value
+  switch($tag){
+    'input' {
+      switch($type){
+        'checkbox' {
+          $shouldCheck = $false
+          if($Value -is [bool]){ $shouldCheck = $Value }
+          elseif(-not [string]::IsNullOrWhiteSpace($stringValue)){ $shouldCheck = $stringValue -match '^(?i)(1|true|yes|ok)$' }
+          if($shouldCheck){ $Element.SetAttribute('checked','checked') }
+          else { $Element.SetAttribute('checked',$null) }
+        }
+        'radio' {
+          $radioValue = ('' + $Element.GetAttribute('value'))
+          $shouldCheck = $false
+          if($Value -is [bool]){ $shouldCheck = $Value }
+          elseif(-not [string]::IsNullOrWhiteSpace($stringValue)){
+            if($radioValue){ $shouldCheck = $radioValue.Equals($stringValue,[System.StringComparison]::OrdinalIgnoreCase) }
+          }
+          if($shouldCheck){ $Element.SetAttribute('checked','checked') }
+          else { $Element.SetAttribute('checked',$null) }
+        }
+        default {
+          $Element.SetAttribute('value',$stringValue)
+        }
+      }
+      try { $Element.InvokeMember('onchange') } catch {}
+    }
+    'select' {
+      $options = $Element.GetElementsByTagName('option')
+      $matched = $false
+      foreach($opt in $options){
+        if(-not $opt){ continue }
+        $optValue = ('' + $opt.GetAttribute('value'))
+        $optText = ('' + $opt.InnerText).Trim()
+        $shouldSelect = $false
+        if(-not [string]::IsNullOrWhiteSpace($stringValue)){
+          if($optValue -and $optValue.Equals($stringValue,[System.StringComparison]::OrdinalIgnoreCase)){
+            $shouldSelect = $true
+          } elseif($optText -and $optText.Equals($stringValue,[System.StringComparison]::OrdinalIgnoreCase)){
+            $shouldSelect = $true
+          }
+        } elseif($Value -is [bool]){
+          if($Value -and $optText -match '^(?i)(yes|true|ok|checked)$'){ $shouldSelect = $true }
+          elseif((-not $Value) -and $optText -match '^(?i)(no|false|unchecked)$'){ $shouldSelect = $true }
+        }
+        if($shouldSelect){
+          $opt.SetAttribute('selected','selected')
+          $matched = $true
+        } else {
+          $opt.SetAttribute('selected',$null)
+        }
+      }
+      if(-not $matched){ $Element.SetAttribute('value',$stringValue) }
+      try { $Element.InvokeMember('onchange') } catch {}
+    }
+    'textarea' {
+      $Element.InnerText = $stringValue
+      try { $Element.InvokeMember('onchange') } catch {}
+    }
+    default {
+      if(-not [string]::IsNullOrWhiteSpace($stringValue)){
+        $Element.InnerText = $stringValue
+      }
+    }
+  }
+}
+function Set-WebDocumentFieldValue {
+  param(
+    [Parameter(Mandatory=$true)] $Document,
+    [Parameter(Mandatory=$true)] [string] $FieldName,
+    $Value
+  )
+  if(-not $Document){ return }
+  $normalizedTarget = ($FieldName -replace '[^a-z0-9]','').ToLowerInvariant()
+  if([string]::IsNullOrWhiteSpace($normalizedTarget)){ return }
+  $preferred = New-Object System.Collections.ArrayList
+  $fallback  = New-Object System.Collections.ArrayList
+  foreach($tagName in @('input','select','textarea')){
+    $elements = $Document.GetElementsByTagName($tagName)
+    foreach($element in $elements){
+      if(-not $element){ continue }
+      $candidates = @((if($element.Id){ '' + $element.Id } else { $null }), ('' + $element.GetAttribute('name')),( '' + $element.GetAttribute('data-field')),( '' + $element.GetAttribute('aria-label')),( '' + $element.GetAttribute('placeholder')))
+      $exactMatch = $false
+      foreach($candidate in $candidates){
+        if([string]::IsNullOrWhiteSpace($candidate)){ continue }
+        $norm = ($candidate -replace '[^a-z0-9]','').ToLowerInvariant()
+        if($norm -eq $normalizedTarget){
+          if(-not $preferred.Contains($element)){ [void]$preferred.Add($element) }
+          $exactMatch = $true
+        } elseif($norm -and $norm.Contains($normalizedTarget)){
+          if((-not $preferred.Contains($element)) -and (-not $fallback.Contains($element))){ [void]$fallback.Add($element) }
+        }
+      }
+      if($exactMatch){ break }
+    }
+    if($preferred.Count -gt 0){ break }
+  }
+  $targets = if($preferred.Count -gt 0){ $preferred } else { $fallback }
+  foreach($target in $targets){
+    try { Apply-WebElementValue -Element $target -Value $Value } catch { Write-Verbose ("Failed to set field '$FieldName': " + $_.Exception.Message) -Verbose }
+  }
+}
+# Derive which web form fields should be updated directly from the canonical
+# RoundingEvents export columns so the same metadata that drives the CSV also
+# powers the browser automation.
+function Get-RoundingWebsiteFieldAssignments {
+  param(
+    [Parameter(Mandatory=$true)] $EventData
+  )
+  $assignments = New-Object System.Collections.Generic.List[object]
+  if(-not $EventData){ return $assignments }
+  $ignored = if($script:RoundingWebsiteIgnoredColumns){ $script:RoundingWebsiteIgnoredColumns } else { @('Timestamp','RoundingUrl') }
+  foreach($column in $script:RoundingEventColumns){
+    if($ignored -contains $column){ continue }
+    $prop = $EventData.PSObject.Properties[$column]
+    if(-not $prop){ continue }
+    $value = $prop.Value
+    $candidates = New-Object System.Collections.Generic.List[string]
+    if($script:RoundingWebsiteFieldOverrides.ContainsKey($column)){
+      $alias = $script:RoundingWebsiteFieldOverrides[$column]
+      if(-not [string]::IsNullOrWhiteSpace($alias) -and -not $candidates.Contains($alias)){ [void]$candidates.Add($alias) }
+    }
+    if(-not [string]::IsNullOrWhiteSpace($column) -and -not $candidates.Contains($column)){ [void]$candidates.Add($column) }
+    if($candidates.Count -eq 0){ continue }
+    [void]$assignments.Add([pscustomobject]@{ Names = $candidates; Value = $value })
+  }
+  return $assignments
+}
+function Update-RoundingWebsite {
+  param(
+    [Parameter(Mandatory=$true)] $EventData
+  )
+  if(-not $EventData){ return }
+  $url = $EventData.RoundingUrl
+  if([string]::IsNullOrWhiteSpace($url)){ return }
+  $form = $null
+  $browser = $null
+  $handler = $null
+  $waiter = $null
+  try {
+    $form = New-Object System.Windows.Forms.Form
+    $form.ShowInTaskbar = $false
+    $form.WindowState = [System.Windows.Forms.FormWindowState]::Minimized
+    $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedToolWindow
+    $form.Opacity = 0
+    $browser = New-Object System.Windows.Forms.WebBrowser
+    $browser.ScriptErrorsSuppressed = $true
+    $browser.Dock = 'Fill'
+    $form.Controls.Add($browser)
+    $waiter = New-Object System.Threading.AutoResetEvent($false)
+    $handler = [System.Windows.Forms.WebBrowserDocumentCompletedEventHandler]{
+      param($sender,$eventArgs)
+      if($sender -and $sender.ReadyState -eq [System.Windows.Forms.WebBrowserReadyState]::Complete){
+        $waiter.Set() | Out-Null
+      }
+    }
+    $browser.add_DocumentCompleted($handler)
+    $browser.Navigate($url)
+    $form.Show()
+    $timeout = [TimeSpan]::FromSeconds(30)
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    while($stopwatch.Elapsed -lt $timeout){
+      if($waiter.WaitOne(200)){ break }
+      [System.Windows.Forms.Application]::DoEvents()
+    }
+    $stopwatch.Stop()
+    $doc = $browser.Document
+    if(-not $doc){ return }
+    $assignments = Get-RoundingWebsiteFieldAssignments -EventData $EventData
+    foreach($assignment in $assignments){
+      foreach($name in $assignment.Names){
+        Set-WebDocumentFieldValue -Document $doc -FieldName $name -Value $assignment.Value
+      }
+    }
+  } catch {
+    Write-Warning ("Failed to update rounding website: " + $_.Exception.Message)
+  } finally {
+    if($handler -and $browser){
+      try { $browser.remove_DocumentCompleted($handler) } catch {}
+    }
+    if($browser){
+      try { $browser.Stop() } catch {}
+      try { $browser.Dispose() } catch {}
+    }
+    if($form){
+      try { $form.Close() } catch {}
+      try { $form.Dispose() } catch {}
+    }
+    if($waiter){
+      try { $waiter.Dispose() } catch {}
+    }
+  }
+}
 function Update-ManualRoundButton($parentRec){
   if($parentRec){
     $url = Get-RoundingUrlForParent $parentRec
-    if($url){ $btnManualRound.Enabled = $true; $btnManualRound.Tag = $url; $tip.SetToolTip($btnManualRound,$url); return }
+    if($url){
+      $btnManualRound.Enabled = $true
+      $btnManualRound.Tag = $url
+      $tip.SetToolTip($btnManualRound,$url)
+      if($btnRoundNow){
+        $btnRoundNow.Enabled = $true
+        $btnRoundNow.Tag = $url
+        $tip.SetToolTip($btnRoundNow,$url)
+      }
+      return
+    }
   }
   $btnManualRound.Enabled = $false; $btnManualRound.Tag = $null; $tip.SetToolTip($btnManualRound,"")
+  if($btnRoundNow){
+    $btnRoundNow.Enabled = $false
+    $btnRoundNow.Tag = $null
+    $tip.SetToolTip($btnRoundNow,"")
+  }
 }
 # ---- Location Validation ----
 function Get-City-ForLocation([string]$loc){
@@ -3249,6 +3504,140 @@ function Clear-UI(){
   $statusLabel.Text = "Ready - scan or enter a device."
   Size-AssocForRows(1) | Out-Null
 }
+function Invoke-RoundingSaveAction{
+  param(
+    [switch]$UpdateBrowser
+  )
+  $row = $null
+  try {
+    try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor; $form.UseWaitCursor = $true } catch {}
+    Stop-RoundingTimer
+    $out = $script:OutputFolder
+    if(-not (Test-Path $out)){ New-Item -ItemType Directory -Path $out -Force | Out-Null }
+    $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
+    $exists = Test-Path $file
+    if($exists){ Ensure-RoundingCommentsColumn $file }
+    $pc = $script:CurrentParent
+    if(-not $pc){ $pc = Resolve-ParentComputer (Find-RecordRaw $txtAT.Text) }
+    if(-not $pc){ $pc = $script:CurrentDisplay }
+    $url = $null
+    if($pc){
+      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
+      $url = Get-RoundingUrlForParent $pc
+    }
+    $deptValue = ''
+    if($cmbDept -and $cmbDept.Text){ $deptValue = $cmbDept.Text }
+    elseif($txtDept -and $txtDept.Text){ $deptValue = $txtDept.Text }
+    if($deptValue){
+      try { Save-DepartmentUserAdd $deptValue } catch {}
+      if($txtDept){ $txtDept.Text = $deptValue }
+      if($cmbDept){ $cmbDept.Text = $deptValue }
+      try { Populate-Department-Combo $deptValue } catch {}
+    }
+    $row = [pscustomobject]@{
+      Timestamp        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+      AssetTag         = if($pc){
+        try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
+        $pc.asset_tag}else{$null}
+      Name             = if($pc){
+        try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
+        $pc.name}else{$null}
+      Serial           = if($pc){
+        try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
+        $pc.serial_number}else{$null}
+      City             = $txtCity.Text
+      Location         = $txtLocation.Text
+      Building         = $txtBldg.Text
+      Floor            = $txtFloor.Text
+      Room             = $txtRoom.Text
+      CheckStatus      = $cmbChkStatus.Text
+      RoundingMinutes  = [int]$numTime.Value
+      CableMgmtOK      = $chkCable.Checked
+      CablingNeeded    = $chkCableNeeded.Checked
+      LabelOK          = $chkLabels.Checked
+      CartOK           = $chkCart.Checked
+      PeripheralsOK    = $chkPeriph.Checked
+      MaintenanceType  = $cmbMaintType.Text
+      Department       = $deptValue
+      RoundingUrl      = $url
+      Comments         = $txtComments.Text
+    }
+    $cmbDept.Visible = $false  # Hidden until Edit Location is active
+    $rowOut = $row | Select-Object $script:RoundingEventColumns
+    if(-not $exists){ $rowOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
+    else { $rowOut | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
+    if($chkCableNeeded.Checked){
+      $excelPath = Join-Path $script:OutputFolder 'CablingNeeded.xlsx'
+      $excel = $null
+      $workbook = $null
+      $worksheet = $null
+      $excelPathExists = Test-Path $excelPath
+      try {
+        $excel = New-Object -ComObject Excel.Application
+        $excel.Visible = $false
+        $excel.DisplayAlerts = $false
+        if($excelPathExists){
+          $workbook = $excel.Workbooks.Open($excelPath)
+        } else {
+          $workbook = $excel.Workbooks.Add()
+          $worksheet = $workbook.Worksheets.Item(1)
+          $headers = @('Timestamp','Name','Asset Tag','Location','Room')
+          for($i = 0; $i -lt $headers.Count; $i++){
+            $worksheet.Cells.Item(1,$i + 1).Value2 = $headers[$i]
+          }
+        }
+        if(-not $worksheet){ $worksheet = $workbook.Worksheets.Item(1) }
+        $usedRange = $worksheet.UsedRange
+        $lastRow = $usedRange.Rows.Count
+        if($lastRow -eq 1 -and -not $worksheet.Cells.Item(1,1).Value2){ $lastRow = 0 }
+        $nextRow = $lastRow + 1
+        $worksheet.Cells.Item($nextRow,1).Value2 = $row.Timestamp
+        $worksheet.Cells.Item($nextRow,2).Value2 = $row.Name
+        $worksheet.Cells.Item($nextRow,3).Value2 = $row.AssetTag
+        $worksheet.Cells.Item($nextRow,4).Value2 = $row.Location
+        $worksheet.Cells.Item($nextRow,5).Value2 = $row.Room
+        if($excelPathExists){ $workbook.Save() }
+        else { $workbook.SaveAs($excelPath) }
+      } catch {
+        Write-Warning ("Failed to log cabling needed entry: " + $_.Exception.Message)
+      } finally {
+        if($worksheet){ [System.Runtime.InteropServices.Marshal]::ReleaseComObject($worksheet) | Out-Null }
+        if($workbook){
+          try { $workbook.Close($true) } catch {}
+          [System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook) | Out-Null
+        }
+        if($excel){
+          try { $excel.Quit() } catch {}
+          [System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel) | Out-Null
+        }
+        [System.GC]::Collect()
+        [System.GC]::WaitForPendingFinalizers()
+      }
+    }
+    if($UpdateBrowser -and $row -and $row.RoundingUrl){
+      try { Update-RoundingWebsite -EventData $row } catch { Write-Warning ("Round Now sync failed: " + $_.Exception.Message) }
+    }
+    foreach($cb in @($chkCable,$chkCableNeeded,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked = $false }
+    [System.Windows.Forms.MessageBox]::Show(("Saved rounding event to" + [Environment]::NewLine + $file),"Save Event") | Out-Null
+    $cmbChkStatus.SelectedIndex = 0
+    $txtScan.Clear()
+    Clear-UI
+    Focus-ScanInput
+    try {
+      if ($row -and $row.Location) {
+        Add-NearbyScope $null $row.Location $null $null
+        Update-ScopeLabel
+        Rebuild-Nearby
+        Write-Host ("Main Save: Added Location scope '" + $row.Location + "' -> Count=" + $script:ActiveNearbyScopes.Count)
+      } else {
+        Write-Host "Main Save: Row.Location missing; not adding scope."
+      }
+    } catch { Write-Host ("Main Save: Error - " + $_.Exception.Message) }
+  } finally {
+    try { $form.Cursor = [System.Windows.Forms.Cursors]::Default; $form.UseWaitCursor = $false } catch {}
+  }
+  return $row
+}
 # ---- Events ----
 $txtScan.Add_KeyDown({ if($_.KeyCode -eq 'Enter'){ Do-Lookup; $_.SuppressKeyPress=$true } })
 $txtScan.Add_TextChanged({ if([string]::IsNullOrWhiteSpace($txtScan.Text)){ Clear-UI } })
@@ -3310,129 +3699,8 @@ $btnCheckComplete.Add_Click({
     }
   }
 })
-$btnSave.Add_Click({
-  Stop-RoundingTimer
-  $out = $script:OutputFolder
-  if(-not (Test-Path $out)){ New-Item -ItemType Directory -Path $out -Force | Out-Null }
-$file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
-  $exists = Test-Path $file
-  if($exists){ Ensure-RoundingCommentsColumn $file }
-  $pc = $script:CurrentParent
-  if(-not $pc){ $pc = Resolve-ParentComputer (Find-RecordRaw $txtAT.Text) }
-  if(-not $pc){ $pc = $script:CurrentDisplay }
-  $url = $null
-  if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
- $url = Get-RoundingUrlForParent $pc }
-  $deptValue = ''
-  if($cmbDept -and $cmbDept.Text){ $deptValue = $cmbDept.Text }
-  elseif($txtDept -and $txtDept.Text){ $deptValue = $txtDept.Text }
-  if($deptValue){
-    try { Save-DepartmentUserAdd $deptValue } catch {}
-    if($txtDept){ $txtDept.Text = $deptValue }
-    if($cmbDept){ $cmbDept.Text = $deptValue }
-    try { Populate-Department-Combo $deptValue } catch {}
-  }
-  $row = [pscustomobject]@{
-    Timestamp        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-    AssetTag         = if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
-$pc.asset_tag}else{$null}
-    Name             = if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
-$pc.name}else{$null}
-    Serial           = if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
-$pc.serial_number}else{$null}
-    City             = $txtCity.Text
-    Location         = $txtLocation.Text
-    Building         = $txtBldg.Text
-    Floor            = $txtFloor.Text
-    Room             = $txtRoom.Text
-    CheckStatus      = $cmbChkStatus.Text
-    RoundingMinutes  = [int]$numTime.Value
-    CableMgmtOK      = $chkCable.Checked
-    CablingNeeded    = $chkCableNeeded.Checked
-    LabelOK          = $chkLabels.Checked
-    CartOK           = $chkCart.Checked
-    PeripheralsOK    = $chkPeriph.Checked
-    MaintenanceType = $cmbMaintType.Text
-    Department       = $deptValue
-    RoundingUrl      = $url
-    Comments         = $txtComments.Text
-  }
-  $cmbDept.Visible = $false  # Hidden until Edit Location is active
-  $rowOut = $row | Select-Object $script:RoundingEventColumns
-  if(-not $exists){ $rowOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
-  else { $rowOut | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
-  if($chkCableNeeded.Checked){
-    $excelPath = Join-Path $script:OutputFolder 'CablingNeeded.xlsx'
-    $excel = $null
-    $workbook = $null
-    $worksheet = $null
-    $excelPathExists = Test-Path $excelPath
-    try {
-      $excel = New-Object -ComObject Excel.Application
-      $excel.Visible = $false
-      $excel.DisplayAlerts = $false
-      if($excelPathExists){
-        $workbook = $excel.Workbooks.Open($excelPath)
-      } else {
-        $workbook = $excel.Workbooks.Add()
-        $worksheet = $workbook.Worksheets.Item(1)
-        $headers = @('Timestamp','Name','Asset Tag','Location','Room')
-        for($i = 0; $i -lt $headers.Count; $i++){
-          $worksheet.Cells.Item(1,$i + 1).Value2 = $headers[$i]
-        }
-      }
-      if(-not $worksheet){ $worksheet = $workbook.Worksheets.Item(1) }
-      $usedRange = $worksheet.UsedRange
-      $lastRow = $usedRange.Rows.Count
-      if($lastRow -eq 1 -and -not $worksheet.Cells.Item(1,1).Value2){ $lastRow = 0 }
-      $nextRow = $lastRow + 1
-      $worksheet.Cells.Item($nextRow,1).Value2 = $row.Timestamp
-      $worksheet.Cells.Item($nextRow,2).Value2 = $row.Name
-      $worksheet.Cells.Item($nextRow,3).Value2 = $row.AssetTag
-      $worksheet.Cells.Item($nextRow,4).Value2 = $row.Location
-      $worksheet.Cells.Item($nextRow,5).Value2 = $row.Room
-      if($excelPathExists){ $workbook.Save() }
-      else { $workbook.SaveAs($excelPath) }
-    } catch {
-      Write-Warning ("Failed to log cabling needed entry: " + $_.Exception.Message)
-    } finally {
-      if($worksheet){ [System.Runtime.InteropServices.Marshal]::ReleaseComObject($worksheet) | Out-Null }
-      if($workbook){
-        try { $workbook.Close($true) } catch {}
-        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook) | Out-Null
-      }
-      if($excel){
-        try { $excel.Quit() } catch {}
-        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel) | Out-Null
-      }
-      [System.GC]::Collect()
-      [System.GC]::WaitForPendingFinalizers()
-    }
-  }
-  foreach($cb in @($chkCable,$chkCableNeeded,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked = $false }
-  [System.Windows.Forms.MessageBox]::Show(("Saved rounding event to
-" + $file),"Save Event") | Out-Null
-  $cmbChkStatus.SelectedIndex = 0
-  $txtScan.Clear()
-  Clear-UI
-  Focus-ScanInput
-  # -- Nearby: add Location-only scope and rebuild
-  try {
-    if ($row -and $row.Location) {
-      Add-NearbyScope $null $row.Location $null $null
-      Update-ScopeLabel
-      Rebuild-Nearby
-      Write-Host ("Main Save: Added Location scope '" + $row.Location + "' -> Count=" + $script:ActiveNearbyScopes.Count)
-    } else {
-      Write-Host "Main Save: Row.Location missing; not adding scope."
-    }
-  } catch { Write-Host ("Main Save: Error - " + $_.Exception.Message) }
-  try { $form.Cursor = [System.Windows.Forms.Cursors]::Default; $form.UseWaitCursor = $false } catch {}
-})
+$btnSave.Add_Click({ Invoke-RoundingSaveAction | Out-Null })
+$btnRoundNow.Add_Click({ Invoke-RoundingSaveAction -UpdateBrowser | Out-Null })
 $btnManualRound.Add_Click({
   if($btnManualRound.Tag){ Start-Process -FilePath $btnManualRound.Tag }
   else { [System.Windows.Forms.MessageBox]::Show("No rounding URL found for this device.","Manual Round") | Out-Null }
@@ -4231,11 +4499,11 @@ if ($pc) {
   }
 })
 # Hook Save on Main to accumulate scopes (based on last event appended)
-$btnSave.Add_Click({
+$scopeUpdateHandler = {
   Start-Sleep -Milliseconds 120
   try {
     $out = $script:OutputFolder
-$file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
+    $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
     if (Test-Path $file) {
       $rows = Import-Csv $file
       if ($rows.Count -gt 0) {
@@ -4249,7 +4517,9 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
       }
     }
   } catch { }
-})
+}
+$btnSave.Add_Click($scopeUpdateHandler)
+if($btnRoundNow){ $btnRoundNow.Add_Click($scopeUpdateHandler) }
 # Initial build
 Update-ScopeLabel
 # ======================== NEARBY TAB INJECTION END ========================
