@@ -382,25 +382,13 @@ function Set-ModernTheme {
         } catch { $ctl.ForeColor = $fgText }
       }
       'System\.Windows\.Forms\.Button|ModernUI\.RoundedButton' {
-        try { $ctl.FlatStyle = 'Flat' } catch {}
-        try { $ctl.FlatAppearance.BorderSize = 0 } catch {}
-        $ctl.BackColor = $accent
-        $ctl.ForeColor = [System.Drawing.Color]::White
+        try { $ctl.FlatStyle = 'Standard' } catch {}
+        try { $ctl.UseVisualStyleBackColor = $true } catch {}
+        $ctl.BackColor = [System.Drawing.SystemColors]::Control
+        $ctl.ForeColor = [System.Drawing.SystemColors]::ControlText
         if ($ctl -is [ModernUI.RoundedButton]) {
           $ctl.CornerRadius = 4
-        } else {
-          Set-RoundedCorners $ctl 12
         }
-        $accentCopy = $accent
-        $accentHover = $accentHv
-        $ctl.Add_MouseEnter(({
-          param($s,$e)
-          $s.BackColor = $accentHover
-        }).GetNewClosure())
-        $ctl.Add_MouseLeave(({
-          param($s,$e)
-          $s.BackColor = $accentCopy
-        }).GetNewClosure())
       }
       'System\.Windows\.Forms\.TextBox' {
         $ctl.BorderStyle = 'FixedSingle'
@@ -530,7 +518,7 @@ $script:NewAssetToolMainForm = $null
 # Canonical column order for rounding event exports (includes Comments column)
 $script:RoundingEventColumns = @(
   'Timestamp','AssetTag','Name','Serial','City','Location','Building','Floor','Room',
-  'CheckStatus','RoundingMinutes','CableMgmtOK','LabelOK','CartOK','PeripheralsOK',
+  'CheckStatus','RoundingMinutes','CableMgmtOK','CablingNeeded','LabelOK','CartOK','PeripheralsOK',
   'MaintenanceType','Department','RoundingUrl','Comments'
 )
 # Tolerant header map + fast caches for Room validation
@@ -1478,11 +1466,9 @@ $nameRow.Dock = 'Fill'
 $btnCopyHost = New-Object System.Windows.Forms.Button
 $btnCopyHost.Text = "📋"
 $btnCopyHost.Size = '28,24'
-$btnCopyHost.Margin = New-Object System.Windows.Forms.Padding(0,0,6,0)
-$btnCopyHost.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnCopyHost.FlatAppearance.BorderSize = 0
-$btnCopyHost.BackColor = [System.Drawing.Color]::FromArgb(240, 243, 247)
-$btnCopyHost.UseVisualStyleBackColor = $false
+$btnCopyHost.Margin = New-Object System.Windows.Forms.Padding(0,0,2,0)
+$btnCopyHost.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
+$btnCopyHost.UseVisualStyleBackColor = $true
 $btnCopyHost.Cursor = [System.Windows.Forms.Cursors]::Hand
 $nameRow.Controls.Add($btnCopyHost,0,0)
 
@@ -1710,15 +1696,15 @@ $btnAddPeripheral.Text   = 'Add Peripheral'
 $btnAddPeripheral.Size   = '140,32'
 $btnAddPeripheral.Margin = '0,0,8,0'
 $btnAddPeripheral.Anchor = 'Left'
-$btnAddPeripheral.BackColor = [System.Drawing.Color]::FromArgb(0,120,212)
-$btnAddPeripheral.ForeColor = [System.Drawing.Color]::White
+$btnAddPeripheral.BackColor = [System.Drawing.SystemColors]::Control
+$btnAddPeripheral.ForeColor = [System.Drawing.SystemColors]::ControlText
 $btnRemove = New-Object ModernUI.RoundedButton
 $btnRemove.Text   = 'Remove Peripheral'
 $btnRemove.Size   = '160,32'
 $btnRemove.Margin = '0,0,0,0'
 $btnRemove.Anchor = 'Left'
-$btnRemove.BackColor = [System.Drawing.Color]::FromArgb(243,245,248)
-$btnRemove.ForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
+$btnRemove.BackColor = [System.Drawing.SystemColors]::Control
+$btnRemove.ForeColor = [System.Drawing.SystemColors]::ControlText
 $assocButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
 $assocButtonsPanel.Dock = 'Left'
 $assocButtonsPanel.AutoSize = $true
@@ -1813,6 +1799,7 @@ $lblMaintType=New-Object System.Windows.Forms.Label; $lblMaintType.Text='Mainten
 $cmbMaintType=New-Object System.Windows.Forms.ComboBox; $cmbMaintType.DropDownStyle='DropDownList'; $cmbMaintType.Dock='Fill'
 $cmbMaintType.Items.AddRange(@('Excluded','General Rounding','Mobile Cart','Critical Clinical'))
 $cmbMaintType.TabIndex = 0
+$cmbMaintType.MinimumSize = New-Object System.Drawing.Size(200,0)
 
 $lblChkStatus=New-Object System.Windows.Forms.Label; $lblChkStatus.Text="Check Status"; $lblChkStatus.AutoSize=$true
 $cmbChkStatus=New-Object System.Windows.Forms.ComboBox; $cmbChkStatus.DropDownStyle='DropDownList'; $cmbChkStatus.Dock='Fill'
@@ -1831,30 +1818,32 @@ $cmbChkStatus.Items.AddRange(@(
   "Pending Repair"
 )); $cmbChkStatus.SelectedIndex=0
 $cmbChkStatus.TabIndex = 1
+$cmbChkStatus.MinimumSize = New-Object System.Drawing.Size(240,0)
+$cmbChkStatus.DropDownWidth = 360
 
 $lblTime=New-Object System.Windows.Forms.Label; $lblTime.Text="Rounding Time (min)"; $lblTime.AutoSize=$true
 $numTime=New-Object System.Windows.Forms.NumericUpDown; $numTime.Minimum=1; $numTime.Maximum=120; $numTime.Value=3; $numTime.Width=120
 $numTime.TabIndex = 2
 
 $chkCable=New-Object System.Windows.Forms.CheckBox; $chkCable.Text="Validate Cable Management"; $chkCable.AutoSize=$true; $chkCable.TabIndex = 3
-$chkCart=New-Object System.Windows.Forms.CheckBox; $chkCart.Text="Check Physical Cart Is Working"; $chkCart.AutoSize=$true; $chkCart.TabIndex = 4
-$chkLabels=New-Object System.Windows.Forms.CheckBox; $chkLabels.Text="Ensure monitor appropriately labelled"; $chkLabels.AutoSize=$true; $chkLabels.TabIndex = 5
-$chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate peripherals are connected and working"; $chkPeriph.AutoSize=$true; $chkPeriph.TabIndex = 6
+$chkCableNeeded=New-Object System.Windows.Forms.CheckBox; $chkCableNeeded.Text="Cabling Needed"; $chkCableNeeded.AutoSize=$true; $chkCableNeeded.TabIndex = 4
+$chkCart=New-Object System.Windows.Forms.CheckBox; $chkCart.Text="Check Physical Cart Is Working"; $chkCart.AutoSize=$true; $chkCart.TabIndex = 5
+$chkLabels=New-Object System.Windows.Forms.CheckBox; $chkLabels.Text="Ensure monitor appropriately labelled"; $chkLabels.AutoSize=$true; $chkLabels.TabIndex = 6
+$chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate peripherals are connected and working"; $chkPeriph.AutoSize=$true; $chkPeriph.TabIndex = 7
 
-$btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Size='150,36'; $btnCheckComplete.TabIndex = 7
-$btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Size='132,36'; $btnSave.TabIndex = 8
-$btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 9
+$btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Size='150,36'; $btnCheckComplete.TabIndex = 8
+$btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Size='132,36'; $btnSave.TabIndex = 9
+$btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 10
 
-$btnCheckComplete.BackColor = $script:ThemeColors.Accent
-$btnCheckComplete.ForeColor = [System.Drawing.Color]::White
-$secondaryBlue = [System.Drawing.Color]::FromArgb(0, 102, 189)
-$btnSave.BackColor = $secondaryBlue
-$btnSave.ForeColor = [System.Drawing.Color]::White
-$btnManualRound.BackColor = $secondaryBlue
-$btnManualRound.ForeColor = [System.Drawing.Color]::White
+$btnCheckComplete.BackColor = [System.Drawing.SystemColors]::Control
+$btnCheckComplete.ForeColor = [System.Drawing.SystemColors]::ControlText
+$btnSave.BackColor = [System.Drawing.SystemColors]::Control
+$btnSave.ForeColor = [System.Drawing.SystemColors]::ControlText
+$btnManualRound.BackColor = [System.Drawing.SystemColors]::Control
+$btnManualRound.ForeColor = [System.Drawing.SystemColors]::ControlText
 
-$lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 10
-$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=11; $txtComments.WordWrap = $true
+$lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 11
+$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=12; $txtComments.WordWrap = $true
 
 $layoutMaint = New-Object System.Windows.Forms.TableLayoutPanel
 $layoutMaint.Dock = 'Fill'
@@ -1874,21 +1863,22 @@ $rowCombos = New-Object System.Windows.Forms.TableLayoutPanel
 $rowCombos.Dock = 'Fill'
 $rowCombos.AutoSize = $true
 $rowCombos.AutoSizeMode = 'GrowAndShrink'
-$rowCombos.ColumnCount = 4
-$rowCombos.RowCount = 1
+$rowCombos.ColumnCount = 2
+$rowCombos.RowCount = 2
 $rowCombos.ColumnStyles.Clear()
 $rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
-$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
+$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$rowCombos.RowStyles.Clear()
+$rowCombos.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$rowCombos.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $rowCombos.Controls.Add($lblMaintType,0,0)
 $rowCombos.Controls.Add($cmbMaintType,1,0)
-$rowCombos.Controls.Add($lblChkStatus,2,0)
-$rowCombos.Controls.Add($cmbChkStatus,3,0)
-$lblMaintType.Margin = New-Object System.Windows.Forms.Padding(0,0,6,0)
-$cmbMaintType.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
-$lblChkStatus.Margin = New-Object System.Windows.Forms.Padding(0,0,6,0)
-$cmbChkStatus.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+$rowCombos.Controls.Add($lblChkStatus,0,1)
+$rowCombos.Controls.Add($cmbChkStatus,1,1)
+$lblMaintType.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
+$cmbMaintType.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+$lblChkStatus.Margin = New-Object System.Windows.Forms.Padding(0,8,12,0)
+$cmbChkStatus.Margin = New-Object System.Windows.Forms.Padding(0,4,0,0)
 
 $rowTime = New-Object System.Windows.Forms.TableLayoutPanel
 $rowTime.Dock = 'Fill'
@@ -1909,22 +1899,26 @@ $rowChecks.Dock = 'Fill'
 $rowChecks.AutoSize = $true
 $rowChecks.AutoSizeMode = 'GrowAndShrink'
 $rowChecks.ColumnCount = 2
-$rowChecks.RowCount = 2
+$rowChecks.RowCount = 3
 $rowChecks.ColumnStyles.Clear()
 $rowChecks.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
 $rowChecks.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
 $rowChecks.RowStyles.Clear()
 $rowChecks.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $rowChecks.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$rowChecks.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $rowChecks.Controls.Add($chkCable,0,0)
-$rowChecks.Controls.Add($chkCart,1,0)
+$rowChecks.Controls.Add($chkCableNeeded,1,0)
 $rowChecks.Controls.Add($chkLabels,0,1)
-$rowChecks.Controls.Add($chkPeriph,1,1)
+$rowChecks.Controls.Add($chkCart,1,1)
+$rowChecks.Controls.Add($chkPeriph,0,2)
+$rowChecks.SetColumnSpan($chkPeriph,2)
 $rowChecks.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $chkCable.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
+$chkCableNeeded.Margin = New-Object System.Windows.Forms.Padding(12,0,0,0)
 $chkLabels.Margin = New-Object System.Windows.Forms.Padding(0,6,12,0)
-$chkCart.Margin = New-Object System.Windows.Forms.Padding(12,0,0,0)
-$chkPeriph.Margin = New-Object System.Windows.Forms.Padding(12,6,0,0)
+$chkCart.Margin = New-Object System.Windows.Forms.Padding(12,6,0,0)
+$chkPeriph.Margin = New-Object System.Windows.Forms.Padding(0,6,0,0)
 
 $actionsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
 $actionsPanel.Dock = 'Fill'
@@ -3041,7 +3035,7 @@ function Clear-UI(){
   try { $dgv.Rows.Clear() } catch {}
   try { $cards.Controls.Clear() } catch {}
   Update-ManualRoundButton $null; Update-CartCheckbox-State $null
-  foreach($cb in @($chkCable,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked=$false }
+  foreach($cb in @($chkCable,$chkCableNeeded,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked=$false }
   $btnFixName.Enabled = $false
   if($btnAddPeripheral){ $btnAddPeripheral.Enabled = $false }
   $statusLabel.Text = "Ready - scan or enter a device."
@@ -3084,7 +3078,7 @@ $dgv.Add_CellDoubleClick({
   if($rec){ $par=Resolve-ParentComputer $rec; Populate-UI $rec $par }
 })
 $btnCheckComplete.Add_Click({
-  $checkboxes = @($chkCable,$chkLabels,$chkPeriph,$chkCart)
+  $checkboxes = @($chkCable,$chkCableNeeded,$chkLabels,$chkPeriph,$chkCart)
   $enabledBoxes = $checkboxes | Where-Object { $_.Enabled }
   $allEnabledChecked = $false
   if($enabledBoxes.Count -gt 0){
@@ -3145,6 +3139,7 @@ $pc.serial_number}else{$null}
     CheckStatus      = $cmbChkStatus.Text
     RoundingMinutes  = [int]$numTime.Value
     CableMgmtOK      = $chkCable.Checked
+    CablingNeeded    = $chkCableNeeded.Checked
     LabelOK          = $chkLabels.Checked
     CartOK           = $chkCart.Checked
     PeripheralsOK    = $chkPeriph.Checked
@@ -3157,7 +3152,7 @@ $pc.serial_number}else{$null}
   $rowOut = $row | Select-Object $script:RoundingEventColumns
   if(-not $exists){ $rowOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
   else { $rowOut | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
-  foreach($cb in @($chkCable,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked = $false }
+  foreach($cb in @($chkCable,$chkCableNeeded,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked = $false }
   [System.Windows.Forms.MessageBox]::Show(("Saved rounding event to
 " + $file),"Save Event") | Out-Null
   $cmbChkStatus.SelectedIndex = 0
@@ -3276,15 +3271,23 @@ function Ensure-RoundingCommentsColumn([string]$file){
     } elseif($header){
       $columns = @($header -split ',')
     }
+    $targetColumns = @($script:RoundingEventColumns)
     if(-not $columns -or $columns.Count -eq 0){
-      $columns = @($script:RoundingEventColumns)
-    } elseif(-not ($columns -contains 'Comments')){
-      $columns = @($columns + 'Comments')
+      $columns = $targetColumns
+    } else {
+      foreach($col in $targetColumns){
+        if(-not ($columns -contains $col)){
+          $columns += $col
+        }
+      }
     }
     if($rows -and $rows.Count -gt 0){
       foreach($r in $rows){
         if(-not $r.PSObject.Properties['Comments']){
           $r | Add-Member -NotePropertyName Comments -NotePropertyValue '' -Force
+        }
+        if(-not $r.PSObject.Properties['CablingNeeded']){
+          $r | Add-Member -NotePropertyName CablingNeeded -NotePropertyValue $false -Force
         }
       }
       $rows | Select-Object $columns | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8
@@ -3938,6 +3941,7 @@ if ($pc) {
       CheckStatus      = $status
       RoundingMinutes  = 3
       CableMgmtOK      = $false
+      CablingNeeded    = $false
       LabelOK          = $false
       CartOK           = $false
       PeripheralsOK    = $false
