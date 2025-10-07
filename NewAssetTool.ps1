@@ -1280,15 +1280,28 @@ $RIGHT_COL_PERCENT  = 54
 $GAP                = 6
 $form = New-Object System.Windows.Forms.Form
 $script:NewAssetToolManualScaleFactor = 1.0
-$desiredChromeScale = 0.8
+$script:NewAssetToolTargetChromeScale = 0.8
+$global:NewAssetToolTargetChromeScale = $script:NewAssetToolTargetChromeScale
 $applyWinFormsManualScale = {
   param([string]$Source = 'unspecified')
 
   if (-not $global:NewAssetToolPerMonitorDpiContextEnabled) { return }
 
+  $targetScale = $script:NewAssetToolTargetChromeScale
+  if (-not $targetScale -or [double]::IsNaN([double]$targetScale) -or $targetScale -le 0) { $targetScale = 1.0 }
+
+  $currentDpi = 96.0
+  try {
+    if ($form -and $form.DeviceDpi -gt 0) { $currentDpi = [double]$form.DeviceDpi }
+  } catch {}
+
+  if ($currentDpi -le 0) { $currentDpi = 96.0 }
+
+  $desiredManualScale = $targetScale * (96.0 / $currentDpi)
+
   $current = $script:NewAssetToolManualScaleFactor
   if ([Math]::Abs([double]$current) -lt [double]::Epsilon) { $current = 1.0 }
-  $ratio = $desiredChromeScale / [double]$current
+  $ratio = $desiredManualScale / [double]$current
 
   $contextDescription = 'unknown'
   try {
@@ -1299,18 +1312,18 @@ $applyWinFormsManualScale = {
 
   if ([Math]::Abs($ratio - 1.0) -gt 0.0001) {
     Write-Verbose (
-      "[DPI][WinForms] Scaling form by ratio {0:n3} from {1:n3} to {2:n3} ({3}) context={4}" -f 
-      $ratio, $current, $desiredChromeScale, $Source, $contextDescription
+      "[DPI][WinForms] Scaling form by ratio {0:n3} from {1:n3} to {2:n3} (dpi={3:n1}) context={4}" -f
+      $ratio, $current, $desiredManualScale, $currentDpi, $contextDescription
     ) -Verbose
     try { $form.Scale([float]$ratio) } catch {}
   } else {
     Write-Verbose (
-      "[DPI][WinForms] Scale already at target {0:n3} ({1}) context={2}" -f 
-      $desiredChromeScale, $Source, $contextDescription
+      "[DPI][WinForms] Scale already at target {0:n3} (dpi={1:n1}) context={2}" -f
+      $desiredManualScale, $currentDpi, $contextDescription
     ) -Verbose
   }
 
-  $script:NewAssetToolManualScaleFactor = $desiredChromeScale
+  $script:NewAssetToolManualScaleFactor = $desiredManualScale
 }
 $form.Text = "Inventory Assoc Finder - OMI"
 $statusPathLabelDefault = "Data: (not set)    |    Output: (not set)"
