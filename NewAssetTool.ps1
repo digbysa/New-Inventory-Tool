@@ -2498,6 +2498,35 @@ function Set-WebDocumentFieldValueLegacy {
   }
 }
 
+function Show-WebView2RuntimeInstructions {
+  param(
+    [string]$Reason = 'The Microsoft Edge WebView2 runtime could not be located.'
+  )
+  if($script:WebView2RuntimePrompted){ return }
+  $script:WebView2RuntimePrompted = $true
+  $newline = [Environment]::NewLine
+  $downloadUrl = 'https://go.microsoft.com/fwlink/p/?LinkId=2124703'
+  $messageLines = @(
+    $Reason,
+    '',
+    'Rounding auto-fill depends on the Microsoft Edge WebView2 runtime.',
+    'If it is already installed, open Apps & Features, search for "Microsoft Edge WebView2 Runtime", choose Modify, and run Repair. Restart the inventory tool afterwards.',
+    '',
+    'If it is missing or the repair fails, reinstall using the Evergreen Standalone installer:',
+    $downloadUrl
+  )
+  $message = ($messageLines -join $newline)
+  try {
+    [System.Windows.Forms.MessageBox]::Show(
+      $message,
+      'Fix Microsoft Edge WebView2 runtime',
+      [System.Windows.Forms.MessageBoxButtons]::OK,
+      [System.Windows.Forms.MessageBoxIcon]::Warning
+    ) | Out-Null
+  } catch {}
+  Write-Warning $message
+}
+
 function Ensure-WebView2Assemblies {
   if($script:WebView2AssemblyLoaded){ return $true }
   $loaded = $false
@@ -2509,11 +2538,13 @@ function Ensure-WebView2Assemblies {
     try { Add-Type -AssemblyName Microsoft.Web.WebView2.Core -ErrorAction SilentlyContinue } catch {}
   } else {
     $searchRoots = @()
-    foreach($base in @($env:ProgramFiles, ${env:ProgramFiles(x86)})){
+    foreach($base in @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:LOCALAPPDATA)){
       if([string]::IsNullOrWhiteSpace($base)){ continue }
       try {
         $candidate = Join-Path $base 'Microsoft\\EdgeWebView\\Application'
-        if(Test-Path $candidate){ $searchRoots += $candidate }
+        if(Test-Path $candidate -and -not ($searchRoots -contains $candidate)){
+          $searchRoots += $candidate
+        }
       } catch {}
     }
     foreach($root in $searchRoots){
@@ -2537,6 +2568,7 @@ function Ensure-WebView2Assemblies {
     $script:WebView2AssemblyLoaded = $true
     return $true
   }
+  Show-WebView2RuntimeInstructions
   return $false
 }
 
