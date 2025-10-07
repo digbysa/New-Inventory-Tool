@@ -1823,7 +1823,8 @@ $cmbChkStatus.MinimumSize = New-Object System.Drawing.Size(0,0)
 function Set-ComboPreferredWidth {
   param(
     [System.Windows.Forms.ComboBox]$Combo,
-    [int]$Padding = 15
+    [int]$Padding = 15,
+    [int]$AdditionalWidth = 0
   )
 
   $maxWidth = 0
@@ -1832,14 +1833,14 @@ function Set-ComboPreferredWidth {
     if($size.Width -gt $maxWidth){ $maxWidth = $size.Width }
   }
 
-  $desiredWidth = $maxWidth + $Padding
+  $desiredWidth = $maxWidth + $Padding + $AdditionalWidth
   $Combo.Width = $desiredWidth
   $Combo.MinimumSize = New-Object System.Drawing.Size($desiredWidth, 0)
   $Combo.DropDownWidth = [Math]::Max($Combo.DropDownWidth, $desiredWidth)
 }
 
-Set-ComboPreferredWidth -Combo $cmbMaintType
-Set-ComboPreferredWidth -Combo $cmbChkStatus
+Set-ComboPreferredWidth -Combo $cmbMaintType -AdditionalWidth 30
+Set-ComboPreferredWidth -Combo $cmbChkStatus -AdditionalWidth 100
 
 $lblTime=New-Object System.Windows.Forms.Label; $lblTime.Text="Rounding Time (min)"; $lblTime.AutoSize=$true
 $numTime=New-Object System.Windows.Forms.NumericUpDown; $numTime.Minimum=1; $numTime.Maximum=120; $numTime.Value=3; $numTime.Width=120
