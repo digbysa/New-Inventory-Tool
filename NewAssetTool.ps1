@@ -523,6 +523,8 @@ $script:RoundingEventColumns = @(
 )
 $script:RoundingWebsiteFieldOverrides = @{}
 $script:RoundingWebsiteIgnoredColumns = @('Timestamp','RoundingUrl')
+$script:ShowWebAutoFill = $false
+$script:WebView2AssemblyLoaded = $false
 # Tolerant header map + fast caches for Room validation
 $script:LocCols = @{}
 $script:RoomsNorm  = @()  # all normalized Room strings from LocationMaster*.csv
@@ -1982,13 +1984,16 @@ $numTime.Add_ValueChanged({
 $chkCable=New-Object System.Windows.Forms.CheckBox; $chkCable.Text="Validate Cable Management"; $chkCable.AutoSize=$true; $chkCable.TabIndex = 3
 $chkCableNeeded=New-Object System.Windows.Forms.CheckBox; $chkCableNeeded.Text="Cabling Needed"; $chkCableNeeded.AutoSize=$true; $chkCableNeeded.TabIndex = 4
 $chkCart=New-Object System.Windows.Forms.CheckBox; $chkCart.Text="Check Physical Cart Is Working"; $chkCart.AutoSize=$true; $chkCart.TabIndex = 5
-$chkLabels=New-Object System.Windows.Forms.CheckBox; $chkLabels.Text="Ensure monitor appropriately labelled"; $chkLabels.AutoSize=$true; $chkLabels.TabIndex = 6
-$chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate peripherals are connected and working"; $chkPeriph.AutoSize=$true; $chkPeriph.TabIndex = 7
+$chkShowWebAutoFill=New-Object System.Windows.Forms.CheckBox; $chkShowWebAutoFill.Text="Show web auto-fill"; $chkShowWebAutoFill.AutoSize=$true; $chkShowWebAutoFill.TabIndex = 6
+$chkLabels=New-Object System.Windows.Forms.CheckBox; $chkLabels.Text="Ensure monitor appropriately labelled"; $chkLabels.AutoSize=$true; $chkLabels.TabIndex = 7
+$chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate peripherals are connected and working"; $chkPeriph.AutoSize=$true; $chkPeriph.TabIndex = 8
+$chkShowWebAutoFill.Checked = $script:ShowWebAutoFill
+$chkShowWebAutoFill.Add_CheckedChanged({ $script:ShowWebAutoFill = $chkShowWebAutoFill.Checked })
 
-$btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Size='150,36'; $btnCheckComplete.TabIndex = 8
-$btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Size='132,36'; $btnSave.TabIndex = 9
-$btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 10
-$btnRoundNow=New-Object ModernUI.RoundedButton; $btnRoundNow.Text="Round Now"; $btnRoundNow.Size='132,36'; $btnRoundNow.Enabled=$false; $btnRoundNow.TabIndex = 11
+$btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Size='150,36'; $btnCheckComplete.TabIndex = 9
+$btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Size='132,36'; $btnSave.TabIndex = 10
+$btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 11
+$btnRoundNow=New-Object ModernUI.RoundedButton; $btnRoundNow.Text="Round Now"; $btnRoundNow.Size='132,36'; $btnRoundNow.Enabled=$false; $btnRoundNow.TabIndex = 12
 
 $btnCheckComplete.BackColor = [System.Drawing.SystemColors]::Control
 $btnCheckComplete.ForeColor = [System.Drawing.SystemColors]::ControlText
@@ -2057,7 +2062,7 @@ $rowChecks.Dock = 'Fill'
 $rowChecks.AutoSize = $true
 $rowChecks.AutoSizeMode = 'GrowAndShrink'
 $rowChecks.ColumnCount = 2
-$rowChecks.RowCount = 3
+$rowChecks.RowCount = 4
 $rowChecks.ColumnStyles.Clear()
 $rowChecks.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
 $rowChecks.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
@@ -2065,17 +2070,20 @@ $rowChecks.RowStyles.Clear()
 $rowChecks.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $rowChecks.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $rowChecks.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$rowChecks.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $rowChecks.Controls.Add($chkCable,0,0)
 $rowChecks.Controls.Add($chkCableNeeded,1,0)
 $rowChecks.Controls.Add($chkLabels,0,1)
 $rowChecks.Controls.Add($chkCart,1,1)
-$rowChecks.Controls.Add($chkPeriph,0,2)
+$rowChecks.Controls.Add($chkShowWebAutoFill,1,2)
+$rowChecks.Controls.Add($chkPeriph,0,3)
 $rowChecks.SetColumnSpan($chkPeriph,2)
 $rowChecks.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $chkCable.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
 $chkCableNeeded.Margin = New-Object System.Windows.Forms.Padding(12,0,0,0)
 $chkLabels.Margin = New-Object System.Windows.Forms.Padding(0,6,12,0)
 $chkCart.Margin = New-Object System.Windows.Forms.Padding(12,6,0,0)
+$chkShowWebAutoFill.Margin = New-Object System.Windows.Forms.Padding(12,6,0,0)
 $chkPeriph.Margin = New-Object System.Windows.Forms.Padding(0,6,0,0)
 
 $actionsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
@@ -2453,7 +2461,7 @@ function Apply-WebElementValue {
     }
   }
 }
-function Set-WebDocumentFieldValue {
+function Set-WebDocumentFieldValueLegacy {
   param(
     [Parameter(Mandatory=$true)] $Document,
     [Parameter(Mandatory=$true)] [string] $FieldName,
@@ -2489,6 +2497,252 @@ function Set-WebDocumentFieldValue {
     try { Apply-WebElementValue -Element $target -Value $Value } catch { Write-Verbose ("Failed to set field '$FieldName': " + $_.Exception.Message) -Verbose }
   }
 }
+
+function Ensure-WebView2Assemblies {
+  if($script:WebView2AssemblyLoaded){ return $true }
+  $loaded = $false
+  try {
+    Add-Type -AssemblyName Microsoft.Web.WebView2.WinForms -ErrorAction Stop
+    $loaded = $true
+  } catch {}
+  if($loaded){
+    try { Add-Type -AssemblyName Microsoft.Web.WebView2.Core -ErrorAction SilentlyContinue } catch {}
+  } else {
+    $searchRoots = @()
+    foreach($base in @($env:ProgramFiles, ${env:ProgramFiles(x86)})){
+      if([string]::IsNullOrWhiteSpace($base)){ continue }
+      try {
+        $candidate = Join-Path $base 'Microsoft\\EdgeWebView\\Application'
+        if(Test-Path $candidate){ $searchRoots += $candidate }
+      } catch {}
+    }
+    foreach($root in $searchRoots){
+      $versionDirs = @()
+      try { $versionDirs = Get-ChildItem -Path $root -Directory -ErrorAction Stop | Sort-Object Name -Descending } catch { continue }
+      foreach($dir in $versionDirs){
+        $dll = Join-Path $dir.FullName 'EBWebView\\Microsoft.Web.WebView2.WinForms.dll'
+        if(-not (Test-Path $dll)){ continue }
+        try {
+          Add-Type -Path $dll -ErrorAction Stop
+          $coreDll = Join-Path $dir.FullName 'EBWebView\\Microsoft.Web.WebView2.Core.dll'
+          if(Test-Path $coreDll){ try { Add-Type -Path $coreDll -ErrorAction SilentlyContinue } catch {} }
+          $loaded = $true
+          break
+        } catch {}
+      }
+      if($loaded){ break }
+    }
+  }
+  if($loaded){
+    $script:WebView2AssemblyLoaded = $true
+    return $true
+  }
+  return $false
+}
+
+function ConvertTo-JavaScriptLiteral {
+  param($Value)
+  try {
+    return (ConvertTo-Json -InputObject $Value -Compress)
+  } catch {
+    if($null -eq $Value){ return 'null' }
+    try { return (ConvertTo-Json -InputObject ('' + $Value) -Compress) } catch { return 'null' }
+  }
+}
+
+function Invoke-WebView2Script {
+  param(
+    [Parameter(Mandatory=$true)] $WebView,
+    [Parameter(Mandatory=$true)] [string] $Script
+  )
+  if(-not $WebView -or [string]::IsNullOrWhiteSpace($Script)){ return }
+  try {
+    $task = $WebView.ExecuteScriptAsync($Script)
+    if($task){ try { $null = $task.GetAwaiter().GetResult() } catch {} }
+  } catch {
+    Write-Verbose ("Failed to execute WebView2 script: " + $_.Exception.Message) -Verbose
+  }
+}
+
+function Invoke-WebView2FieldValue {
+  param(
+    [Parameter(Mandatory=$true)] $WebView,
+    [Parameter(Mandatory=$true)] [string] $FieldName,
+    $Value
+  )
+  if(-not $WebView){ return }
+  try { if(-not ($WebView.CoreWebView2)){ return } } catch { return }
+  $normalizedTarget = ($FieldName -replace '[^a-z0-9]','').ToLowerInvariant()
+  if([string]::IsNullOrWhiteSpace($normalizedTarget)){ return }
+  $stringValue = ConvertTo-WebFieldString $Value
+  if($null -eq $stringValue){ $stringValue = '' }
+  $valueIsBool = $false
+  $boolValue = $false
+  if($Value -is [bool]){
+    $valueIsBool = $true
+    $boolValue = [bool]$Value
+  }
+  $normalizedTargetLiteral = ConvertTo-JavaScriptLiteral $normalizedTarget
+  $stringValueLiteral = ConvertTo-JavaScriptLiteral $stringValue
+  $valueIsBoolLiteral = if($valueIsBool){ 'true' } else { 'false' }
+  $boolValueLiteral = if($boolValue){ 'true' } else { 'false' }
+  $script = @"
+(function(){
+  const normalizedTarget = $normalizedTargetLiteral;
+  if(!normalizedTarget){ return; }
+  const valueString = $stringValueLiteral;
+  const valueIsBool = $valueIsBoolLiteral;
+  const boolValue = $boolValueLiteral;
+  const stringValueText = valueString === null || valueString === undefined ? '' : String(valueString);
+  const stringValueLower = stringValueText.toLowerCase();
+  const hasStringValue = stringValueText.trim().length > 0;
+  function parseShouldCheck(){
+    if(valueIsBool){ return !!boolValue; }
+    if(!hasStringValue){ return false; }
+    return /^(1|true|yes|ok)$/i.test(stringValueText.trim());
+  }
+  function normalize(text){
+    return (text || '').toString().toLowerCase().replace(/[^a-z0-9]/g,'');
+  }
+  function trigger(el){
+    if(!el){ return; }
+    try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch(e) {}
+    try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch(e) {}
+  }
+  function apply(el){
+    if(!el){ return; }
+    const tag = (el.tagName || '').toLowerCase();
+    const type = (el.getAttribute && el.getAttribute('type') || '').toLowerCase();
+    const strValue = stringValueText;
+    switch(tag){
+      case 'input':
+        switch(type){
+          case 'checkbox':
+            el.checked = parseShouldCheck();
+            trigger(el);
+            break;
+          case 'radio':
+            const radioValue = (el.value || '').toString().toLowerCase();
+            let shouldCheck = false;
+            if(valueIsBool){
+              shouldCheck = !!boolValue;
+            } else if(hasStringValue){
+              shouldCheck = radioValue === stringValueLower;
+            }
+            if(shouldCheck){
+              el.checked = true;
+              trigger(el);
+            }
+            break;
+          default:
+            el.value = strValue;
+            trigger(el);
+            break;
+        }
+        break;
+      case 'select':
+        let matched = false;
+        const options = Array.from(el.options || []);
+        for(const opt of options){
+          if(!opt){ continue; }
+          const optValue = (opt.value || '').toString().toLowerCase();
+          const optText = (opt.text || '').toString().trim();
+          const optTextLower = optText.toLowerCase();
+          let shouldSelect = false;
+          if(hasStringValue){
+            if(optValue === stringValueLower || optTextLower === stringValueLower){
+              shouldSelect = true;
+            }
+          } else if(valueIsBool){
+            if(boolValue && /^(yes|true|ok|checked)$/i.test(optText)){
+              shouldSelect = true;
+            } else if(!boolValue && /^(no|false|unchecked)$/i.test(optText)){
+              shouldSelect = true;
+            }
+          }
+          if(shouldSelect){
+            opt.selected = true;
+            matched = true;
+          } else {
+            opt.selected = false;
+          }
+        }
+        if(!matched){
+          el.value = strValue;
+        }
+        trigger(el);
+        break;
+      case 'textarea':
+        el.value = strValue;
+        trigger(el);
+        break;
+      default:
+        if(hasStringValue){
+          if('value' in el){
+            try { el.value = strValue; } catch(e) {}
+          }
+          try { el.textContent = strValue; } catch(e) {}
+        }
+        break;
+    }
+  }
+  const preferred = [];
+  const fallback = [];
+  const tags = ['input','select','textarea'];
+  for(const tag of tags){
+    const elements = document.getElementsByTagName(tag);
+    for(let i=0; i<elements.length; i++){
+      const el = elements[i];
+      if(!el){ continue; }
+      const candidates = [
+        el.id || '',
+        el.getAttribute && el.getAttribute('name') || '',
+        el.getAttribute && el.getAttribute('data-field') || '',
+        el.getAttribute && el.getAttribute('aria-label') || '',
+        el.getAttribute && el.getAttribute('placeholder') || ''
+      ];
+      let exactMatch = false;
+      for(const candidate of candidates){
+        if(!candidate){ continue; }
+        const norm = normalize(candidate);
+        if(!norm){ continue; }
+        if(norm === normalizedTarget){
+          if(!preferred.includes(el)){ preferred.push(el); }
+          exactMatch = true;
+        } else if(norm.indexOf(normalizedTarget) !== -1){
+          if(!preferred.includes(el) && !fallback.includes(el)){ fallback.push(el); }
+        }
+      }
+      if(exactMatch){ break; }
+    }
+    if(preferred.length){ break; }
+  }
+  const targets = preferred.length ? preferred : fallback;
+  targets.forEach(apply);
+})();
+"@
+  Invoke-WebView2Script -WebView $WebView -Script $script
+}
+
+function Set-WebDocumentFieldValue {
+  param(
+    [Parameter(Mandatory=$true)] $Document,
+    [Parameter(Mandatory=$true)] [string] $FieldName,
+    $Value
+  )
+  if(-not $Document){ return }
+  $webViewType = $null
+  try { $webViewType = [Type]::GetType('Microsoft.Web.WebView2.WinForms.WebView2, Microsoft.Web.WebView2.WinForms') } catch {}
+  if($webViewType -and $Document -is $webViewType){
+    Invoke-WebView2FieldValue -WebView $Document -FieldName $FieldName -Value $Value
+    return
+  }
+  if($Document.PSObject.Properties['CoreWebView2'] -and $Document.PSObject.Methods['ExecuteScriptAsync']){
+    Invoke-WebView2FieldValue -WebView $Document -FieldName $FieldName -Value $Value
+    return
+  }
+  Set-WebDocumentFieldValueLegacy -Document $Document -FieldName $FieldName -Value $Value
+}
 # Derive which web form fields should be updated directly from the canonical
 # RoundingEvents export columns so the same metadata that drives the CSV also
 # powers the browser automation.
@@ -2522,30 +2776,73 @@ function Update-RoundingWebsite {
   if(-not $EventData){ return }
   $url = $EventData.RoundingUrl
   if([string]::IsNullOrWhiteSpace($url)){ return }
+  if(-not (Ensure-WebView2Assemblies)){
+    Write-Warning "Failed to load Microsoft Edge WebView2 runtime; unable to update rounding website."
+    return
+  }
   $form = $null
   $browser = $null
   $handler = $null
   $waiter = $null
   try {
     $form = New-Object System.Windows.Forms.Form
-    $form.ShowInTaskbar = $false
-    $form.WindowState = [System.Windows.Forms.FormWindowState]::Minimized
-    $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedToolWindow
-    $form.Opacity = 0
-    $browser = New-Object System.Windows.Forms.WebBrowser
-    $browser.ScriptErrorsSuppressed = $true
+    $form.Text = 'Rounding Web Auto-Fill'
+    $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+    $form.Size = New-Object System.Drawing.Size(1200,800)
+    $form.MinimumSize = New-Object System.Drawing.Size(600,400)
+    if($script:ShowWebAutoFill){
+      $form.ShowInTaskbar = $true
+      $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::SizableToolWindow
+      $form.WindowState = [System.Windows.Forms.FormWindowState]::Normal
+      $form.Opacity = 1
+    } else {
+      $form.ShowInTaskbar = $false
+      $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedToolWindow
+      $form.WindowState = [System.Windows.Forms.FormWindowState]::Minimized
+      $form.Opacity = 0
+    }
+    try {
+      $browserType = [Type]::GetType('Microsoft.Web.WebView2.WinForms.WebView2, Microsoft.Web.WebView2.WinForms', $true)
+    } catch {
+      throw 'Microsoft Edge WebView2 control is not available.'
+    }
+    if(-not $browserType){ throw 'Microsoft Edge WebView2 control is not available.' }
+    $browser = [System.Activator]::CreateInstance($browserType)
     $browser.Dock = 'Fill'
     $form.Controls.Add($browser)
     $waiter = New-Object System.Threading.AutoResetEvent($false)
-    $handler = [System.Windows.Forms.WebBrowserDocumentCompletedEventHandler]{
+    $form.Show()
+    [System.Windows.Forms.Application]::DoEvents()
+    $ensureTask = $null
+    try { $ensureTask = $browser.EnsureCoreWebView2Async() } catch {}
+    if($ensureTask){
+      try { $null = $ensureTask.GetAwaiter().GetResult() } catch { throw }
+    }
+    try {
+      if(-not $browser.CoreWebView2){ throw 'Failed to initialize Microsoft Edge WebView2.' }
+    } catch {
+      throw
+    }
+    try { $form.Text = "Rounding Web Auto-Fill - $url" } catch {}
+    if($script:ShowWebAutoFill){
+      try { $form.Activate() } catch {}
+    }
+    $handler = [System.EventHandler[Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs]]{
       param($sender,$eventArgs)
-      if($sender -and $sender.ReadyState -eq [System.Windows.Forms.WebBrowserReadyState]::Complete){
+      if($eventArgs -and $eventArgs.IsSuccess){
         $waiter.Set() | Out-Null
       }
     }
-    $browser.add_DocumentCompleted($handler)
-    $browser.Navigate($url)
-    $form.Show()
+    try { $browser.add_NavigationCompleted($handler) } catch {}
+    try {
+      if($browser.CoreWebView2){
+        $browser.CoreWebView2.Navigate($url)
+      } else {
+        $browser.Source = $url
+      }
+    } catch {
+      throw
+    }
     $timeout = [TimeSpan]::FromSeconds(30)
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     while($stopwatch.Elapsed -lt $timeout){
@@ -2553,22 +2850,20 @@ function Update-RoundingWebsite {
       [System.Windows.Forms.Application]::DoEvents()
     }
     $stopwatch.Stop()
-    $doc = $browser.Document
-    if(-not $doc){ return }
     $assignments = Get-RoundingWebsiteFieldAssignments -EventData $EventData
     foreach($assignment in $assignments){
       foreach($name in $assignment.Names){
-        Set-WebDocumentFieldValue -Document $doc -FieldName $name -Value $assignment.Value
+        Set-WebDocumentFieldValue -Document $browser -FieldName $name -Value $assignment.Value
       }
     }
   } catch {
     Write-Warning ("Failed to update rounding website: " + $_.Exception.Message)
   } finally {
     if($handler -and $browser){
-      try { $browser.remove_DocumentCompleted($handler) } catch {}
+      try { $browser.remove_NavigationCompleted($handler) } catch {}
     }
     if($browser){
-      try { $browser.Stop() } catch {}
+      try { if($browser.CoreWebView2){ $browser.CoreWebView2.Stop() } } catch {}
       try { $browser.Dispose() } catch {}
     }
     if($form){
