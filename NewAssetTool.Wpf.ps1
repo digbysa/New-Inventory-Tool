@@ -87,34 +87,13 @@ $form.Visible = $true
 
 $rootGrid = $window.FindName('RootGrid')
 $rootScaleTransform = $window.FindName('RootScaleTransform')
-$targetChromeScale = 0.8
-try {
-  $candidate = $null
-  if (Test-Path Variable:\global:NewAssetToolTargetChromeScale) {
-    $candidate = $global:NewAssetToolTargetChromeScale
-  } elseif (Test-Path Variable:\script:NewAssetToolTargetChromeScale) {
-    $candidate = $script:NewAssetToolTargetChromeScale
-  }
-  if ($null -ne $candidate) {
-    try { $targetChromeScale = [double]$candidate } catch {}
-  }
-} catch {}
 $applyWpfScale = {
-  param(
-    [string]$Source = 'unspecified',
-    [double]$dpiX = 0,
-    [double]$dpiY = 0
-  )
+  param([string]$Source = 'unspecified')
 
   if (-not $global:NewAssetToolPerMonitorDpiContextEnabled) { return }
   if (-not $rootScaleTransform) {
     Write-Verbose "[DPI][WPF] Root scale transform not located; skipping scale." -Verbose
     return
-  }
-
-  $effectiveTarget = $targetChromeScale
-  if (-not $effectiveTarget -or [double]::IsNaN([double]$effectiveTarget) -or $effectiveTarget -le 0) {
-    $effectiveTarget = 1.0
   }
 
   $contextDescription = 'unknown'
@@ -125,34 +104,10 @@ $applyWpfScale = {
   } catch {}
 
   try {
-    if ($dpiX -le 0 -or $dpiY -le 0) {
-      try {
-        if ($window) {
-          $presentationSource = [System.Windows.PresentationSource]::FromVisual($window)
-          if ($presentationSource -and $presentationSource.CompositionTarget) {
-            if ($dpiX -le 0) { $dpiX = 96.0 * $presentationSource.CompositionTarget.TransformToDevice.M11 }
-            if ($dpiY -le 0) { $dpiY = 96.0 * $presentationSource.CompositionTarget.TransformToDevice.M22 }
-          }
-        }
-      } catch {}
-    }
-
-    if ($dpiX -le 0) { $dpiX = 96.0 }
-    if ($dpiY -le 0) { $dpiY = 96.0 }
-
-    $scaleX = $effectiveTarget
-    $scaleY = $effectiveTarget
-
-    $dpiScaleX = $dpiX / 96.0
-    $dpiScaleY = $dpiY / 96.0
-    if ($dpiScaleX -gt 0) { $scaleX = $effectiveTarget / $dpiScaleX }
-    if ($dpiScaleY -gt 0) { $scaleY = $effectiveTarget / $dpiScaleY }
-
-    $rootScaleTransform.ScaleX = $scaleX
-    $rootScaleTransform.ScaleY = $scaleY
+    $rootScaleTransform.ScaleX = 0.8
+    $rootScaleTransform.ScaleY = 0.8
     Write-Verbose (
-      "[DPI][WPF] Applied root layout scale X={0:n3}, Y={1:n3} (dpiX={2:n1}, dpiY={3:n1}) ({4}) context={5}" -f
-      $scaleX, $scaleY, $dpiX, $dpiY, $Source, $contextDescription
+      "[DPI][WPF] Applied root layout scale 0.8 ({0}) context={1}" -f $Source, $contextDescription
     ) -Verbose
   } catch {
     Write-Verbose "[DPI][WPF] Failed to apply layout scale ({0}): $($_.Exception.Message)" -Verbose
@@ -161,10 +116,7 @@ $applyWpfScale = {
 
 if ($global:NewAssetToolPerMonitorDpiContextEnabled -and $window) {
   try {
-    $window.Add_DpiChanged({
-      param($sender,$eventArgs)
-      & $applyWpfScale 'Window.DpiChanged' $eventArgs.NewDpi.PixelsPerInchX $eventArgs.NewDpi.PixelsPerInchY
-    })
+    $window.Add_DpiChanged({ param($sender,$eventArgs) & $applyWpfScale 'Window.DpiChanged' })
   } catch {
     Write-Verbose "[DPI][WPF] Failed to attach DpiChanged handler: $($_.Exception.Message)" -Verbose
   }
