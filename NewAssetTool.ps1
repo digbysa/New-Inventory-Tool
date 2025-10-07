@@ -3174,6 +3174,54 @@ $pc.serial_number}else{$null}
   $rowOut = $row | Select-Object $script:RoundingEventColumns
   if(-not $exists){ $rowOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
   else { $rowOut | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
+  if($chkCableNeeded.Checked){
+    $excelPath = Join-Path $script:OutputFolder 'CablingNeeded.xlsx'
+    $excel = $null
+    $workbook = $null
+    $worksheet = $null
+    $excelPathExists = Test-Path $excelPath
+    try {
+      $excel = New-Object -ComObject Excel.Application
+      $excel.Visible = $false
+      $excel.DisplayAlerts = $false
+      if($excelPathExists){
+        $workbook = $excel.Workbooks.Open($excelPath)
+      } else {
+        $workbook = $excel.Workbooks.Add()
+        $worksheet = $workbook.Worksheets.Item(1)
+        $headers = @('Timestamp','Name','Asset Tag','Location','Room')
+        for($i = 0; $i -lt $headers.Count; $i++){
+          $worksheet.Cells.Item(1,$i + 1).Value2 = $headers[$i]
+        }
+      }
+      if(-not $worksheet){ $worksheet = $workbook.Worksheets.Item(1) }
+      $usedRange = $worksheet.UsedRange
+      $lastRow = $usedRange.Rows.Count
+      if($lastRow -eq 1 -and -not $worksheet.Cells.Item(1,1).Value2){ $lastRow = 0 }
+      $nextRow = $lastRow + 1
+      $worksheet.Cells.Item($nextRow,1).Value2 = $row.Timestamp
+      $worksheet.Cells.Item($nextRow,2).Value2 = $row.Name
+      $worksheet.Cells.Item($nextRow,3).Value2 = $row.AssetTag
+      $worksheet.Cells.Item($nextRow,4).Value2 = $row.Location
+      $worksheet.Cells.Item($nextRow,5).Value2 = $row.Room
+      if($excelPathExists){ $workbook.Save() }
+      else { $workbook.SaveAs($excelPath) }
+    } catch {
+      Write-Warning ("Failed to log cabling needed entry: " + $_.Exception.Message)
+    } finally {
+      if($worksheet){ [System.Runtime.InteropServices.Marshal]::ReleaseComObject($worksheet) | Out-Null }
+      if($workbook){
+        try { $workbook.Close($true) } catch {}
+        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook) | Out-Null
+      }
+      if($excel){
+        try { $excel.Quit() } catch {}
+        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel) | Out-Null
+      }
+      [System.GC]::Collect()
+      [System.GC]::WaitForPendingFinalizers()
+    }
+  }
   foreach($cb in @($chkCable,$chkCableNeeded,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked = $false }
   [System.Windows.Forms.MessageBox]::Show(("Saved rounding event to
 " + $file),"Save Event") | Out-Null
