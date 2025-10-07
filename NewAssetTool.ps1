@@ -1796,13 +1796,13 @@ $grpMaint.Margin = New-Object System.Windows.Forms.Padding($GAP)
 $grpMaint.Padding = New-Object System.Windows.Forms.Padding(12)
 
 $lblMaintType=New-Object System.Windows.Forms.Label; $lblMaintType.Text='Maintenance Type'; $lblMaintType.AutoSize=$true
-$cmbMaintType=New-Object System.Windows.Forms.ComboBox; $cmbMaintType.DropDownStyle='DropDownList'; $cmbMaintType.Dock='Fill'
+$cmbMaintType=New-Object System.Windows.Forms.ComboBox; $cmbMaintType.DropDownStyle='DropDownList'; $cmbMaintType.Dock='None'; $cmbMaintType.Anchor='Left'
 $cmbMaintType.Items.AddRange(@('Excluded','General Rounding','Mobile Cart','Critical Clinical'))
 $cmbMaintType.TabIndex = 0
-$cmbMaintType.MinimumSize = New-Object System.Drawing.Size(200,0)
+$cmbMaintType.MinimumSize = New-Object System.Drawing.Size(0,0)
 
 $lblChkStatus=New-Object System.Windows.Forms.Label; $lblChkStatus.Text="Check Status"; $lblChkStatus.AutoSize=$true
-$cmbChkStatus=New-Object System.Windows.Forms.ComboBox; $cmbChkStatus.DropDownStyle='DropDownList'; $cmbChkStatus.Dock='Fill'
+$cmbChkStatus=New-Object System.Windows.Forms.ComboBox; $cmbChkStatus.DropDownStyle='DropDownList'; $cmbChkStatus.Dock='None'; $cmbChkStatus.Anchor='Left'
 $cmbChkStatus.Items.AddRange(@(
   "Complete",
   "Inaccessible - Asset not found",
@@ -1812,14 +1812,34 @@ $cmbChkStatus.Items.AddRange(@(
   "Inaccessible - Other",
   "Inaccessible - Restricted area",
   "Inaccessible - Room locked - Card Swipe",
-  "Inaccessible - Room locked - Key Lock",
+ "Inaccessible - Room locked - Key Lock",
   "Inaccessible - Under renovation",
   "Inaccessible - User working at home",
   "Pending Repair"
 )); $cmbChkStatus.SelectedIndex=0
 $cmbChkStatus.TabIndex = 1
-$cmbChkStatus.MinimumSize = New-Object System.Drawing.Size(240,0)
-$cmbChkStatus.DropDownWidth = 360
+$cmbChkStatus.MinimumSize = New-Object System.Drawing.Size(0,0)
+
+function Set-ComboPreferredWidth {
+  param(
+    [System.Windows.Forms.ComboBox]$Combo,
+    [int]$Padding = 15
+  )
+
+  $maxWidth = 0
+  foreach($item in $Combo.Items){
+    $size = [System.Windows.Forms.TextRenderer]::MeasureText($item.ToString(), $Combo.Font)
+    if($size.Width -gt $maxWidth){ $maxWidth = $size.Width }
+  }
+
+  $desiredWidth = $maxWidth + $Padding
+  $Combo.Width = $desiredWidth
+  $Combo.MinimumSize = New-Object System.Drawing.Size($desiredWidth, 0)
+  $Combo.DropDownWidth = [Math]::Max($Combo.DropDownWidth, $desiredWidth)
+}
+
+Set-ComboPreferredWidth -Combo $cmbMaintType
+Set-ComboPreferredWidth -Combo $cmbChkStatus
 
 $lblTime=New-Object System.Windows.Forms.Label; $lblTime.Text="Rounding Time (min)"; $lblTime.AutoSize=$true
 $numTime=New-Object System.Windows.Forms.NumericUpDown; $numTime.Minimum=1; $numTime.Maximum=120; $numTime.Value=3; $numTime.Width=120
@@ -1863,22 +1883,23 @@ $rowCombos = New-Object System.Windows.Forms.TableLayoutPanel
 $rowCombos.Dock = 'Fill'
 $rowCombos.AutoSize = $true
 $rowCombos.AutoSizeMode = 'GrowAndShrink'
-$rowCombos.ColumnCount = 2
-$rowCombos.RowCount = 2
+$rowCombos.ColumnCount = 4
+$rowCombos.RowCount = 1
 $rowCombos.ColumnStyles.Clear()
 $rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $rowCombos.RowStyles.Clear()
-$rowCombos.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $rowCombos.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $rowCombos.Controls.Add($lblMaintType,0,0)
 $rowCombos.Controls.Add($cmbMaintType,1,0)
-$rowCombos.Controls.Add($lblChkStatus,0,1)
-$rowCombos.Controls.Add($cmbChkStatus,1,1)
+$rowCombos.Controls.Add($lblChkStatus,2,0)
+$rowCombos.Controls.Add($cmbChkStatus,3,0)
 $lblMaintType.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
-$cmbMaintType.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
-$lblChkStatus.Margin = New-Object System.Windows.Forms.Padding(0,8,12,0)
-$cmbChkStatus.Margin = New-Object System.Windows.Forms.Padding(0,4,0,0)
+$cmbMaintType.Margin = New-Object System.Windows.Forms.Padding(0,0,24,0)
+$lblChkStatus.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
+$cmbChkStatus.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 
 $rowTime = New-Object System.Windows.Forms.TableLayoutPanel
 $rowTime.Dock = 'Fill'
