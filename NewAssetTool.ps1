@@ -1465,13 +1465,12 @@ Add-SummaryRow -LabelText 'Detected Type:' -Control $txtType -IsFirst $true -Lab
 $nameRow = New-Object System.Windows.Forms.TableLayoutPanel
 $nameRow.AutoSize = $true
 $nameRow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
-$nameRow.ColumnCount = 3
+$nameRow.ColumnCount = 2
 $nameRow.RowCount = 1
-$nameRow.Margin = New-Object System.Windows.Forms.Padding(12,8,0,0)
+$nameRow.Margin = New-Object System.Windows.Forms.Padding(0,8,0,0)
 $nameRow.ColumnStyles.Clear()
 $nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$nameRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $nameRow.RowStyles.Clear()
 $nameRow.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $nameRow.Dock = 'Fill'
@@ -1487,10 +1486,23 @@ $btnCopyHost.UseVisualStyleBackColor = $false
 $btnCopyHost.Cursor = [System.Windows.Forms.Cursors]::Hand
 $nameRow.Controls.Add($btnCopyHost,0,0)
 
+$nameValueRow = New-Object System.Windows.Forms.TableLayoutPanel
+$nameValueRow.AutoSize = $true
+$nameValueRow.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+$nameValueRow.ColumnCount = 2
+$nameValueRow.RowCount = 1
+$nameValueRow.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+$nameValueRow.ColumnStyles.Clear()
+$nameValueRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+$nameValueRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$nameValueRow.RowStyles.Clear()
+$nameValueRow.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$nameValueRow.Dock = 'Fill'
+
 $txtHost = New-SummaryTextBox
 $txtHost.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 $txtHost.Dock = 'Fill'
-$nameRow.Controls.Add($txtHost,1,0)
+$nameValueRow.Controls.Add($txtHost,0,0)
 
 $btnFixName = New-Object ModernUI.RoundedButton
 $btnFixName.Text = "Fix"
@@ -1498,7 +1510,9 @@ $btnFixName.Size = '60,24'
 $btnFixName.Anchor = 'Top,Right'
 $btnFixName.Margin = New-Object System.Windows.Forms.Padding(6,0,0,0)
 $btnFixName.Enabled = $false
-$nameRow.Controls.Add($btnFixName,2,0)
+$nameValueRow.Controls.Add($btnFixName,1,0)
+
+$nameRow.Controls.Add($nameValueRow,1,0)
 $tip.SetToolTip($btnCopyHost, 'Copy host name to clipboard')
 $btnCopyHost.Add_Click({
   $textToCopy = $txtHost.Text
