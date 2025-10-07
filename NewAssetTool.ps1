@@ -2561,13 +2561,40 @@ function Get-ProposedParentToken($cand,$parentRec){
   }
   return $parentRec.asset_tag
 }
+function Get-ParentDisplayName([string]$token,$fallbackRec=$null){
+  if([string]::IsNullOrWhiteSpace($token)){ return '(none)' }
+  $trimmed = $token.Trim()
+  if($fallbackRec -and $fallbackRec.asset_tag){
+    $fallbackKey = $fallbackRec.asset_tag.Trim().ToUpper()
+    if($trimmed.Trim().ToUpper() -eq $fallbackKey -and -not [string]::IsNullOrWhiteSpace($fallbackRec.name)){
+      return $fallbackRec.name
+    }
+  }
+  $key = $trimmed.ToUpper()
+  if($script:IndexByAsset.ContainsKey($key)){
+    $parentRec = $script:IndexByAsset[$key]
+    if($parentRec -and -not [string]::IsNullOrWhiteSpace($parentRec.name)){
+      return $parentRec.name
+    }
+  }
+  return $trimmed
+}
 function Get-PeripheralLinkPreview($cand,$parentRec){
-  if(-not $cand){ return [pscustomobject]@{ Name=''; Parent='' } }
-  $previewParent = Get-ProposedParentToken $cand $parentRec
-  $previewName = $cand.name
+  if(-not $cand){
+    return [pscustomobject]@{
+      ProposedName          = ''
+      ProposedParentToken   = ''
+      ProposedParentDisplay = ''
+    }
+  }
+  $previewParentToken = Get-ProposedParentToken $cand $parentRec
   $proposedName = Compute-ProposedName $cand $parentRec
-  if(-not [string]::IsNullOrWhiteSpace($proposedName)){ $previewName = $proposedName }
-  return [pscustomobject]@{ Name=$previewName; Parent=$previewParent }
+  $parentDisplay = Get-ParentDisplayName $previewParentToken $parentRec
+  return [pscustomobject]@{
+    ProposedName          = $proposedName
+    ProposedParentToken   = $previewParentToken
+    ProposedParentDisplay = if([string]::IsNullOrWhiteSpace($parentDisplay)){ '' } else { $parentDisplay }
+  }
 }
 function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[string]$oldParent,[string]$newParent,[string]$oldName,[string]$newName){
   $out = if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder}
@@ -2668,13 +2695,13 @@ function Show-AddPeripheralDialog($parentRec){
   $tblPreview.AutoSize = $true
   $tblPreview.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $tblPreview.ColumnCount = 2
-  $tblPreview.RowCount = 9
+  $tblPreview.RowCount = 7
   $tblPreview.Dock = 'Top'
   $tblPreview.ColumnStyles.Clear()
   $tblPreview.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)) )
   $tblPreview.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)) )
   $tblPreview.RowStyles.Clear()
-  for($i=0;$i -lt 9;$i++){ [void]$tblPreview.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) ) }
+  for($i=0;$i -lt 7;$i++){ [void]$tblPreview.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) ) }
 
   $createLabel = {
     param($text)
@@ -2692,33 +2719,62 @@ function Show-AddPeripheralDialog($parentRec){
   }
 
   $lblTypeVal = & $createValue
-  $lblNameVal = & $createValue
-  $lblProposedNameVal = & $createValue
-  $lblParentVal = & $createValue
-  $lblProposedParentVal = & $createValue
+  $lblNameCurrentVal = & $createValue
+  $lblNameProposedVal = & $createValue
+  $lblParentCurrentVal = & $createValue
+  $lblParentProposedVal = & $createValue
   $lblAssetVal = & $createValue
   $lblSerialVal = & $createValue
   $lblRITMVal = & $createValue
   $lblRetireVal = & $createValue
 
+  $createArrow = {
+    $lbl = New-Object System.Windows.Forms.Label
+    $lbl.AutoSize = $true
+    $lbl.Margin = '6,0,6,4'
+    $lbl.Text = '---->'
+    $lbl.Visible = $false
+    return $lbl
+  }
+
+  $lblNameArrow = & $createArrow
+  $nameValuePanel = New-Object System.Windows.Forms.FlowLayoutPanel
+  $nameValuePanel.AutoSize = $true
+  $nameValuePanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $nameValuePanel.FlowDirection = 'LeftToRight'
+  $nameValuePanel.WrapContents = $false
+  $nameValuePanel.Margin = '0,0,0,0'
+  $nameValuePanel.Padding = '0,0,0,0'
+  $nameValuePanel.Controls.Add($lblNameCurrentVal)
+  $nameValuePanel.Controls.Add($lblNameArrow)
+  $nameValuePanel.Controls.Add($lblNameProposedVal)
+
+  $lblParentArrow = & $createArrow
+  $parentValuePanel = New-Object System.Windows.Forms.FlowLayoutPanel
+  $parentValuePanel.AutoSize = $true
+  $parentValuePanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $parentValuePanel.FlowDirection = 'LeftToRight'
+  $parentValuePanel.WrapContents = $false
+  $parentValuePanel.Margin = '0,0,0,0'
+  $parentValuePanel.Padding = '0,0,0,0'
+  $parentValuePanel.Controls.Add($lblParentCurrentVal)
+  $parentValuePanel.Controls.Add($lblParentArrow)
+  $parentValuePanel.Controls.Add($lblParentProposedVal)
+
   $tblPreview.Controls.Add((& $createLabel 'Type:'),0,0)
   $tblPreview.Controls.Add($lblTypeVal,1,0)
   $tblPreview.Controls.Add((& $createLabel 'Name:'),0,1)
-  $tblPreview.Controls.Add($lblNameVal,1,1)
-  $tblPreview.Controls.Add((& $createLabel 'Proposed Name:'),0,2)
-  $tblPreview.Controls.Add($lblProposedNameVal,1,2)
-  $tblPreview.Controls.Add((& $createLabel 'Current Parent:'),0,3)
-  $tblPreview.Controls.Add($lblParentVal,1,3)
-  $tblPreview.Controls.Add((& $createLabel 'Proposed Parent:'),0,4)
-  $tblPreview.Controls.Add($lblProposedParentVal,1,4)
-  $tblPreview.Controls.Add((& $createLabel 'Asset Tag:'),0,5)
-  $tblPreview.Controls.Add($lblAssetVal,1,5)
-  $tblPreview.Controls.Add((& $createLabel 'Serial Number:'),0,6)
-  $tblPreview.Controls.Add($lblSerialVal,1,6)
-  $tblPreview.Controls.Add((& $createLabel 'RITM:'),0,7)
-  $tblPreview.Controls.Add($lblRITMVal,1,7)
-  $tblPreview.Controls.Add((& $createLabel 'Retire:'),0,8)
-  $tblPreview.Controls.Add($lblRetireVal,1,8)
+  $tblPreview.Controls.Add($nameValuePanel,1,1)
+  $tblPreview.Controls.Add((& $createLabel 'Parent:'),0,2)
+  $tblPreview.Controls.Add($parentValuePanel,1,2)
+  $tblPreview.Controls.Add((& $createLabel 'Asset Tag:'),0,3)
+  $tblPreview.Controls.Add($lblAssetVal,1,3)
+  $tblPreview.Controls.Add((& $createLabel 'Serial Number:'),0,4)
+  $tblPreview.Controls.Add($lblSerialVal,1,4)
+  $tblPreview.Controls.Add((& $createLabel 'RITM:'),0,5)
+  $tblPreview.Controls.Add($lblRITMVal,1,5)
+  $tblPreview.Controls.Add((& $createLabel 'Retire:'),0,6)
+  $tblPreview.Controls.Add($lblRetireVal,1,6)
 
   $grpPreview.Controls.Add($tblPreview)
 
@@ -2755,10 +2811,12 @@ function Show-AddPeripheralDialog($parentRec){
   $layout.Controls.Add($buttonPanel,0,2)
   $dialog.Controls.Add($layout)
 
-  $valueLabels = @($lblTypeVal,$lblNameVal,$lblProposedNameVal,$lblParentVal,$lblProposedParentVal,$lblAssetVal,$lblSerialVal,$lblRITMVal,$lblRetireVal)
+  $valueLabels = @($lblTypeVal,$lblNameCurrentVal,$lblNameProposedVal,$lblParentCurrentVal,$lblParentProposedVal,$lblAssetVal,$lblSerialVal,$lblRITMVal,$lblRetireVal)
   $lookupResult = $null
   $clearPreview = {
     foreach($lbl in $valueLabels){ $lbl.Text = '' }
+    $lblNameArrow.Visible = $false
+    $lblParentArrow.Visible = $false
     $btnDialogAdd.Enabled = $false
   }
   $applyPreview = {
@@ -2772,22 +2830,33 @@ function Show-AddPeripheralDialog($parentRec){
       return
     }
     $lblTypeVal.Text = if($cand.Type){ $cand.Type } else { $cand.Kind }
-    $lblNameVal.Text = $cand.name
+    $lblNameCurrentVal.Text = if($cand.name){ $cand.name } else { '' }
     $lblAssetVal.Text = $cand.asset_tag
     $lblSerialVal.Text = $cand.serial_number
-    if([string]::IsNullOrWhiteSpace($cand.u_parent_asset)){ $lblParentVal.Text = '(none)' } else { $lblParentVal.Text = $cand.u_parent_asset }
+    $lblRITMVal.Text = $cand.RITM
+    $lblRetireVal.Text = Fmt-DateLong $cand.Retire
+    $lblParentCurrentVal.Text = Get-ParentDisplayName $cand.u_parent_asset
     $preview = Get-PeripheralLinkPreview $cand $parentRec
+    $proposedName = ''
+    $proposedParentDisplay = ''
     if($preview){
-      if($preview.Name){ $lblProposedNameVal.Text = $preview.Name }
-      if($preview.Parent){ $lblProposedParentVal.Text = $preview.Parent }
+      if(-not [string]::IsNullOrWhiteSpace($preview.ProposedName)){
+        $proposedName = $preview.ProposedName
+      }
+      if(-not [string]::IsNullOrWhiteSpace($preview.ProposedParentDisplay)){
+        $proposedParentDisplay = $preview.ProposedParentDisplay
+      }
     }
-    if([string]::IsNullOrWhiteSpace($lblProposedParentVal.Text) -and -not [string]::IsNullOrWhiteSpace($lblParentVal.Text)){
-      $lblProposedParentVal.Text = $lblParentVal.Text
+    if([string]::IsNullOrWhiteSpace($proposedName)){
+      $proposedName = $lblNameCurrentVal.Text
     }
-    if($cand.Type -eq 'Monitor'){
-      $lblRITMVal.Text = $cand.RITM
-      $lblRetireVal.Text = Fmt-DateLong $cand.Retire
+    $lblNameProposedVal.Text = $proposedName
+    $lblNameArrow.Visible = -not [string]::IsNullOrWhiteSpace($proposedName)
+    if([string]::IsNullOrWhiteSpace($proposedParentDisplay)){
+      $proposedParentDisplay = $lblParentCurrentVal.Text
     }
+    $lblParentProposedVal.Text = $proposedParentDisplay
+    $lblParentArrow.Visible = -not [string]::IsNullOrWhiteSpace($proposedParentDisplay)
     if($cand.Kind -eq 'Peripheral'){ $btnDialogAdd.Enabled = $true }
   }
 
