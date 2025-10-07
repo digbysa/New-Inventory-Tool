@@ -3163,7 +3163,7 @@ $dgv.Add_CellDoubleClick({
   }
 })
 $btnCheckComplete.Add_Click({
-  $checkboxes = @($chkCable,$chkCableNeeded,$chkLabels,$chkPeriph,$chkCart)
+  $checkboxes = @($chkCable,$chkLabels,$chkPeriph,$chkCart)
   $enabledBoxes = $checkboxes | Where-Object { $_.Enabled }
   $allEnabledChecked = $false
   if($enabledBoxes.Count -gt 0){
