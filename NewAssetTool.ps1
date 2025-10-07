@@ -1863,6 +1863,54 @@ $lblTime=New-Object System.Windows.Forms.Label; $lblTime.Text="Rounding Time (mi
 $numTime=New-Object System.Windows.Forms.NumericUpDown; $numTime.Minimum=1; $numTime.Maximum=120; $numTime.Value=3; $numTime.Width=120
 $numTime.TabIndex = 2
 
+$script:RoundingBaseMinutes = 3
+$script:RoundingStartTime = $null
+$script:RoundingTimer = New-Object System.Windows.Forms.Timer
+$script:RoundingTimer.Interval = 1000
+
+function Stop-RoundingTimer {
+  if ($script:RoundingTimer) { $script:RoundingTimer.Stop() }
+  $script:RoundingStartTime = $null
+}
+
+function Set-RoundingTimerBase {
+  if (-not $numTime) { return }
+  try {
+    $base = [decimal]$script:RoundingBaseMinutes
+    if ($base -lt $numTime.Minimum) { $base = $numTime.Minimum }
+    if ($base -gt $numTime.Maximum) { $base = $numTime.Maximum }
+    if ($numTime.Value -ne $base) { $numTime.Value = $base }
+  } catch {}
+}
+
+function Reset-RoundingTimer {
+  Stop-RoundingTimer
+  Set-RoundingTimerBase
+}
+
+function Start-RoundingTimer {
+  Stop-RoundingTimer
+  Set-RoundingTimerBase
+  $script:RoundingStartTime = [DateTime]::UtcNow
+  if ($script:RoundingTimer) { $script:RoundingTimer.Start() }
+}
+
+$script:RoundingTimer.Add_Tick({
+  $start = $script:RoundingStartTime
+  if (-not $start) { return }
+  $elapsed = [DateTime]::UtcNow - $start
+  $elapsedMinutes = [math]::Floor($elapsed.TotalMinutes)
+  $target = [decimal]$script:RoundingBaseMinutes
+  if ($elapsedMinutes -ge $script:RoundingBaseMinutes) {
+    $max = [double]$numTime.Maximum
+    $target = [decimal]([math]::Min($elapsedMinutes, $max))
+  }
+  $current = [decimal]$numTime.Value
+  if ($target -gt $current) {
+    $numTime.Value = $target
+  }
+})
+
 $chkCable=New-Object System.Windows.Forms.CheckBox; $chkCable.Text="Validate Cable Management"; $chkCable.AutoSize=$true; $chkCable.TabIndex = 3
 $chkCableNeeded=New-Object System.Windows.Forms.CheckBox; $chkCableNeeded.Text="Cabling Needed"; $chkCableNeeded.AutoSize=$true; $chkCableNeeded.TabIndex = 4
 $chkCart=New-Object System.Windows.Forms.CheckBox; $chkCart.Text="Check Physical Cart Is Working"; $chkCart.AutoSize=$true; $chkCart.TabIndex = 5
@@ -2387,7 +2435,11 @@ function Make-Card($title,$kvPairs,[System.Drawing.Color]$ritmColor,[bool]$showR
       if(-not $rec -and $ids.name){
         foreach($k in (HostnameKeyVariants $ids.name)){ if($script:IndexByName.ContainsKey($k)){ $rec = $script:IndexByName[$k]; break } }
       }
-      if($rec){ $par = Resolve-ParentComputer $rec; Populate-UI $rec $par }
+      if($rec){
+        $par = Resolve-ParentComputer $rec
+        Populate-UI $rec $par
+        Start-RoundingTimer
+      }
     }
   })
   $lblTitle = New-Object System.Windows.Forms.Label
@@ -3043,13 +3095,20 @@ function Focus-ScanInput(){
   }
 }
 function Do-Lookup(){
+  Stop-RoundingTimer
   $raw = Find-RecordRaw $txtScan.Text
-  if(-not $raw){ $statusLabel.Text=("No match for '" + $txtScan.Text + "'"); return }
+  if(-not $raw){
+    Reset-RoundingTimer
+    $statusLabel.Text=("No match for '" + $txtScan.Text + "'")
+    return
+  }
   $parent = Resolve-ParentComputer $raw
   Populate-UI $raw $parent
+  Start-RoundingTimer
   $statusLabel.Text=("Found " + $raw.Kind + " / " + $raw.Type)
 }
 function Clear-UI(){
+  Reset-RoundingTimer
   $script:CurrentDisplay = $null; $script:CurrentParent  = $null
   foreach($tb in @($txtType,$txtHost,$txtAT,$txtSN,$txtParent,$txtRITM,$txtRetire,$txtRound,$txtCity,$txtLocation,$txtBldg,$txtFloor,$txtRoom,$txtDept,$txtDepartment,$txtComments)){
     if($tb -is [System.Windows.Forms.Control]){
@@ -3114,7 +3173,11 @@ $dgv.Add_CellDoubleClick({
   if(-not $rec -and $name){
     foreach($k in (HostnameKeyVariants $name)){ if($script:IndexByName.ContainsKey($k)){ $rec=$script:IndexByName[$k]; break } }
   }
-  if($rec){ $par=Resolve-ParentComputer $rec; Populate-UI $rec $par }
+  if($rec){
+    $par=Resolve-ParentComputer $rec
+    Populate-UI $rec $par
+    Start-RoundingTimer
+  }
 })
 $btnCheckComplete.Add_Click({
   $checkboxes = @($chkCable,$chkCableNeeded,$chkLabels,$chkPeriph,$chkCart)
@@ -3138,6 +3201,7 @@ $btnCheckComplete.Add_Click({
   }
 })
 $btnSave.Add_Click({
+  Stop-RoundingTimer
   $out = $script:OutputFolder
   if(-not (Test-Path $out)){ New-Item -ItemType Directory -Path $out -Force | Out-Null }
 $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
@@ -3191,6 +3255,54 @@ $pc.serial_number}else{$null}
   $rowOut = $row | Select-Object $script:RoundingEventColumns
   if(-not $exists){ $rowOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
   else { $rowOut | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
+  if($chkCableNeeded.Checked){
+    $excelPath = Join-Path $script:OutputFolder 'CablingNeeded.xlsx'
+    $excel = $null
+    $workbook = $null
+    $worksheet = $null
+    $excelPathExists = Test-Path $excelPath
+    try {
+      $excel = New-Object -ComObject Excel.Application
+      $excel.Visible = $false
+      $excel.DisplayAlerts = $false
+      if($excelPathExists){
+        $workbook = $excel.Workbooks.Open($excelPath)
+      } else {
+        $workbook = $excel.Workbooks.Add()
+        $worksheet = $workbook.Worksheets.Item(1)
+        $headers = @('Timestamp','Name','Asset Tag','Location','Room')
+        for($i = 0; $i -lt $headers.Count; $i++){
+          $worksheet.Cells.Item(1,$i + 1).Value2 = $headers[$i]
+        }
+      }
+      if(-not $worksheet){ $worksheet = $workbook.Worksheets.Item(1) }
+      $usedRange = $worksheet.UsedRange
+      $lastRow = $usedRange.Rows.Count
+      if($lastRow -eq 1 -and -not $worksheet.Cells.Item(1,1).Value2){ $lastRow = 0 }
+      $nextRow = $lastRow + 1
+      $worksheet.Cells.Item($nextRow,1).Value2 = $row.Timestamp
+      $worksheet.Cells.Item($nextRow,2).Value2 = $row.Name
+      $worksheet.Cells.Item($nextRow,3).Value2 = $row.AssetTag
+      $worksheet.Cells.Item($nextRow,4).Value2 = $row.Location
+      $worksheet.Cells.Item($nextRow,5).Value2 = $row.Room
+      if($excelPathExists){ $workbook.Save() }
+      else { $workbook.SaveAs($excelPath) }
+    } catch {
+      Write-Warning ("Failed to log cabling needed entry: " + $_.Exception.Message)
+    } finally {
+      if($worksheet){ [System.Runtime.InteropServices.Marshal]::ReleaseComObject($worksheet) | Out-Null }
+      if($workbook){
+        try { $workbook.Close($true) } catch {}
+        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook) | Out-Null
+      }
+      if($excel){
+        try { $excel.Quit() } catch {}
+        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel) | Out-Null
+      }
+      [System.GC]::Collect()
+      [System.GC]::WaitForPendingFinalizers()
+    }
+  }
   foreach($cb in @($chkCable,$chkCableNeeded,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked = $false }
   [System.Windows.Forms.MessageBox]::Show(("Saved rounding event to
 " + $file),"Save Event") | Out-Null
@@ -3927,6 +4039,7 @@ $dgvNearby.Add_CellDoubleClick({
   if ($rec) {
     $par = Resolve-ParentComputer $rec
     Populate-UI $rec $par
+    Start-RoundingTimer
     $tabTop.SelectedTab = $tabPageMain
   }
 })
