@@ -1846,6 +1846,54 @@ $lblTime=New-Object System.Windows.Forms.Label; $lblTime.Text="Rounding Time (mi
 $numTime=New-Object System.Windows.Forms.NumericUpDown; $numTime.Minimum=1; $numTime.Maximum=120; $numTime.Value=3; $numTime.Width=120
 $numTime.TabIndex = 2
 
+$script:RoundingBaseMinutes = 3
+$script:RoundingStartTime = $null
+$script:RoundingTimer = New-Object System.Windows.Forms.Timer
+$script:RoundingTimer.Interval = 1000
+
+function Stop-RoundingTimer {
+  if ($script:RoundingTimer) { $script:RoundingTimer.Stop() }
+  $script:RoundingStartTime = $null
+}
+
+function Set-RoundingTimerBase {
+  if (-not $numTime) { return }
+  try {
+    $base = [decimal]$script:RoundingBaseMinutes
+    if ($base -lt $numTime.Minimum) { $base = $numTime.Minimum }
+    if ($base -gt $numTime.Maximum) { $base = $numTime.Maximum }
+    if ($numTime.Value -ne $base) { $numTime.Value = $base }
+  } catch {}
+}
+
+function Reset-RoundingTimer {
+  Stop-RoundingTimer
+  Set-RoundingTimerBase
+}
+
+function Start-RoundingTimer {
+  Stop-RoundingTimer
+  Set-RoundingTimerBase
+  $script:RoundingStartTime = [DateTime]::UtcNow
+  if ($script:RoundingTimer) { $script:RoundingTimer.Start() }
+}
+
+$script:RoundingTimer.Add_Tick({
+  $start = $script:RoundingStartTime
+  if (-not $start) { return }
+  $elapsed = [DateTime]::UtcNow - $start
+  $elapsedMinutes = [math]::Floor($elapsed.TotalMinutes)
+  $target = [decimal]$script:RoundingBaseMinutes
+  if ($elapsedMinutes -ge $script:RoundingBaseMinutes) {
+    $max = [double]$numTime.Maximum
+    $target = [decimal]([math]::Min($elapsedMinutes, $max))
+  }
+  $current = [decimal]$numTime.Value
+  if ($target -gt $current) {
+    $numTime.Value = $target
+  }
+})
+
 $chkCable=New-Object System.Windows.Forms.CheckBox; $chkCable.Text="Validate Cable Management"; $chkCable.AutoSize=$true; $chkCable.TabIndex = 3
 $chkCableNeeded=New-Object System.Windows.Forms.CheckBox; $chkCableNeeded.Text="Cabling Needed"; $chkCableNeeded.AutoSize=$true; $chkCableNeeded.TabIndex = 4
 $chkCart=New-Object System.Windows.Forms.CheckBox; $chkCart.Text="Check Physical Cart Is Working"; $chkCart.AutoSize=$true; $chkCart.TabIndex = 5
@@ -2370,7 +2418,11 @@ function Make-Card($title,$kvPairs,[System.Drawing.Color]$ritmColor,[bool]$showR
       if(-not $rec -and $ids.name){
         foreach($k in (HostnameKeyVariants $ids.name)){ if($script:IndexByName.ContainsKey($k)){ $rec = $script:IndexByName[$k]; break } }
       }
-      if($rec){ $par = Resolve-ParentComputer $rec; Populate-UI $rec $par }
+      if($rec){
+        $par = Resolve-ParentComputer $rec
+        Populate-UI $rec $par
+        Start-RoundingTimer
+      }
     }
   })
   $lblTitle = New-Object System.Windows.Forms.Label
@@ -3026,13 +3078,20 @@ function Focus-ScanInput(){
   }
 }
 function Do-Lookup(){
+  Stop-RoundingTimer
   $raw = Find-RecordRaw $txtScan.Text
-  if(-not $raw){ $statusLabel.Text=("No match for '" + $txtScan.Text + "'"); return }
+  if(-not $raw){
+    Reset-RoundingTimer
+    $statusLabel.Text=("No match for '" + $txtScan.Text + "'")
+    return
+  }
   $parent = Resolve-ParentComputer $raw
   Populate-UI $raw $parent
+  Start-RoundingTimer
   $statusLabel.Text=("Found " + $raw.Kind + " / " + $raw.Type)
 }
 function Clear-UI(){
+  Reset-RoundingTimer
   $script:CurrentDisplay = $null; $script:CurrentParent  = $null
   foreach($tb in @($txtType,$txtHost,$txtAT,$txtSN,$txtParent,$txtRITM,$txtRetire,$txtRound,$txtCity,$txtLocation,$txtBldg,$txtFloor,$txtRoom,$txtDept,$txtDepartment,$txtComments)){
     if($tb -is [System.Windows.Forms.Control]){
@@ -3097,7 +3156,11 @@ $dgv.Add_CellDoubleClick({
   if(-not $rec -and $name){
     foreach($k in (HostnameKeyVariants $name)){ if($script:IndexByName.ContainsKey($k)){ $rec=$script:IndexByName[$k]; break } }
   }
-  if($rec){ $par=Resolve-ParentComputer $rec; Populate-UI $rec $par }
+  if($rec){
+    $par=Resolve-ParentComputer $rec
+    Populate-UI $rec $par
+    Start-RoundingTimer
+  }
 })
 $btnCheckComplete.Add_Click({
   $checkboxes = @($chkCable,$chkCableNeeded,$chkLabels,$chkPeriph,$chkCart)
@@ -3121,6 +3184,7 @@ $btnCheckComplete.Add_Click({
   }
 })
 $btnSave.Add_Click({
+  Stop-RoundingTimer
   $out = $script:OutputFolder
   if(-not (Test-Path $out)){ New-Item -ItemType Directory -Path $out -Force | Out-Null }
 $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
@@ -3958,6 +4022,7 @@ $dgvNearby.Add_CellDoubleClick({
   if ($rec) {
     $par = Resolve-ParentComputer $rec
     Populate-UI $rec $par
+    Start-RoundingTimer
     $tabTop.SelectedTab = $tabPageMain
   }
 })
