@@ -1021,12 +1021,29 @@ function Save-DepartmentUserAdd([string]$dept){
     if([string]::IsNullOrWhiteSpace($dept)){ return }
     $n = Normalize-Field $dept
     if($script:DepartmentListNorm.Contains($n)){ return }
-    $fileDU = $null; try { if($script:DataFolder){ $fileDU = Join-Path $script:DataFolder 'DepartmentMaster-UserAdds.csv' } } catch {}
-    if(-not $fileDU -or -not (Test-Path $fileDU)){
-      try { $fileDU = Join-Path $PSScriptRoot 'Data/DepartmentMaster-UserAdds.csv' } catch {}
+    $fileDU = $null
+    try {
+      if($script:DataFolder){ $fileDU = Join-Path $script:DataFolder 'DepartmentMaster-UserAdds.csv' }
+    } catch {}
+    if(-not $fileDU){
+      try {
+        $dataFolder = Join-Path $PSScriptRoot 'Data'
+        if(-not (Test-Path $dataFolder)){
+          try { New-Item -Path $dataFolder -ItemType Directory -Force | Out-Null } catch {}
+        }
+        $fileDU = Join-Path $dataFolder 'DepartmentMaster-UserAdds.csv'
+      } catch {}
     }
-    if(-not $fileDU -or -not (Test-Path $fileDU)){
+    if(-not $fileDU){
       try { $fileDU = 'DepartmentMaster-UserAdds.csv' } catch {}
+    }
+    if($fileDU){
+      try {
+        $dir = Split-Path -Path $fileDU -Parent
+        if($dir -and -not (Test-Path $dir)){
+          try { New-Item -Path $dir -ItemType Directory -Force | Out-Null } catch {}
+        }
+      } catch {}
     }
     $exists = Test-Path $fileDU
     $row = [pscustomobject]@{ Department = $dept }
