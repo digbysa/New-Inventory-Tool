@@ -1850,6 +1850,7 @@ $script:RoundingBaseMinutes = 3
 $script:RoundingStartTime = $null
 $script:RoundingTimer = New-Object System.Windows.Forms.Timer
 $script:RoundingTimer.Interval = 1000
+$script:IsUpdatingRoundingTime = $false
 
 function Stop-RoundingTimer {
   if ($script:RoundingTimer) { $script:RoundingTimer.Stop() }
@@ -1862,7 +1863,11 @@ function Set-RoundingTimerBase {
     $base = [decimal]$script:RoundingBaseMinutes
     if ($base -lt $numTime.Minimum) { $base = $numTime.Minimum }
     if ($base -gt $numTime.Maximum) { $base = $numTime.Maximum }
-    if ($numTime.Value -ne $base) { $numTime.Value = $base }
+    if ($numTime.Value -ne $base) {
+      $script:IsUpdatingRoundingTime = $true
+      try { $numTime.Value = $base }
+      finally { $script:IsUpdatingRoundingTime = $false }
+    }
   } catch {}
 }
 
@@ -1890,8 +1895,18 @@ $script:RoundingTimer.Add_Tick({
   }
   $current = [decimal]$numTime.Value
   if ($target -gt $current) {
-    $numTime.Value = $target
+    $script:IsUpdatingRoundingTime = $true
+    try { $numTime.Value = $target }
+    finally { $script:IsUpdatingRoundingTime = $false }
   }
+})
+
+$numTime.Add_ValueChanged({
+  if ($script:IsUpdatingRoundingTime) { return }
+  try {
+    $script:RoundingBaseMinutes = [decimal]$numTime.Value
+  } catch {}
+  Stop-RoundingTimer
 })
 
 $chkCable=New-Object System.Windows.Forms.CheckBox; $chkCable.Text="Validate Cable Management"; $chkCable.AutoSize=$true; $chkCable.TabIndex = 3
