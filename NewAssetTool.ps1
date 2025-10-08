@@ -82,6 +82,7 @@ $script:NewAssetToolSearchTextBox = $null
 function Set-ScanSearchControl {
   param([object]$control)
   $script:NewAssetToolSearchTextBox = $control
+  try { Update-RoundNowButtonState } catch {}
 }
 # ===== Script directory resolver (robust, PS 5.1-safe) =====
 function Get-OwnScriptDir {
@@ -519,7 +520,7 @@ $script:NewAssetToolMainForm = $null
 $script:RoundingEventColumns = @(
   'Timestamp','AssetTag','Name','Serial','City','Location','Building','Floor','Room',
   'CheckStatus','RoundingMinutes','CableMgmtOK','CablingNeeded','LabelOK','CartOK','PeripheralsOK',
-  'MaintenanceType','Department','RoundingUrl','Comments'
+  'MaintenanceType','Department','RoundingUrl','Comments','Rounded'
 )
 # Tolerant header map + fast caches for Room validation
 $script:LocCols = @{}
@@ -1961,6 +1962,7 @@ $chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate p
 $btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Size='150,36'; $btnCheckComplete.TabIndex = 8
 $btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Size='132,36'; $btnSave.TabIndex = 9
 $btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 10
+$btnRoundNow=New-Object ModernUI.RoundedButton; $btnRoundNow.Text="Round Now"; $btnRoundNow.Size='140,36'; $btnRoundNow.TabIndex = 11
 
 $btnCheckComplete.BackColor = [System.Drawing.SystemColors]::Control
 $btnCheckComplete.ForeColor = [System.Drawing.SystemColors]::ControlText
@@ -1968,9 +1970,11 @@ $btnSave.BackColor = [System.Drawing.SystemColors]::Control
 $btnSave.ForeColor = [System.Drawing.SystemColors]::ControlText
 $btnManualRound.BackColor = [System.Drawing.SystemColors]::Control
 $btnManualRound.ForeColor = [System.Drawing.SystemColors]::ControlText
+$btnRoundNow.BackColor = [System.Drawing.SystemColors]::Control
+$btnRoundNow.ForeColor = [System.Drawing.SystemColors]::ControlText
 
-$lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 11
-$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=12; $txtComments.WordWrap = $true
+$lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 12
+$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=13; $txtComments.WordWrap = $true
 
 $layoutMaint = New-Object System.Windows.Forms.TableLayoutPanel
 $layoutMaint.Dock = 'Fill'
@@ -2057,10 +2061,27 @@ $actionsPanel.FlowDirection = 'LeftToRight'
 $actionsPanel.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $btnCheckComplete.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
 $btnSave.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
-$btnManualRound.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+$btnManualRound.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
+$btnRoundNow.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 $actionsPanel.Controls.Add($btnCheckComplete)
 $actionsPanel.Controls.Add($btnSave)
 $actionsPanel.Controls.Add($btnManualRound)
+$actionsPanel.Controls.Add($btnRoundNow)
+
+function Update-RoundNowButtonState {
+  try {
+    if(-not $btnRoundNow){ return }
+    $text = $null
+    if($txtScan){
+      $text = $txtScan.Text
+    }
+    if(-not $text -and $script:NewAssetToolSearchTextBox){
+      try { $text = $script:NewAssetToolSearchTextBox.Text } catch { $text = $null }
+    }
+    $btnRoundNow.Enabled = [string]::IsNullOrWhiteSpace($text)
+  } catch { }
+}
+Update-RoundNowButtonState
 
 $lblComments.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $txtComments.Margin = New-Object System.Windows.Forms.Padding(0,4,0,0)
@@ -3251,7 +3272,12 @@ function Clear-UI(){
 }
 # ---- Events ----
 $txtScan.Add_KeyDown({ if($_.KeyCode -eq 'Enter'){ Do-Lookup; $_.SuppressKeyPress=$true } })
-$txtScan.Add_TextChanged({ if([string]::IsNullOrWhiteSpace($txtScan.Text)){ Clear-UI } })
+$txtScan.Add_TextChanged({
+  if([string]::IsNullOrWhiteSpace($txtScan.Text)){
+    Clear-UI
+  }
+  try { Update-RoundNowButtonState } catch {}
+})
 $btnEditLoc.Add_Click({ Toggle-EditLocation })
 $btnAddPeripheral.Add_Click({
   $pc = $script:CurrentParent
@@ -3360,6 +3386,7 @@ $pc.serial_number}else{$null}
     Department       = $deptValue
     RoundingUrl      = $url
     Comments         = $txtComments.Text
+    Rounded          = 'No'
   }
   $cmbDept.Visible = $false  # Hidden until Edit Location is active
   $rowOut = $row | Select-Object $script:RoundingEventColumns
@@ -3521,31 +3548,19 @@ function Ensure-RoundingCommentsColumn([string]$file){
   try {
     if([string]::IsNullOrWhiteSpace($file)){ return }
     if(-not (Test-Path $file)){ return }
-    $header = $null
-    try { $header = Get-Content -Path $file -TotalCount 1 -Encoding UTF8 } catch { $header = $null }
-    if($header -and $header -match '(^|,)"?Comments"?(,|$)'){ return }
     $rows = @()
     try { $rows = Import-Csv -Path $file } catch { $rows = @() }
-    $columns = @()
-    if($rows -and $rows.Count -gt 0){
-      $columns = @($rows[0].PSObject.Properties.Name)
-    } elseif($header){
-      $columns = @($header -split ',')
-    }
     $targetColumns = @($script:RoundingEventColumns)
-    if(-not $columns -or $columns.Count -eq 0){
-      $columns = $targetColumns
-    } else {
-      foreach($col in $targetColumns){
-        if(-not ($columns -contains $col)){
-          $columns += $col
-        }
-      }
-    }
+    $columns = $targetColumns
     if($rows -and $rows.Count -gt 0){
       foreach($r in $rows){
         if(-not $r.PSObject.Properties['Comments']){
           $r | Add-Member -NotePropertyName Comments -NotePropertyValue '' -Force
+        }
+        if(-not $r.PSObject.Properties['Rounded']){
+          $r | Add-Member -NotePropertyName Rounded -NotePropertyValue 'No' -Force
+        } elseif([string]::IsNullOrWhiteSpace($r.Rounded)){
+          try { $r.Rounded = 'No' } catch {}
         }
         if(-not $r.PSObject.Properties['CablingNeeded']){
           $r | Add-Member -NotePropertyName CablingNeeded -NotePropertyValue $false -Force
@@ -4211,6 +4226,7 @@ if ($pc) {
       Department       = $row.Cells['Department'].Value
       RoundingUrl      = $url
       Comments         = ''
+      Rounded          = 'No'
     }
     $evOut = $ev | Select-Object $script:RoundingEventColumns
     if (-not $exists) { $evOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }

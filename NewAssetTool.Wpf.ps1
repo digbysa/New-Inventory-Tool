@@ -161,6 +161,7 @@ if ($searchTextBox) {
     if ($txtScan -and $txtScan.Text -ne $sender.Text) {
       $txtScan.Text = $sender.Text
     }
+    try { Update-RoundNowButtonState } catch {}
   })
   $searchTextBox.Add_KeyDown({
     param($sender,$eventArgs)
