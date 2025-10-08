@@ -4039,6 +4039,7 @@ function Should-Include-PC-InScopes($pc){
   if (-not $pc) { return $false }
   $k = ScopeKey $null $pc.location $null $null
   if (-not $k) { return $false }
+  if (-not $script:ActiveNearbyScopes) { return $false }
   return $script:ActiveNearbyScopes.Contains($k)
 }
 
