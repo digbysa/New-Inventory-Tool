@@ -3338,32 +3338,18 @@ $btnCheckComplete.Add_Click({
 })
 $btnSave.Add_Click({
   Stop-RoundingTimer
-  $basePath = if($script:OutputFolder){ $script:OutputFolder } else { $script:DataFolder }
-  if([string]::IsNullOrWhiteSpace($basePath)){
-    [System.Windows.Forms.MessageBox]::Show("Output folder is not configured. Unable to save rounding event.","Save Event") | Out-Null
-    Focus-ScanInput
-    return
-  }
-  if(-not (Test-Path $basePath)){ New-Item -ItemType Directory -Path $basePath -Force | Out-Null }
-  $file = Join-Path $basePath 'RoundingEvents.csv'
+  $out = $script:OutputFolder
+  if(-not (Test-Path $out)){ New-Item -ItemType Directory -Path $out -Force | Out-Null }
+$file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
   $exists = Test-Path $file
   if($exists){ Ensure-RoundingCommentsColumn $file }
   $pc = $script:CurrentParent
   if(-not $pc){ $pc = Resolve-ParentComputer (Find-RecordRaw $txtAT.Text) }
   if(-not $pc){ $pc = $script:CurrentDisplay }
-  $isExcluded = $false
+  $url = $null
   if($pc){
-    try {
-      $mt = ('' + $pc.u_device_rounding).Trim()
-      if($mt -match '^(?i)Excluded$') { $isExcluded = $true }
-    } catch {}
-  }
-  if($isExcluded -and -not $chkShowExcluded.Checked){
-    [System.Windows.Forms.MessageBox]::Show("This device is marked as Excluded from rounding.","Save Event") | Out-Null
-    Focus-ScanInput
-    return
-  }
-  $url = if($pc){ Get-RoundingUrlForParent $pc } else { $null }
+      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
+ $url = Get-RoundingUrlForParent $pc }
   $deptValue = ''
   if($cmbDept -and $cmbDept.Text){ $deptValue = $cmbDept.Text }
   elseif($txtDept -and $txtDept.Text){ $deptValue = $txtDept.Text }
@@ -3375,9 +3361,15 @@ $btnSave.Add_Click({
   }
   $row = [pscustomobject]@{
     Timestamp        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-    AssetTag         = if($pc){ $pc.asset_tag } else { $null }
-    Name             = if($pc){ $pc.name } else { $null }
-    Serial           = if($pc){ $pc.serial_number } else { $null }
+    AssetTag         = if($pc){
+      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
+$pc.asset_tag}else{$null}
+    Name             = if($pc){
+      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
+$pc.name}else{$null}
+    Serial           = if($pc){
+      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
+$pc.serial_number}else{$null}
     City             = $txtCity.Text
     Location         = $txtLocation.Text
     Building         = $txtBldg.Text
@@ -3390,7 +3382,7 @@ $btnSave.Add_Click({
     LabelOK          = if ($chkLabels.Checked) { 'Yes' } else { 'No' }
     CartOK           = if ($chkCart.Checked) { 'Yes' } else { 'No' }
     PeripheralsOK    = if ($chkPeriph.Checked) { 'Yes' } else { 'No' }
-    MaintenanceType  = $cmbMaintType.Text
+    MaintenanceType = $cmbMaintType.Text
     Department       = $deptValue
     RoundingUrl      = $url
     Comments         = $txtComments.Text
@@ -3401,8 +3393,7 @@ $btnSave.Add_Click({
   if(-not $exists){ $rowOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
   else { $rowOut | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
   if($chkCableNeeded.Checked){
-    $excelBase = if($script:OutputFolder){ $script:OutputFolder } else { $basePath }
-    $excelPath = Join-Path $excelBase 'CablingNeeded.xlsx'
+    $excelPath = Join-Path $script:OutputFolder 'CablingNeeded.xlsx'
     $excel = $null
     $workbook = $null
     $worksheet = $null
@@ -4059,12 +4050,8 @@ function Get-RoundingStatusColor([Nullable[DateTime]]$dt){
   return [System.Drawing.Color]::MistyRose
 }
 function Rebuild-Nearby {
-  if(-not $dgvNearby){
-    Update-ScopeLabel
-    return
-  }
-  try { $dgvNearby.SuspendLayout() } catch {}
-  try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
+try { $dgvNearby.SuspendLayout() } catch {}
+try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   try { Write-Host ("Rebuild-Nearby: Active scopes=" + ($(if($script:ActiveNearbyScopes){$script:ActiveNearbyScopes.Count}else{0}))) } catch {}
   Load-RoundingEvents
   $todaySet = Get-RoundedToday-Set
