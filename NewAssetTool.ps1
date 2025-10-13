@@ -84,6 +84,7 @@ function Set-ScanSearchControl {
   $script:NewAssetToolSearchTextBox = $control
 }
 
+$script:DeviceTypeSummaryControl = $null
 $script:SearchTextButtonStates = @{}
 $script:RoundNowDisabledTooltip = 'The search bar needs to be empty to use this feature.'
 
@@ -101,13 +102,30 @@ function Get-CurrentSearchInputText {
   return ''
 }
 
+function Get-CurrentDeviceTypeText {
+  try {
+    if ($script:DeviceTypeSummaryControl) {
+      return '' + $script:DeviceTypeSummaryControl.Text
+    }
+  } catch {}
+  try {
+    if ($txtType) {
+      return '' + $txtType.Text
+    }
+  } catch {}
+  return ''
+}
+
 function Update-SearchDependentButtonStates {
-  $text = Get-CurrentSearchInputText
-  $isEmpty = [string]::IsNullOrWhiteSpace($text)
+  $searchText = Get-CurrentSearchInputText
+  $isSearchEmpty = [string]::IsNullOrWhiteSpace($searchText)
+
+  $deviceTypeText = Get-CurrentDeviceTypeText
+  $hasDeviceType = -not [string]::IsNullOrWhiteSpace($deviceTypeText)
 
   if ($btnRoundNow) {
     try {
-      $shouldEnableRoundNow = $isEmpty
+      $shouldEnableRoundNow = $isSearchEmpty
       if ($btnRoundNow.Enabled -ne $shouldEnableRoundNow) {
         $btnRoundNow.Enabled = $shouldEnableRoundNow
       }
@@ -123,7 +141,7 @@ function Update-SearchDependentButtonStates {
     if (-not $button) { continue }
     try {
       $baseEnabled = [bool]$entry.BaseEnabled
-      $shouldEnable = (-not $isEmpty) -and $baseEnabled
+      $shouldEnable = $hasDeviceType -and $baseEnabled
       if ($button.Enabled -ne $shouldEnable) {
         $button.Enabled = $shouldEnable
       }
@@ -1678,6 +1696,14 @@ function Add-SummaryRow {
 
 $txtType = New-SummaryTextBox -IsFirst $true
 Add-SummaryRow -LabelText 'Detected Type:' -Control $txtType -IsFirst $true -LabelTopMargin 0
+
+$script:DeviceTypeSummaryControl = $txtType
+try {
+  $txtType.Add_TextChanged({
+    try { Update-SearchDependentButtonStates } catch {}
+  })
+} catch {}
+try { Update-SearchDependentButtonStates } catch {}
 
 $nameRow = New-Object System.Windows.Forms.TableLayoutPanel
 $nameRow.AutoSize = $true
