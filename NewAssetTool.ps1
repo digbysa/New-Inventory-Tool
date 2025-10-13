@@ -83,6 +83,76 @@ function Set-ScanSearchControl {
   param([object]$control)
   $script:NewAssetToolSearchTextBox = $control
 }
+
+$script:SearchTextButtonStates = @{}
+$script:RoundNowDisabledTooltip = 'The search bar needs to be empty to use this feature.'
+
+function Get-CurrentSearchInputText {
+  try {
+    if ($script:NewAssetToolSearchTextBox) {
+      return '' + $script:NewAssetToolSearchTextBox.Text
+    }
+  } catch {}
+  try {
+    if ($txtScan) {
+      return '' + $txtScan.Text
+    }
+  } catch {}
+  return ''
+}
+
+function Update-SearchDependentButtonStates {
+  $text = Get-CurrentSearchInputText
+  $isEmpty = [string]::IsNullOrWhiteSpace($text)
+
+  if ($btnRoundNow) {
+    try {
+      $shouldEnableRoundNow = $isEmpty
+      if ($btnRoundNow.Enabled -ne $shouldEnableRoundNow) {
+        $btnRoundNow.Enabled = $shouldEnableRoundNow
+      }
+      if ($tip) {
+        $tooltipText = if ($shouldEnableRoundNow) { '' } else { $script:RoundNowDisabledTooltip }
+        $tip.SetToolTip($btnRoundNow, $tooltipText)
+      }
+    } catch {}
+  }
+
+  foreach ($entry in $script:SearchTextButtonStates.Values) {
+    $button = $entry.Button
+    if (-not $button) { continue }
+    try {
+      $baseEnabled = [bool]$entry.BaseEnabled
+      $shouldEnable = (-not $isEmpty) -and $baseEnabled
+      if ($button.Enabled -ne $shouldEnable) {
+        $button.Enabled = $shouldEnable
+      }
+    } catch {}
+  }
+}
+
+function Update-RoundNowButtonState {
+  Update-SearchDependentButtonStates
+}
+
+function Set-SearchTextButtonBaseState {
+  param(
+    [System.Windows.Forms.Control]$Button,
+    [bool]$BaseEnabled
+  )
+
+  if (-not $Button) { return }
+  $key = $null
+  try { $key = [System.Runtime.CompilerServices.RuntimeHelpers]::GetHashCode($Button) } catch {}
+  if ($null -eq $key) {
+    try { $key = $Button.GetHashCode() } catch { return }
+  }
+  $script:SearchTextButtonStates[$key] = [PSCustomObject]@{
+    Button = $Button
+    BaseEnabled = [bool]$BaseEnabled
+  }
+  try { Update-RoundNowButtonState } catch {}
+}
 # ===== Script directory resolver (robust, PS 5.1-safe) =====
 function Get-OwnScriptDir {
   try {
@@ -1891,6 +1961,9 @@ $assocButtonsPanel.Padding = '0,4,0,0'
 $assocButtonsPanel.Controls.Add($btnAddPeripheral)
 $assocButtonsPanel.Controls.Add($btnRemove)
 $assocToolbarPanel.Controls.Add($assocButtonsPanel)
+
+Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled $false
+Set-SearchTextButtonBaseState -Button $btnRemove -BaseEnabled $true
 $assocGridPanel = New-Object System.Windows.Forms.Panel
 $assocGridPanel.Dock = 'Fill'
 $assocGridPanel.Margin = '0,0,0,0'
@@ -2095,6 +2168,8 @@ $btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave
 $btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 10
 $btnRoundNow=New-Object ModernUI.RoundedButton; $btnRoundNow.Text="Round Now"; $btnRoundNow.Size='140,36'; $btnRoundNow.Enabled=$false; $btnRoundNow.TabIndex = 11
 
+Set-SearchTextButtonBaseState -Button $btnSave -BaseEnabled $true
+
 $btnCheckComplete.BackColor = [System.Drawing.SystemColors]::Control
 $btnCheckComplete.ForeColor = [System.Drawing.SystemColors]::ControlText
 $btnSave.BackColor = [System.Drawing.SystemColors]::Control
@@ -2103,21 +2178,6 @@ $btnManualRound.BackColor = [System.Drawing.SystemColors]::Control
 $btnManualRound.ForeColor = [System.Drawing.SystemColors]::ControlText
 $btnRoundNow.BackColor = [System.Drawing.SystemColors]::Control
 $btnRoundNow.ForeColor = [System.Drawing.SystemColors]::ControlText
-
-function Update-RoundNowButtonState {
-  if(-not $btnRoundNow){ return }
-  try {
-    $text = ''
-    if ($script:NewAssetToolSearchTextBox) {
-      $text = '' + $script:NewAssetToolSearchTextBox.Text
-    } elseif ($txtScan) {
-      $text = '' + $txtScan.Text
-    }
-    $btnRoundNow.Enabled = [string]::IsNullOrWhiteSpace($text)
-  } catch {
-    try { $btnRoundNow.Enabled = $false } catch {}
-  }
-}
 
 $lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 12
 $txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=13; $txtComments.WordWrap = $true
@@ -3151,7 +3211,7 @@ function Populate-UI($displayRec,$parentRec){
   if($parentRec){ Refresh-AssocViews $parentRec }
   Update-CartCheckbox-State $parentRec
   Update-ManualRoundButton   $parentRec
-  if($btnAddPeripheral){ $btnAddPeripheral.Enabled = [bool]$parentRec }
+  if($btnAddPeripheral){ Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled ([bool]$parentRec) }
   Validate-ParentAndName $displayRec $parentRec
   Update-FixNameButton $displayRec $parentRec
 }
@@ -3399,7 +3459,7 @@ function Clear-UI(){
   Update-ManualRoundButton $null; Update-CartCheckbox-State $null
   foreach($cb in @($chkCable,$chkCableNeeded,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked=$false }
   $btnFixName.Enabled = $false
-  if($btnAddPeripheral){ $btnAddPeripheral.Enabled = $false }
+  if($btnAddPeripheral){ Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled $false }
   $statusLabel.Text = "Ready - scan or enter a device."
   Size-AssocForRows(1) | Out-Null
 }
