@@ -124,6 +124,14 @@ namespace ModernUI
   {
     public int CornerRadius { get; set; }
 
+    private Color _baseBackColor;
+    private Color _hoverBackColor;
+    private bool _isHovering;
+    private Color _enabledForeColor;
+    private bool _hasEnabledForeColor;
+    private bool _suppressForeColorTracking;
+    private readonly Color _disabledForeColor = Color.FromArgb(160, 160, 160);
+
     public RoundedButton()
     {
         FlatStyle = FlatStyle.Flat;
@@ -131,6 +139,12 @@ namespace ModernUI
         UseVisualStyleBackColor = false;
         CornerRadius = 12;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+
+        _baseBackColor = BackColor;
+        _hoverBackColor = CalculateHoverColor(_baseBackColor);
+        _enabledForeColor = ForeColor;
+        _hasEnabledForeColor = true;
+        UpdateEnabledStateVisuals();
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -172,8 +186,7 @@ namespace ModernUI
             }
 
             TextFormatFlags format = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis;
-            Color textColor = Enabled ? ForeColor : ControlPaint.Dark(ForeColor);
-            TextRenderer.DrawText(e.Graphics, Text, Font, bounds, textColor, format);
+            TextRenderer.DrawText(e.Graphics, Text, Font, bounds, ForeColor, format);
         }
     }
 
@@ -184,6 +197,15 @@ namespace ModernUI
 
     protected override void OnBackColorChanged(EventArgs e)
     {
+        if (!_isHovering)
+        {
+            UpdateBaseBackColor(BackColor);
+        }
+        else
+        {
+            _hoverBackColor = CalculateHoverColor(_baseBackColor);
+        }
+
         base.OnBackColorChanged(e);
         Invalidate();
     }
@@ -191,6 +213,11 @@ namespace ModernUI
     protected override void OnForeColorChanged(EventArgs e)
     {
         base.OnForeColorChanged(e);
+        if (!_suppressForeColorTracking && Enabled)
+        {
+            _enabledForeColor = ForeColor;
+            _hasEnabledForeColor = true;
+        }
         Invalidate();
     }
 
@@ -203,7 +230,92 @@ namespace ModernUI
     protected override void OnEnabledChanged(EventArgs e)
     {
         base.OnEnabledChanged(e);
+        UpdateEnabledStateVisuals();
         Invalidate();
+    }
+
+    protected override void OnMouseEnter(EventArgs e)
+    {
+        base.OnMouseEnter(e);
+        if (!Enabled)
+        {
+            return;
+        }
+
+        _isHovering = true;
+        Cursor = Cursors.Hand;
+        BackColor = _hoverBackColor;
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        if (_isHovering)
+        {
+            _isHovering = false;
+            BackColor = _baseBackColor;
+        }
+
+        base.OnMouseLeave(e);
+    }
+
+    private static Color CalculateHoverColor(Color color)
+    {
+        return ControlPaint.Light(color);
+    }
+
+    private void UpdateBaseBackColor(Color color)
+    {
+        _baseBackColor = color;
+        _hoverBackColor = CalculateHoverColor(color);
+    }
+
+    private void UpdateEnabledStateVisuals()
+    {
+        _isHovering = false;
+        BackColor = _baseBackColor;
+
+        if (Enabled)
+        {
+            Cursor = Cursors.Hand;
+            RestoreEnabledForeColor();
+        }
+        else
+        {
+            Cursor = Cursors.Default;
+            ApplyDisabledForeColor();
+        }
+    }
+
+    private void ApplyDisabledForeColor()
+    {
+        _suppressForeColorTracking = true;
+        try
+        {
+            base.ForeColor = _disabledForeColor;
+        }
+        finally
+        {
+            _suppressForeColorTracking = false;
+        }
+    }
+
+    private void RestoreEnabledForeColor()
+    {
+        if (!_hasEnabledForeColor)
+        {
+            _enabledForeColor = SystemColors.ControlText;
+            _hasEnabledForeColor = true;
+        }
+
+        _suppressForeColorTracking = true;
+        try
+        {
+            base.ForeColor = _enabledForeColor;
+        }
+        finally
+        {
+            _suppressForeColorTracking = false;
+        }
     }
 
     private static GraphicsPath CreatePath(Rectangle rect, int radius)
@@ -385,7 +497,11 @@ function Set-ModernTheme {
         try { $ctl.FlatStyle = 'Standard' } catch {}
         try { $ctl.UseVisualStyleBackColor = $true } catch {}
         $ctl.BackColor = [System.Drawing.SystemColors]::Control
-        $ctl.ForeColor = [System.Drawing.SystemColors]::ControlText
+        if ($ctl.Enabled) {
+          $ctl.ForeColor = [System.Drawing.SystemColors]::ControlText
+        } else {
+          $ctl.ForeColor = [System.Drawing.Color]::FromArgb(160,160,160)
+        }
         if ($ctl -is [ModernUI.RoundedButton]) {
           $ctl.CornerRadius = 4
         }
@@ -1513,6 +1629,22 @@ $btnCopyHost.Margin = New-Object System.Windows.Forms.Padding(0,0,2,0)
 $btnCopyHost.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
 $btnCopyHost.UseVisualStyleBackColor = $true
 $btnCopyHost.Cursor = [System.Windows.Forms.Cursors]::Hand
+$btnCopyHost.Add_EnabledChanged({
+  param($sender,$eventArgs)
+  if ($sender.Enabled) {
+    $sender.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $sender.ForeColor = [System.Drawing.SystemColors]::ControlText
+  } else {
+    $sender.Cursor = [System.Windows.Forms.Cursors]::Default
+    $sender.ForeColor = [System.Drawing.Color]::FromArgb(160,160,160)
+  }
+})
+if ($btnCopyHost.Enabled) {
+  $btnCopyHost.ForeColor = [System.Drawing.SystemColors]::ControlText
+} else {
+  $btnCopyHost.Cursor = [System.Windows.Forms.Cursors]::Default
+  $btnCopyHost.ForeColor = [System.Drawing.Color]::FromArgb(160,160,160)
+}
 $nameRow.Controls.Add($btnCopyHost,0,0)
 
 $nameValueRow = New-Object System.Windows.Forms.TableLayoutPanel
