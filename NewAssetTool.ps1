@@ -3601,6 +3601,7 @@ $pc.serial_number}else{$null}
     Comments         = $txtComments.Text
     Rounded          = 'No'
   }
+  Set-RoundingEventRoundedDefault $row
   $cmbDept.Visible = $false  # Hidden until Edit Location is active
   $rowOut = $row | Select-Object $script:RoundingEventColumns
   if(-not $exists){ $rowOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
@@ -3757,6 +3758,16 @@ if (-not $script:NEAR_STATUSES) {
 if (-not (Get-Variable -Scope Script -Name RoundingEvents -ErrorAction SilentlyContinue)) {
   $script:RoundingEvents = @()
 }
+function Set-RoundingEventRoundedDefault([psobject]$row){
+  if(-not $row){ return }
+  try {
+    if(-not $row.PSObject.Properties['Rounded']){
+      $row | Add-Member -NotePropertyName Rounded -NotePropertyValue 'No' -Force
+    } elseif([string]::IsNullOrWhiteSpace($row.Rounded)){
+      $row.Rounded = 'No'
+    }
+  } catch {}
+}
 function Ensure-RoundingCommentsColumn([string]$file){
   try {
     if([string]::IsNullOrWhiteSpace($file)){ return }
@@ -3789,11 +3800,7 @@ function Ensure-RoundingCommentsColumn([string]$file){
         if(-not $r.PSObject.Properties['Comments']){
           $r | Add-Member -NotePropertyName Comments -NotePropertyValue '' -Force
         }
-        if(-not $r.PSObject.Properties['Rounded']){
-          $r | Add-Member -NotePropertyName Rounded -NotePropertyValue 'No' -Force
-        } elseif([string]::IsNullOrWhiteSpace($r.Rounded)){
-          $r.Rounded = 'No'
-        }
+        Set-RoundingEventRoundedDefault $r
         if(-not $r.PSObject.Properties['CablingNeeded']){
           $r | Add-Member -NotePropertyName CablingNeeded -NotePropertyValue $false -Force
         }
@@ -4461,6 +4468,7 @@ if ($pc) {
       Comments         = ''
       Rounded          = 'No'
     }
+    Set-RoundingEventRoundedDefault $ev
     $evOut = $ev | Select-Object $script:RoundingEventColumns
     if (-not $exists) { $evOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
     else { $evOut | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
