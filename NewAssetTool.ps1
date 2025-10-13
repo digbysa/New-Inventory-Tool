@@ -86,7 +86,7 @@ function Set-ScanSearchControl {
 
 $script:DeviceTypeSummaryControl = $null
 $script:SearchTextButtonStates = @{}
-$script:RoundNowDisabledTooltip = 'The search bar needs to be empty to use this feature.'
+$script:RoundNowDisabledTooltip = 'A detected device type is required to use this feature.'
 
 function Get-CurrentSearchInputText {
   try {
@@ -117,15 +117,12 @@ function Get-CurrentDeviceTypeText {
 }
 
 function Update-SearchDependentButtonStates {
-  $searchText = Get-CurrentSearchInputText
-  $isSearchEmpty = [string]::IsNullOrWhiteSpace($searchText)
-
   $deviceTypeText = Get-CurrentDeviceTypeText
   $hasDeviceType = -not [string]::IsNullOrWhiteSpace($deviceTypeText)
 
   if ($btnRoundNow) {
     try {
-      $shouldEnableRoundNow = $isSearchEmpty
+      $shouldEnableRoundNow = $hasDeviceType
       if ($btnRoundNow.Enabled -ne $shouldEnableRoundNow) {
         $btnRoundNow.Enabled = $shouldEnableRoundNow
       }
