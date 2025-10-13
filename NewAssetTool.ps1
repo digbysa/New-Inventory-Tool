@@ -2516,8 +2516,24 @@ function Set-ComboSelectionCaseInsensitive([System.Windows.Forms.ComboBox]$combo
     try { $combo.SelectedIndex = ($combo.Items.Count - 1) } catch {}
   }
 }
+function Get-MaintenanceTypeOrDefault([string]$maintenanceType,[string]$deviceName){
+  $mt = ''
+  if(-not [string]::IsNullOrWhiteSpace($maintenanceType)){
+    $mt = $maintenanceType.Trim()
+  }
+  if(-not [string]::IsNullOrWhiteSpace($mt)){
+    return $mt
+  }
+  if(-not [string]::IsNullOrWhiteSpace($deviceName)){
+    try {
+      if($deviceName.Trim() -match '^(?i)AO'){
+        return 'Mobile Cart'
+      }
+    } catch {}
+  }
+  return 'General Rounding'
+}
 function Update-MaintenanceTypeSelection([object]$displayRec,[object]$parentRec){
-  $selection = 'General Rounding'
   $displayName = ''
   try {
     if($displayRec -and $displayRec.name){ $displayName = [string]$displayRec.name }
@@ -2560,12 +2576,7 @@ function Update-MaintenanceTypeSelection([object]$displayRec,[object]$parentRec)
     }
 	} catch {}
 
-  if(-not [string]::IsNullOrWhiteSpace($mt)){
-    $selection = $mt
-  } elseif(-not [string]::IsNullOrWhiteSpace($displayName) -and ($displayName.Trim() -match '^(?i)AO')){
-    # Preserve previous Tangent fallback when no data is available in the CSV.
-    $selection = 'Mobile Cart'
-  }
+  $selection = Get-MaintenanceTypeOrDefault $mt $displayName
   Set-ComboSelectionCaseInsensitive $cmbMaintType $selection
 }
 function Get-RoundingUrlForParent($pc){
@@ -4329,7 +4340,11 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $r.Cells['Floor'].Value     = $pc.u_floor
     $r.Cells['Room'].Value      = $pc.u_room
     $r.Cells['Department'].Value = $pc.u_department_location
-    $r.Cells['MaintenanceType'].Value = ('' + $pc.u_device_rounding).Trim()
+    $mtRaw = ''
+    try {
+      if($pc.PSObject.Properties['u_device_rounding']){ $mtRaw = '' + $pc.u_device_rounding }
+    } catch {}
+    $r.Cells['MaintenanceType'].Value = Get-MaintenanceTypeOrDefault $mtRaw ([string]$pc.name)
     $r.Cells['LastRounded'].Value = (Fmt-DateLong $lr)
     $r.Cells['DaysAgo'].Value   = $days
     $r.Cells['Status'].Value    = "—"
@@ -4446,6 +4461,20 @@ $url = $null
 if ($pc) {
   try { $url = Get-RoundingUrlForParent $pc } catch { $url = $null }
 }
+    $mtRaw = ''
+    if ($pc) {
+      try {
+        if ($pc.PSObject.Properties['u_device_rounding']) { $mtRaw = '' + $pc.u_device_rounding }
+      } catch {}
+    }
+    $mtDeviceName = ''
+    if ($pc) {
+      try { $mtDeviceName = [string]$pc.name } catch {}
+    }
+    if (-not $mtDeviceName) {
+      try { $mtDeviceName = [string]$row.Cells['Host'].Value } catch {}
+    }
+    $mtValue = Get-MaintenanceTypeOrDefault $mtRaw $mtDeviceName
     $ev = [pscustomobject]@{
       Timestamp        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
       AssetTag         = $asset
@@ -4463,7 +4492,7 @@ if ($pc) {
       LabelOK          = 'No'
       CartOK           = 'No'
       PeripheralsOK    = 'No'
-      MaintenanceType  = if ($pc) { $pc.u_device_rounding } else { $null }
+      MaintenanceType  = $mtValue
       Department       = $row.Cells['Department'].Value
       RoundingUrl      = $url
       Comments         = ''
