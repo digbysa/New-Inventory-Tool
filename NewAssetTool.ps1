@@ -193,9 +193,6 @@ namespace ModernUI
   public class RoundedButton : Button
   {
     public int CornerRadius { get; set; }
-    public Color HoverBorderColor { get; set; }
-    public float HoverBorderThickness { get; set; }
-    public bool ShowHoverBorder { get; set; }
 
     private Color _baseBackColor;
     private Color _hoverBackColor;
@@ -211,9 +208,6 @@ namespace ModernUI
         FlatAppearance.BorderSize = 0;
         UseVisualStyleBackColor = false;
         CornerRadius = 12;
-        ShowHoverBorder = true;
-        HoverBorderColor = SystemColors.Highlight;
-        HoverBorderThickness = 1.5f;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
 
         _baseBackColor = BackColor;
@@ -244,16 +238,6 @@ namespace ModernUI
             using (SolidBrush brush = new SolidBrush(fill))
             {
                 e.Graphics.FillPath(brush, path);
-            }
-
-            if (ShowHoverBorder && Enabled && _isHovering && HoverBorderColor.A > 0)
-            {
-                float thickness = HoverBorderThickness > 0 ? HoverBorderThickness : 1f;
-                using (Pen hoverPen = new Pen(HoverBorderColor, thickness))
-                {
-                    hoverPen.Alignment = PenAlignment.Inset;
-                    e.Graphics.DrawPath(hoverPen, path);
-                }
             }
 
             if (Focused && ShowFocusCues)
@@ -331,7 +315,6 @@ namespace ModernUI
         _isHovering = true;
         Cursor = Cursors.Hand;
         BackColor = _hoverBackColor;
-        Invalidate();
     }
 
     protected override void OnMouseLeave(EventArgs e)
@@ -340,7 +323,6 @@ namespace ModernUI
         {
             _isHovering = false;
             BackColor = _baseBackColor;
-            Invalidate();
         }
 
         base.OnMouseLeave(e);
@@ -592,8 +574,6 @@ function Set-ModernTheme {
         }
         if ($ctl -is [ModernUI.RoundedButton]) {
           $ctl.CornerRadius = 4
-          try { $ctl.HoverBorderColor = $accentHv } catch {}
-          try { $ctl.HoverBorderThickness = 1.5 } catch {}
         }
       }
       'System\.Windows\.Forms\.TextBox' {
@@ -3495,25 +3475,19 @@ $btnEditLoc.Add_Click({ Toggle-EditLocation })
 $btnAddPeripheral.Add_Click({
   $pc = $script:CurrentParent
   if(-not $pc){ return }
-  if(-not $chkShowExcluded.Checked){
-    try {
+  try{
+    if(-not $chkShowExcluded.Checked){
       $mt = ('' + $pc.u_device_rounding).Trim()
       if($mt -match '^(?i)Excluded$'){ return }
-    } catch {}
-  }
+    }
+  } catch {}
   Show-AddPeripheralDialog $pc
 })
 $btnRemove.Add_Click({
   $pc = $script:CurrentParent
   if($pc){
-    if(-not $chkShowExcluded.Checked){
-      try {
-        $mt = ('' + $pc.u_device_rounding).Trim()
-        if($mt -match '^(?i)Excluded$'){ return }
-      } catch {}
-    }
-    Remove-Selected-Associations $pc
-  }
+      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
+ Remove-Selected-Associations $pc }
 })
 # Double-click a grid row to open that record
 $dgv.Add_CellDoubleClick({
@@ -3556,25 +3530,19 @@ $btnCheckComplete.Add_Click({
   }
 })
 $btnSave.Add_Click({
-  $pc = $script:CurrentParent
-  if(-not $pc){ $pc = Resolve-ParentComputer (Find-RecordRaw $txtAT.Text) }
-  if(-not $pc){ $pc = $script:CurrentDisplay }
-  if($pc -and -not $chkShowExcluded.Checked){
-    try {
-      $mt = ('' + $pc.u_device_rounding).Trim()
-      if($mt -match '^(?i)Excluded$'){ return }
-    } catch {}
-  }
   Stop-RoundingTimer
   $out = $script:OutputFolder
   if(-not (Test-Path $out)){ New-Item -ItemType Directory -Path $out -Force | Out-Null }
-  $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
+$file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
   $exists = Test-Path $file
   if($exists){ Ensure-RoundingCommentsColumn $file }
+  $pc = $script:CurrentParent
+  if(-not $pc){ $pc = Resolve-ParentComputer (Find-RecordRaw $txtAT.Text) }
+  if(-not $pc){ $pc = $script:CurrentDisplay }
   $url = $null
   if($pc){
-    try { $url = Get-RoundingUrlForParent $pc } catch {}
-  }
+      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
+ $url = Get-RoundingUrlForParent $pc }
   $deptValue = ''
   if($cmbDept -and $cmbDept.Text){ $deptValue = $cmbDept.Text }
   elseif($txtDept -and $txtDept.Text){ $deptValue = $txtDept.Text }
@@ -3586,9 +3554,15 @@ $btnSave.Add_Click({
   }
   $row = [pscustomobject]@{
     Timestamp        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-    AssetTag         = if($pc){ $pc.asset_tag }else{$null}
-    Name             = if($pc){ $pc.name }else{$null}
-    Serial           = if($pc){ $pc.serial_number }else{$null}
+    AssetTag         = if($pc){
+      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
+$pc.asset_tag}else{$null}
+    Name             = if($pc){
+      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
+$pc.name}else{$null}
+    Serial           = if($pc){
+      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
+$pc.serial_number}else{$null}
     City             = $txtCity.Text
     Location         = $txtLocation.Text
     Building         = $txtBldg.Text
