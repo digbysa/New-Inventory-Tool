@@ -705,7 +705,7 @@ $script:NewAssetToolMainForm = $null
 $script:RoundingEventColumns = @(
   'Timestamp','AssetTag','Name','Serial','City','Location','Building','Floor','Room',
   'CheckStatus','RoundingMinutes','CableMgmtOK','CablingNeeded','LabelOK','CartOK','PeripheralsOK',
-  'MaintenanceType','Department','RoundingUrl','Comments'
+  'MaintenanceType','Department','RoundingUrl','Comments','Rounded'
 )
 # Tolerant header map + fast caches for Room validation
 $script:LocCols = @{}
@@ -3579,6 +3579,7 @@ $pc.serial_number}else{$null}
     Department       = $deptValue
     RoundingUrl      = $url
     Comments         = $txtComments.Text
+    Rounded          = 'No'
   }
   $cmbDept.Visible = $false  # Hidden until Edit Location is active
   $rowOut = $row | Select-Object $script:RoundingEventColumns
@@ -3742,7 +3743,13 @@ function Ensure-RoundingCommentsColumn([string]$file){
     if(-not (Test-Path $file)){ return }
     $header = $null
     try { $header = Get-Content -Path $file -TotalCount 1 -Encoding UTF8 } catch { $header = $null }
-    if($header -and $header -match '(^|,)"?Comments"?(,|$)'){ return }
+    $hasComments = $false
+    $hasRounded  = $false
+    if($header){
+      $hasComments = ($header -match '(^|,)"?Comments"?(,|$)')
+      $hasRounded  = ($header -match '(^|,)"?Rounded"?(,|$)')
+    }
+    if($hasComments -and $hasRounded){ return }
     $rows = @()
     try { $rows = Import-Csv -Path $file } catch { $rows = @() }
     $columns = @()
@@ -3768,6 +3775,9 @@ function Ensure-RoundingCommentsColumn([string]$file){
         }
         if(-not $r.PSObject.Properties['CablingNeeded']){
           $r | Add-Member -NotePropertyName CablingNeeded -NotePropertyValue $false -Force
+        }
+        if(-not $r.PSObject.Properties['Rounded']){
+          $r | Add-Member -NotePropertyName Rounded -NotePropertyValue 'No' -Force
         }
       }
       $rows | Select-Object $columns | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8
@@ -4431,6 +4441,7 @@ if ($pc) {
       Department       = $row.Cells['Department'].Value
       RoundingUrl      = $url
       Comments         = ''
+      Rounded          = 'No'
     }
     $evOut = $ev | Select-Object $script:RoundingEventColumns
     if (-not $exists) { $evOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
