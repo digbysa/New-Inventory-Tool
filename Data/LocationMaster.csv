@@ -589,7 +589,7 @@ Duncan,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-2nd Floor,Main 
 Duncan,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-2nd Floor,Main Building,2,268 (W116) Jennifer Sirup
 Duncan,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-2nd Floor,Main Building,2,268 (W117) Kelsey
 Duncan,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-2nd Floor,Main Building,2,Attention Jody (207)
-Duncan,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-2nd Floor,Main Building,2,False
+Duncan,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-2nd Floor,Main Building,2,FALSE
 Duncan,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-2nd Floor,Main Building,2,Home Use
 Duncan,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-2nd Floor,Main Building,2,WFH - Chelsey Mcdonald
 Duncan,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-2nd Floor,Main Building,2,WFH - Janeen Kidd (Project Director)
@@ -804,3 +804,578 @@ Salt Spring Island,VIHA-SSMHSU-Salt Spring Mental Health Substance Use Services-
 Salt Spring Island,VIHA-SSMHSU-Salt Spring Mental Health Substance Use Services-Main Building-1st Floor,Lancer Building,2,Office 6 (Section C)
 Salt Spring Island,VIHA-SSMHSU-Salt Spring Mental Health Substance Use Services-Main Building-1st Floor,Lancer Building,2,Office 7 (Section C)
 Salt Spring Island,VIHA-SSMHSU-Salt Spring Mental Health Substance Use Services-Main Building-1st Floor,Main Building,2,204 - 4 (Section B)
+Alert Bay,VIHA-Alert Bay,Main Building,0,-
+Alert Bay,VIHA-CICHC-Cormorant Island Community Health Centre-Main Building-1st Floor,Main Building,0,-
+Bamfield,VIHA-BAM-Bamfield Health Centre-Main Building-1st Floor,Main Building,0,-
+Brentwood Bay,VIHA-BMR-Brentwood Marchant Road-Sluggett House-1st Floor,Main Building,0,-
+Brentwood Bay,VIHA-BSCR-Brentwood Stelly's Cross Road,Main Building,0,-
+Campbell River,VIHA-Campbell River,Main Building,0,-
+Campbell River,VIHA-CRDS-Campbell River Dogwood Street,Main Building,0,-
+Campbell River,VIHA-CRDS-Campbell River Dogwood Street-Main Building-1st Floor,Main Building,0,-
+Campbell River,VIHA-CRED-Campbell River Eagle Drive-Main Building-2nd Floor,Main Building,0,-
+Campbell River,VIHA-CRG-Campbell River General Hospital,Main Building,0,-
+Campbell River,VIHA-CRG-Campbell River General Hospital-Corporate-Whitehouse,Main Building,0,-
+Campbell River,VIHA-CRG-Campbell River General Hospital-Corporate-Whitehouse-1st Floor,Main Building,0,-
+Campbell River,VIHA-CRG-Campbell River General Hospital-Corporate-Whitehouse-2nd Floor,Main Building,0,-
+Campbell River,VIHA-CRG-Campbell River General Hospital-Main Building,Main Building,0,-
+Campbell River,VIHA-CRG-Campbell River General Hospital-Main Building-1st Floor,Main Building,0,-
+Campbell River,VIHA-CRG-Campbell River General Hospital-Main Building-2nd Floor,Main Building,0,-
+Campbell River,VIHA-CRG-Campbell River General Hospital-Main Building-3rd Floor,Main Building,0,-
+Campbell River,VIHA-CRG-Campbell River General Hospital-Main Building-4th Floor,Main Building,0,-
+Campbell River,VIHA-CRG-Campbell River General Hospital-Main Building-Basement 1,Main Building,0,-
+Campbell River,VIHA-CRHCC-Campbell River Home & Community Care,Main Building,0,-
+Campbell River,VIHA-CRHCC-Campbell River Home & Community Care-Main Building-1st Floor,Main Building,0,-
+Campbell River,VIHA-CRHCC-Campbell River Home & Community Care-Main Building-2nd Floor,Main Building,0,-
+Campbell River,VIHA-CRIP-Campbell River Ironwood Place-Main Building-1st Floor,Main Building,0,-
+Campbell River,VIHA-CRMC-Campbell River Marwalk Crescent-Main Building,Main Building,0,-
+Campbell River,VIHA-CRMC-Campbell River Marwalk Crescent-Main Building-1st Floor,Main Building,0,-
+Campbell River,VIHA-CRMHAS-Campbell River Mental Health & Addiction Services,Main Building,0,-
+Campbell River,VIHA-CRMHAS-Campbell River Mental Health & Addiction Services-Main Building-2nd Floor,Main Building,0,-
+Campbell River,VIHA-CRPH-Campbell River Public Health-Main Building,Main Building,0,-
+Campbell River,VIHA-CRPH-Campbell River Public Health-Main Building-2nd Floor,Main Building,0,-
+Campbell River,VIHA-CRSR_1307-Campbell River Shoppers Row (Unit 1307)-Main Building,Main Building,0,-
+Campbell River,VIHA-CRSR_1307-Campbell River Shoppers Row (Unit 1307)-Main Building-1st Floor,Main Building,0,-
+Campbell River,VIHA-CRTA-Campbell River Twelve Avenue-Main Building-1st Floor,Main Building,0,-
+Campbell River,VIHA-NIMC-North Island Medical Clinic-Main Building -1st Floor,Main Building,0,-
+Campbell River,VIHA-YLRS-Yucalta Lodge-Main Building-1st Floor,Main Building,0,-
+Chemainus,VIHA-CHCC-Chemainus Health Care Centre-Main Building-1st Floor,Main Building,0,-
+Chemainus,VIHA-CHCC-Chemainus Health Care Centre-Main Building-Basement 1,Main Building,0,-
+Comox,VIHA-SJC-St. Joseph's Campus-Main Building-1st Floor,Main Building,0,-
+Comox,VIHA-SJC-St. Joseph's Campus-Main Building-2nd Floor,Main Building,0,-
+Comox,VIHA-SJC-St. Joseph's Campus-Main Building-3rd Floor,Main Building,0,-
+Courtenay,VIHA-AMHO-Auxiliary Mental Health Office,Main Building,0,-
+Courtenay,VIHA-AMHO-Auxiliary Mental Health Office-Main Building,Main Building,0,-
+Courtenay,VIHA-AMHO-Auxiliary Mental Health Office-Main Building-1st Floor,Main Building,0,-
+Courtenay,VIHA-CCA_92-Courtenay Cliffe Avenue (#92)-Main Building-1st Floor,Main Building,0,-
+Courtenay,VIHA-CCA-Courtenay Cliffe Avenue,Main Building,0,-
+Courtenay,VIHA-CCA-Courtenay Cliffe Avenue-Main Building-1st Floor,Main Building,0,-
+Courtenay,VIHA-CCRHC-Courtenay Cumberland Road Health Unit-Main Building-1st Floor,Main Building,0,-
+Courtenay,VIHA-CDLS-Courtenay Downtown Lab Services-Main Building-1st Floor,Main Building,0,-
+Courtenay,VIHA-CHU-Coastal Health Unit-Main Building-1st Floor,Main Building,0,-
+Courtenay,VIHA-CHU-Coastal Health Unit-Main Building-2nd Floor,Main Building,0,-
+Courtenay,VIHA-CIHN-Courtenay Integrated Health Networks,Main Building,0,-
+Courtenay,VIHA-CIHN-Courtenay Integrated Health Networks-Main Building-3rd Floor,Main Building,0,-
+Courtenay,VIHA-CVCHC-Comox Valley Community Health Centre-Main Building-1st Floor,Main Building,0,-
+Courtenay,VIHA-CVHCC-Comox Valley Home & Community Care-Main Building,Main Building,0,-
+Courtenay,VIHA-CVHCC-Comox Valley Home & Community Care-Main Building-1st Floor,Main Building,0,-
+Courtenay,VIHA-CVH-Comox Valley Hospital,Main Building,0,-
+Courtenay,VIHA-CVH-Comox Valley Hospital-Main Building,Main Building,0,-
+Courtenay,VIHA-CVH-Comox Valley Hospital-Main Building-0th Floor,Main Building,0,-
+Courtenay,VIHA-CVH-Comox Valley Hospital-Main Building-1st Floor,Main Building,0,-
+Courtenay,VIHA-CVH-Comox Valley Hospital-Main Building-2nd Floor,Main Building,0,-
+Courtenay,VIHA-CVH-Comox Valley Hospital-Main Building-3rd Floor,Main Building,0,-
+Courtenay,VIHA-CVH-Comox Valley Hospital-Main Building-4th Floor,Main Building,0,-
+Courtenay,VIHA-CVMHAS-Comox Valley Mental Health & Addiction Services-Main Building-1st Floor,Main Building,0,-
+Courtenay,VIHA-CVNC-Comox Valley Nursing Centre,Main Building,0,-
+Courtenay,VIHA-CVNC-Comox Valley Nursing Centre-Main Building-1st Floor,Main Building,0,-
+Courtenay,VIHA-CVSVCLAL-Comox Valley Seniors Village & Casa Loma Assisted Living-Main Building-1st Floor,Main Building,0,-
+Courtenay,"VIHA-NICYF-North Island Child, Youth & Family",Main Building,0,-
+Courtenay,"VIHA-NICYF-North Island Child, Youth & Family-Main Building",Main Building,0,-
+Courtenay,"VIHA-NICYF-North Island Child, Youth & Family-Main Building-1st Floor",Main Building,0,-
+Courtenay,VIHA-RHARF-Ryan Hill Apartments Residential Facility-Main Building,Main Building,0,-
+Courtenay,VIHA-RHARF-Ryan Hill Apartments Residential Facility-Main Building-1st Floor,Main Building,0,-
+Cumberland,VIHA-CCDF-Cumberland Community Dialysis Facility-Main Building-1st Floor,Main Building,0,-
+Cumberland,VIHA-CHC-Cumberland Health Centre,Main Building,0,-
+Cumberland,VIHA-CHC-Cumberland Health Centre-Main Building,Main Building,0,-
+Cumberland,VIHA-CHC-Cumberland Health Centre-Main Building-1st Floor,Main Building,0,-
+Cumberland,VIHA-CHC-Cumberland Health Centre-Main Building-Basement 1,Main Building,0,-
+Cumberland,VIHA-CRL-Cumberland Regional Hospital Laundry Society-Main Building-1st Floor,Main Building,0,-
+Denman Island,VIHA-DIHU-Denman Island Health Unit-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-CDH-Cowichan District Hospital,Main Building,0,-
+Duncan,VIHA-CDH-Cowichan District Hospital-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-CDH-Cowichan District Hospital-Main Building-2nd Floor,Main Building,0,-
+Duncan,VIHA-CDH-Cowichan District Hospital-Main Building-3rd Floor,Main Building,0,-
+Duncan,VIHA-CDH-Cowichan District Hospital-Main Building-4th Floor,Main Building,0,-
+Duncan,VIHA-CDH-Cowichan District Hospital-Main Building-Basement 1,Main Building,0,-
+Duncan,VIHA-CLRC-Cowichan Lodge,Main Building,0,-
+Duncan,VIHA-CLRC-Cowichan Lodge-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-CPRC-Cairnsmore Place (CDH),Main Building,0,-
+Duncan,VIHA-CPRC-Cairnsmore Place (CDH)-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-CPRF-Caulfield Place Residential Facility-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-CQSS-Cowichan Quw'utsun Secondary School,Main Building,0,-
+Duncan,VIHA-CQSS-Cowichan Quw'utsun Secondary School-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-CUPCC-Cowichan Urgent Primary Care Centre,Main Building,0,-
+Duncan,VIHA-DCDF-Duncan Community Dialysis Facility-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-DGSHC-Duncan Government Street Health Centre-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-DJS-Duncan Jubilee Street-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-DMHC-Duncan Mental Health Centre-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-2nd Floor,Main Building,0,-
+Duncan,VIHA-DSS-Duncan Station Street-Main Building-2nd Floor,Main Building,0,-
+Duncan,VIHA-DWH-Duncan Waldon House-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-DWRC-Duncan Wellness and Recovery Centre-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-FHMH-Floral House Mental Health-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-MMHU-Margaret Moss Building-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-MMHU-Margaret Moss Building-Main Building-Basement 1,Main Building,0,-
+Duncan,VIHA-WHMH-Wisteria House Mental Health-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-WRMH-Wicks Road Mental Health-Main Building-1st Floor,Main Building,0,-
+Duncan,VIHA-WRMH-Wicks Road Mental Health-Main Building-2nd Floor,Main Building,0,-
+Gabriola Island,VIHA-GIHC-Gabriola Island Health Centre,Main Building,0,-
+Gabriola Island,VIHA-GIHC-Gabriola Island Health Centre-Main Building-1st Floor,Main Building,0,-
+Galiano Island,VIHA-GIHU-Galiano Island Health Unit,Main Building,0,-
+Galiano Island,VIHA-GIHU-Galiano Island Health Unit-Main Building,Main Building,0,-
+Galiano Island,VIHA-GIHU-Galiano Island Health Unit-Main Building-1st Floor,Main Building,0,-
+Gold River,VIHA-GRHC-Gold River Health Centre-Main Building,Main Building,0,-
+Gold River,VIHA-GRHC-Gold River Health Centre-Main Building-1st Floor,Main Building,0,-
+Hornby Island,VIHA-HDHS-Hornby/ Denman Home Support-Main Building-1st Floor,Main Building,0,-
+Hornby Island,VIHA-HIHC-Hornby Island Health Centre-Main Building-1st Floor,Main Building,0,-
+Kamloops,VIHA-KDC-Kamloops Data Centre,Main Building,0,-
+Kyuquot,VIHA-KYU-Kyuquot Outpost Hospital,Main Building,0,-
+Kyuquot,VIHA-KYU-Kyuquot Outpost Hospital-Main Building-1st Floor,Main Building,0,-
+Ladysmith,VIHA-LCHC-Ladysmith Community Health Centre,Main Building,0,-
+Ladysmith,VIHA-LCHC-Ladysmith Community Health Centre-Main Building-1st Floor,Main Building,0,-
+Ladysmith,VIHA-LCHC-Ladysmith Community Health Centre-Main Building-Basement 1,Main Building,0,-
+Lake Cowichan,VIHA-LCHU-Lake Cowichan Health Unit-Main Building-1st Floor,Main Building,0,-
+Mansons Landing,VIHA-CIHU-Cortes Island Health Unit-Main Building-1st Floor,Main Building,0,-
+Mayne Island,VIHA-MIHU-Mayne Island Health Unit-Main Building-1st Floor,Main Building,0,-
+Mill Bay,VIHA-MBRC-Mill Bay Radiology Centre-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-BCN-Bowen Center Nanaimo,Main Building,0,-
+Nanaimo,VIHA-BCN-Bowen Center Nanaimo-Main Building,Main Building,0,-
+Nanaimo,VIHA-BCN-Bowen Center Nanaimo-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-BCSWC-Barsby Community School Wellness Centre-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-BLMHAS-Brooks Landing Mental Health & Addictions Services,Main Building,0,-
+Nanaimo,VIHA-BLMHAS-Brooks Landing Mental Health & Addictions Services-Main Building,Main Building,0,-
+Nanaimo,VIHA-BLMHAS-Brooks Landing Mental Health & Addictions Services-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-CDC-Clearview Detox Centre,Main Building,0,-
+Nanaimo,VIHA-CDC-Clearview Detox Centre-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-CDT-Communicable Disease & Travel,Main Building,0,-
+Nanaimo,VIHA-CDT-Communicable Disease & Travel-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-CISC-Centre Island Surgical Centre,Main Building,0,-
+Nanaimo,VIHA-CISC-Centre Island Surgical Centre-Main Building,Main Building,0,-
+Nanaimo,VIHA-CISC-Centre Island Surgical Centre-Main Building-Basement 1,Main Building,0,-
+Nanaimo,VIHA-CNUPCC-Central Nanaimo Urgent Primary Care Centre,Main Building,0,-
+Nanaimo,VIHA-CNUPCC-Central Nanaimo Urgent Primary Care Centre-Main Building,Main Building,0,-
+Nanaimo,VIHA-CNUPCC-Central Nanaimo Urgent Primary Care Centre-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-DPRC-Dufferin Place (NRGH),Main Building,0,-
+Nanaimo,VIHA-DPRC-Dufferin Place (NRGH)-Main Building,Main Building,0,-
+Nanaimo,VIHA-DPRC-Dufferin Place (NRGH)-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-DPRC-Dufferin Place (NRGH)-Main Building-Basement 1,Main Building,0,-
+Nanaimo,VIHA-MAUPCC-Medical Arts Urgent Primary Care Centre,Main Building,0,-
+Nanaimo,VIHA-MAUPCC-Medical Arts Urgent Primary Care Centre-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-MDO-Metral Drive Offices,Main Building,0,-
+Nanaimo,VIHA-MDO-Metral Drive Offices-Main Building,Main Building,0,-
+Nanaimo,VIHA-MDO-Metral Drive Offices-Main Building-3rd Floor,Main Building,0,-
+Nanaimo,VIHA-NAN-Nanaimo Data Centre,Main Building,0,-
+Nanaimo,VIHA-NBCBC-Nanaimo Boundary Crescent Beaufort Centre-Main Building,Main Building,0,-
+Nanaimo,VIHA-NBCBC-Nanaimo Boundary Crescent Beaufort Centre-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NBC-Nanaimo Bowen Centre,Main Building,0,-
+Nanaimo,VIHA-NBC-Nanaimo Bowen Centre-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NBRMC-Nanaimo Bowen Road Madrona Clinic,Main Building,0,-
+Nanaimo,VIHA-NBRMC-Nanaimo Bowen Road Madrona Clinic-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NCDF-Nanaimo Community Dialysis Facility,Main Building,0,-
+Nanaimo,VIHA-NCDF-Nanaimo Community Dialysis Facility-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NCMC-Nanaimo Colville Medical Center-Main Building,Main Building,0,-
+Nanaimo,VIHA-NCMC-Nanaimo Colville Medical Center-Main Building-3rd Floor,Main Building,0,-
+Nanaimo,VIHA-NCST-Nanaimo Chapel Street,Main Building,0,-
+Nanaimo,VIHA-NCST-Nanaimo Chapel Street-Main Building-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NDBC-Nanaimo Dufferin Boundary Crescents,Main Building,0,-
+Nanaimo,VIHA-NDBC-Nanaimo Dufferin Boundary Crescents-Main Building,Main Building,0,-
+Nanaimo,VIHA-NDBC-Nanaimo Dufferin Boundary Crescents-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NDC-Nanaimo Dufferin Centre-Main Building,Main Building,0,-
+Nanaimo,VIHA-NDC-Nanaimo Dufferin Centre-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NDHF-Nanaimo & District Hospital Foundation-Main Building,Main Building,0,-
+Nanaimo,VIHA-NDHF-Nanaimo & District Hospital Foundation-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NER-Nanaimo Estevan Road,Main Building,0,-
+Nanaimo,VIHA-NER-Nanaimo Estevan Road-Main Building,Main Building,0,-
+Nanaimo,VIHA-NER-Nanaimo Estevan Road-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NER-Nanaimo Estevan Road-Main Building-2nd Floor,Main Building,0,-
+Nanaimo,VIHA-NER-Nanaimo Estevan Road-Main Building-3rd Floor,Main Building,0,-
+Nanaimo,VIHA-NHC-Nanaimo Health Centre,Main Building,0,-
+Nanaimo,VIHA-NHC-Nanaimo Health Centre-Main Building,Main Building,0,-
+Nanaimo,VIHA-NHC-Nanaimo Health Centre-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NHC-Nanaimo Health Centre-Main Building-2nd Floor,Main Building,0,-
+Nanaimo,VIHA-NLFR-Nanaimo Littleford Road-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NMHAS-Nanaimo Mental Health & Addiction Services,Main Building,0,-
+Nanaimo,VIHA-NMHAS-Nanaimo Mental Health & Addiction Services-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NMMC-Nanaimo Millstone Medical Centre,Main Building,0,-
+Nanaimo,VIHA-NMMC-Nanaimo Millstone Medical Centre-Main Building-2nd Floor,Main Building,0,-
+Nanaimo,VIHA-NMRI-Nanaimo MRI,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital-Ambulatory,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital-Ambulatory-Basement 1,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital-Ambulatory-Ground Floor,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital-Main Building,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital-Main Building-2nd Floor,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital-Main Building-3rd Floor,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital-Main Building-4th Floor,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital-Main Building-5th Floor,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital-Main Building-6th Floor,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital-Main Building-Basement 1,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital-Main Building-Ground Floor,Main Building,0,-
+Nanaimo,VIHA-NRGH-Nanaimo Regional General Hospital-Payroll Portable-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NSFC-Nanaimo Seafield Crescent,Main Building,0,-
+Nanaimo,VIHA-NSFC-Nanaimo Seafield Crescent-Main Building,Main Building,0,-
+Nanaimo,VIHA-NSFC-Nanaimo Seafield Crescent-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NSFC-Nanaimo Seafield Crescent-Main Building-2nd Floor,Main Building,0,-
+Nanaimo,VIHA-NSFC-Nanaimo Seafield Crescent-Main Building-Basement 1,Main Building,0,-
+Nanaimo,VIHA-NSL-Nanaimo Serenity Lodge,Main Building,0,-
+Nanaimo,VIHA-NSL-Nanaimo Serenity Lodge-Main Building,Main Building,0,-
+Nanaimo,VIHA-NSL-Nanaimo Serenity Lodge-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NWPS-Nanaimo Wentworth & Prideaux Street-Main Building,Main Building,0,-
+Nanaimo,VIHA-NWPS-Nanaimo Wentworth & Prideaux Street-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NWPS-Nanaimo Wentworth & Prideaux Street-Main Building-2nd Floor,Main Building,0,-
+Nanaimo,VIHA-NWRD-Nanaimo Waddington Road-Integrated Primary & Community Care,Main Building,0,-
+Nanaimo,VIHA-NWRD-Nanaimo Waddington Road-Integrated Primary & Community Care-Main Building,Main Building,0,-
+Nanaimo,VIHA-NWRD-Nanaimo Waddington Road-Integrated Primary & Community Care-Main Building-2nd Floor,Main Building,0,-
+Nanaimo,VIHA-NWR-Nanaimo Waddington Road-Main Building,Main Building,0,-
+Nanaimo,VIHA-NWR-Nanaimo Waddington Road-Main Building-2nd Floor,Main Building,0,-
+Nanaimo,VIHA-NWTR-Nanaimo Wellington Road-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NWTR-Nanaimo Wellington Road-Main Building-2nd Floor,Main Building,0,-
+Nanaimo,VIHA-NWWSA-Nanaimo Wentworth Street Annex,Main Building,0,-
+Nanaimo,VIHA-NWWSA-Nanaimo Wentworth Street Annex-Annex,Main Building,0,-
+Nanaimo,VIHA-NWWSA-Nanaimo Wentworth Street Annex-Annex-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NWWSA-Nanaimo Wentworth Street Annex-Annex-Basement 1,Main Building,0,-
+Nanaimo,VIHA-NWWS-Nanaimo Wentworth Street,Main Building,0,-
+Nanaimo,VIHA-NWWS-Nanaimo Wentworth Street-Main Building,Main Building,0,-
+Nanaimo,VIHA-NWWS-Nanaimo Wentworth Street-Main Building-1st Floor,Main Building,0,-
+Nanaimo,VIHA-NWWS-Nanaimo Wentworth Street-Main Building-2nd Floor,Main Building,0,-
+Nanaimo,VIHA-NWWS-Nanaimo Wentworth Street-Main Building-3rd Floor,Main Building,0,-
+Nanaimo,VIHA-NYFAS-Nanaimo Discovery Youth & Family Substance Use Services,Main Building,0,-
+Nanaimo,VIHA-NYFAS-Nanaimo Discovery Youth & Family Substance Use Services-Main Building-2nd Floor,Main Building,0,-
+Nanaimo,VIHA-RCO-Regional Corporate Office,Main Building,0,-
+Nanaimo,VIHA-RCO-Regional Corporate Office-Main Building-2nd Floor,Main Building,0,-
+Nanaimo,VIHA-Sat Lab-Satellite Laboratory-Main Building,Main Building,0,-
+Nanaimo,VIHA-Sat Lab-Satellite Laboratory-Main Building-1st Floor,Main Building,0,-
+North Pender Island,VIHA-PIHU-Pender Island Health Unit-Main Building-1st Floor,Main Building,0,-
+Parksville,VIHA-OHC-Oceanside Health Centre,Main Building,0,-
+Parksville,VIHA-OHC-Oceanside Health Centre-Main Building,Main Building,0,-
+Parksville,VIHA-OHC-Oceanside Health Centre-Main Building-1st Floor,Main Building,0,-
+Parksville,VIHA-OHC-Oceanside Health Centre-Main Building-2nd Floor,Main Building,0,-
+Parksville,VIHA-PFP-Parksville Family Place,Main Building,0,-
+Parksville,VIHA-PFP-Parksville Family Place-Main Building-1st Floor,Main Building,0,-
+Parksville,VIHA-PFP-Parksville Family Place-Main Building-2nd Floor,Main Building,0,-
+Parksville,VIHA-PQHU-Parksville/Qualicum Health Unit,Main Building,0,-
+Parksville,VIHA-TLLTC-Trillium Lodge,Main Building,0,-
+Parksville,VIHA-TLLTC-Trillium Lodge-Main Building-1st Floor,Main Building,0,-
+Port Alberni,VIHA-KHCPA-Kiwanis Hilton Centre Port Alberni-Main Building-1st Floor,Main Building,0,-
+Port Alberni,VIHA-PACDF-Port Alberni Community Dialysis Facility-Main Building-1st Floor,Main Building,0,-
+Port Alberni,VIHA-PAHCCS-Port Alberni Home & Community Care Services-Main Building-1st Floor,Main Building,0,-
+Port Alberni,VIHA-PAHC-Port Alberni Health Centre-Main Building-1st Floor,Main Building,0,-
+Port Alberni,VIHA-PAHC-Port Alberni Health Centre-Main Building-2nd Floor,Main Building,0,-
+Port Alberni,VIHA-PAIHN-Port Alberni Integrated Health Network-Main Building-1st Floor,Main Building,0,-
+Port Alberni,VIHA-PAMHAS-Port Alberni Mental Health & Addiction Services-Main Building-1st Floor,Main Building,0,-
+Port Alberni,VIHA-PARS-Port Alberni Redford Street-Main Building-1st Floor,Main Building,0,-
+Port Alberni,VIHA-PAST-Port Alberni Youth Short Term Assessment and Response-Main Building-1st Floor,Main Building,0,-
+Port Alberni,VIHA-WCGH-West Coast General Hospital,Main Building,0,-
+Port Alberni,VIHA-WCGH-West Coast General Hospital-Main Building-1st Floor,Main Building,0,-
+Port Alberni,VIHA-WCGH-West Coast General Hospital-Main Building-2nd Floor,Main Building,0,-
+Port Alberni,VIHA-WRC-Westhaven-Main Building-1st Floor,Main Building,0,-
+Port Alice,VIHA-PAH-Port Alice Health Center-Main Building-1st Floor,Main Building,0,-
+Port Hardy,VIHA-ERM-Eagle Ridge Manor,Main Building,0,-
+Port Hardy,VIHA-ERM-Eagle Ridge Manor-Main Building-1st Floor,Main Building,0,-
+Port Hardy,VIHA-PHFP-Port Hardy Family Practice-Main Building,Main Building,0,-
+Port Hardy,VIHA-PHFP-Port Hardy Family Practice-Main Building-1st Floor,Main Building,0,-
+Port Hardy,VIHA-PHHC-Port Hardy Health Centre,Main Building,0,-
+Port Hardy,VIHA-PHHC-Port Hardy Health Centre-Main Building-1st Floor,Main Building,0,-
+Port Hardy,VIHA-PHH-Port Hardy Hospital,Main Building,0,-
+Port Hardy,VIHA-PHH-Port Hardy Hospital-Main Building-1st Floor,Main Building,0,-
+Port Hardy,VIHA-PHMHAS-Port Hardy Mental Health & Addiction Services-Main Building-1st Floor,Main Building,0,-
+Port Hardy,VIHA-PHPCC-Port Hardy Primary Care Centre-Main Building-1st Floor,Main Building,0,-
+Port McNeill,VIHA-PMAPCC-Port McNeill A'ekakila'as Primary Care Centre-Main Building-1st Floor,Main Building,0,-
+Port McNeill,VIHA-PMH-Port McNeill Hospital-Main Building-1st Floor,Main Building,0,-
+Qualicum Beach,VIHA-AGRC-Arranglen Gardens-Main Building-1st Floor,Main Building,0,-
+Qualicum Beach,VIHA-EPLTC-Eagle Park,Main Building,0,-
+Qualicum Beach,VIHA-EPLTC-Eagle Park-Main Building-1st Floor,Main Building,0,-
+Qualicum Beach,VIHA-QBCC-Qualicum Beach Civic Center Restorative Health-Main Building,Main Building,0,-
+Qualicum Beach,VIHA-QBCC-Qualicum Beach Civic Center Restorative Health-Main Building-1st Floor,Main Building,0,-
+Quathiaski Cove,VIHA-QIMC-Quadra Island Medical Clinic-Main Building-1st Floor,Main Building,0,-
+Quathiaski Cove,VIHA-Quathiaski Cove,Main Building,0,-
+Saanichton,NTT-Microserve-Warehouse-Victoria,Main Building,0,-
+Saanichton,VIHA-PHU-Peninsula Health Unit,Main Building,0,-
+Saanichton,VIHA-PHU-Peninsula Health Unit-Main Building-1st Floor,Main Building,0,-
+Saanichton,VIHA-PHU-Peninsula Health Unit-Main Building-2nd Floor,Main Building,0,-
+Saanichton,VIHA-SCHS-Saanich Community Health Services - Orca Building,Main Building,0,-
+Saanichton,VIHA-SPH-Saanich Peninsula Hospital,Main Building,0,-
+Saanichton,VIHA-SPH-Saanich Peninsula Hospital-Main Building,Main Building,0,-
+Saanichton,VIHA-SPH-Saanich Peninsula Hospital-Main Building-1st Floor,Main Building,0,-
+Saanichton,VIHA-SPH-Saanich Peninsula Hospital-Main Building-Basement 1,Main Building,0,-
+Salt Spring Island,VIHA-LMH-Lady Minto Hospital,Main Building,0,-
+Salt Spring Island,VIHA-LMH-Lady Minto Hospital-Lionel Beach Annex-1st Floor,Main Building,0,-
+Salt Spring Island,VIHA-LMH-Lady Minto Hospital-Lionel Beach Annex-2nd Floor,Main Building,0,-
+Salt Spring Island,VIHA-LMH-Lady Minto Hospital-Main Building-1st Floor,Main Building,0,-
+Salt Spring Island,VIHA-LMH-Lady Minto Hospital-Main Building-Basement 1,Main Building,0,-
+Salt Spring Island,VIHA-SSCHC-Salt Spring Island Creek House-Main Building-1st Floor,Main Building,0,-
+Salt Spring Island,VIHA-SSMHSU-Salt Spring Mental Health Substance Use Services-Main Building-1st Floor,Main Building,0,-
+Sidney,VIHA-SIDL-Sidney Lab-Main Building-1st Floor,Main Building,0,-
+Sointula,VIHA-SHC-Sointula Health Clinic-Main Building-1st Floor,Main Building,0,-
+Sooke,VIHA-CASA-Sooke Health Unit Public Health Nursing-Main Building-1st Floor,Main Building,0,-
+Sooke,VIHA-SIHN-Sooke Integrated Health Network-Main Building-1st Floor,Main Building,0,-
+Tahsis,VIHA-THC-Tahsis Health Centre-Main Building-1st Floor,Main Building,0,-
+Tofino,VIHA-CFP-Coastal Family Place-Main Building-1st Floor,Main Building,0,-
+Tofino,VIHA-TGH-Tofino General Hospital-Main Building,Main Building,0,-
+Tofino,VIHA-TGH-Tofino General Hospital-Main Building-1st Floor,Main Building,0,-
+Tofino,VIHA-TGH-Tofino General Hospital-Main Building-Basement 1,Main Building,0,-
+Ucluelet,VIHA-UFT-Ucluelet Family Ties-Main Building-1st Floor,Main Building,0,-
+Ucluelet,VIHA-ULS-Ucluelet Lab Services-Main Building-1st Floor,Main Building,0,-
+Ucluelet,VIHA-UPR-Ucluelet Peninsula Road-Community Health Centre-1st Floor,Main Building,0,-
+Ucluelet,VIHA-WCMHAS-West Coast Mental Health & Addiction Services-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-ABER-Aberdeen Hospital,Main Building,0,-
+Victoria,VIHA-ABER-Aberdeen Hospital-Main Building,Main Building,0,-
+Victoria,VIHA-ABER-Aberdeen Hospital-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-ABER-Aberdeen Hospital-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-ABER-Aberdeen Hospital-Main Building-3rd Floor,Main Building,0,-
+Victoria,VIHA-ABER-Aberdeen Hospital-Main Building-Basement 1,Main Building,0,-
+Victoria,VIHA-ADSC-Alcohol & Drug Services Clinic,Main Building,0,-
+Victoria,VIHA-ADSC-Alcohol & Drug Services Clinic-Main Building,Main Building,0,-
+Victoria,VIHA-ADSC-Alcohol & Drug Services Clinic-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-AHRF-Adanac House Residential Facility-Main Building,Main Building,0,-
+Victoria,VIHA-AHRF-Adanac House Residential Facility-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-AWL-Admirals Walk Lab-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-BSRF-Blackwood Suites Residential Facility-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-CARF-Caribbean Apartments Residential Facility-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-CCHW-Alex & Jo Campbell Centre for Health and Wellness-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-CSNP-Community Service Centre-Main Building,Main Building,0,-
+Victoria,VIHA-CVAVKR-Old Blanshard Elementary School Building: COVID-IMS,Main Building,0,-
+Victoria,VIHA-DARS-Drug & Alcohol Rehab Society-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-DOS-Downtown Outreach Services-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-DVUPCC-Downtown Victoria Urgent Primary Care Centre,Main Building,0,-
+Victoria,VIHA-ECS-Esquimalt Comerford Street-Main Building,Main Building,0,-
+Victoria,VIHA-ECS-Esquimalt Comerford Street-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-ECV-Eagle Creek Village-Building 7-3rd Floor,Main Building,0,-
+Victoria,VIHA-EHU-Esquimalt Health Unit-Main Building,Main Building,0,-
+Victoria,VIHA-EHU-Esquimalt Health Unit-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-EHU-Esquimalt Health Unit-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-EMP-Eric Martin Pavilion,Main Building,0,-
+Victoria,VIHA-EMP-Eric Martin Pavilion-Eric Martin Pavilion,Main Building,0,-
+Victoria,VIHA-EMP-Eric Martin Pavilion-Eric Martin Pavilion-1st Floor,Main Building,0,-
+Victoria,VIHA-EMP-Eric Martin Pavilion-Eric Martin Pavilion-2nd Floor,Main Building,0,-
+Victoria,VIHA-EMP-Eric Martin Pavilion-Eric Martin Pavilion-3rd Floor,Main Building,0,-
+Victoria,VIHA-EMP-Eric Martin Pavilion-Eric Martin Pavilion-4th Floor,Main Building,0,-
+Victoria,VIHA-EMP-Eric Martin Pavilion-Eric Martin Pavilion-5th Floor,Main Building,0,-
+Victoria,VIHA-EMP-Eric Martin Pavilion-Eric Martin Pavilion-6th Floor,Main Building,0,-
+Victoria,VIHA-EUPCC-Esquimalt Urgent Primary Care Centre-Main Building,Main Building,0,-
+Victoria,VIHA-EUPCC-Esquimalt Urgent Primary Care Centre-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-EWHU-Esquimalt/Westshore Health Unit,Main Building,0,-
+Victoria,VIHA-EWHU-Esquimalt/Westshore Health Unit-Main Building,Main Building,0,-
+Victoria,VIHA-EWHU-Esquimalt/Westshore Health Unit-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-EWHU-Esquimalt/Westshore Health Unit-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-FRMC-Fort Royal Medical Centre,Main Building,0,-
+Victoria,VIHA-FRMC-Fort Royal Medical Centre-Main Building-4th Floor,Main Building,0,-
+Victoria,VIHA-GHHU-Gordon Head/ Oak Bay Health Unit,Main Building,0,-
+Victoria,VIHA-GHHU-Gordon Head/ Oak Bay Health Unit-Main Building,Main Building,0,-
+Victoria,VIHA-GHHU-Gordon Head/ Oak Bay Health Unit-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-GHRC-Gordon Head Recreation Centre-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-GLEN-Glengarry Hospital,Main Building,0,-
+Victoria,VIHA-GLEN-Glengarry Hospital-Chandler Unit-1st Floor,Main Building,0,-
+Victoria,VIHA-GLEN-Glengarry Hospital-Fairfield Unit,Main Building,0,-
+Victoria,VIHA-GLEN-Glengarry Hospital-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-GLEN-Glengarry Hospital-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-GLEN-Glengarry Hospital-Main Building-3rd Floor,Main Building,0,-
+Victoria,VIHA-GLEN-Glengarry Hospital-Main Building-Basement,Main Building,0,-
+Victoria,VIHA-GLEN-Glengarry Hospital-Main Building-Basement 1,Main Building,0,-
+Victoria,VIHA-GLEN-Glengarry Hospital-Richmond Unit,Main Building,0,-
+Victoria,VIHA-GLEN-Glengarry Hospital-Richmond Unit-2nd Floor,Main Building,0,-
+Victoria,VIHA-GRH-Gorge Road Hospital,Main Building,0,-
+Victoria,VIHA-GRH-Gorge Road Hospital-Main Building,Main Building,0,-
+Victoria,VIHA-GRH-Gorge Road Hospital-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-GRH-Gorge Road Hospital-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-GRH-Gorge Road Hospital-Main Building-3rd Floor,Main Building,0,-
+Victoria,VIHA-GRH-Gorge Road Hospital-Main Building-4th Floor,Main Building,0,-
+Victoria,VIHA-GSRF-Garden Street Residential Facility-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-GVHF-Victoria Hospitals Foundation,Main Building,0,-
+Victoria,VIHA-GVHF-Victoria Hospitals Foundation-Wilson Block-1st Floor,Main Building,0,-
+Victoria,VIHA-GVHU-Gateway Village Health Unit,Main Building,0,-
+Victoria,VIHA-GVHU-Gateway Village Health Unit-Main Building,Main Building,0,-
+Victoria,VIHA-GVHU-Gateway Village Health Unit-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-HPMH-Holly Place-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-HSHC-Hillside Seniors Health Centre,Main Building,0,-
+Victoria,VIHA-HSHC-Hillside Seniors Health Centre-Main Building,Main Building,0,-
+Victoria,VIHA-HSHC-Hillside Seniors Health Centre-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-HW-Heritage Woods-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-IMHS-Island Mental Health Service,Main Building,0,-
+Victoria,VIHA-IMHS-Island Mental Health Service-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-JBUPCC-James Bay Urgent Primary Care Clinic,Main Building,0,-
+Victoria,VIHA-JBYC-James Bay Youth Clinic,Main Building,0,-
+Victoria,VIHA-JBYC-James Bay Youth Clinic-Main Building,Main Building,0,-
+Victoria,VIHA-JBYC-James Bay Youth Clinic-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-MUN-Munro Centre-Island Ultrasound-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-NQUPCC-North Quadra Urgent and Primary Care Centre-Main Building,Main Building,0,-
+Victoria,VIHA-NQUPCC-North Quadra Urgent and Primary Care Centre-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-PHRF-Panama House Residential Facility-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-PRIO-Priory Hospital-Heritage Woods,Main Building,0,-
+Victoria,VIHA-PRIO-Priory Hospital-Heritage Woods-1st Floor,Main Building,0,-
+Victoria,VIHA-PRIO-Priory Hospital-Hiscock,Main Building,0,-
+Victoria,VIHA-PRIO-Priory Hospital-Hiscock-1st Floor,Main Building,0,-
+Victoria,VIHA-PRIO-Priory Hospital-Priory Hospital-1st Floor,Main Building,0,-
+Victoria,VIHA-PRIO-Priory Hospital-Rosewood Cottage-1st Floor,Main Building,0,-
+Victoria,VIHA-PSMH-Pembroke Street Mental Health,Main Building,0,-
+Victoria,VIHA-PSMH-Pembroke Street Mental Health-Main Building,Main Building,0,-
+Victoria,VIHA-PSMH-Pembroke Street Mental Health-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Fisher Building,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Fisher Building-1st Floor,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Jack Ledger Building,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Jack Ledger Building-1st Floor,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Jack Ledger Building-Basement 1,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Main Building,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Pearkes Building,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Pearkes Building-1st Floor,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Pearkes Building-Basement 1,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Queen Alexandra Main,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Queen Alexandra Main-1st Floor,Main Building,0,-
+Victoria,VIHA-QAC-Queen Alexandra Centre for Children-Queen Alexandra Main-Basement 1,Main Building,0,-
+Victoria,VIHA-RARF-Rockland Apartments Residential Facility-Main Building,Main Building,0,-
+Victoria,VIHA-RARF-Rockland Apartments Residential Facility-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Adanac Services-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Administrative Building,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Administrative Building-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Administrative Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Administrative Building-3rd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Administrative Building-Basement 1,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Coronation Annex,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Coronation Annex-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Coronation Annex-2nd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Diagnostic & Treatment,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Diagnostic & Treatment-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Diagnostic & Treatment-2nd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Diagnostic & Treatment-3rd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Diagnostic & Treatment-4th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Diagnostic & Treatment-5th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Diagnostic & Treatment-Basement 1,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Eric Martin Pavilion-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Eric Martin Pavilion-2nd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Eric Martin Pavilion-3rd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Eric Martin Pavilion-4th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Eric Martin Pavilion-5th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Eric Martin Pavilion-6th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Eric Martin Pavilion-Basement 1,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Memorial Pavilion,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Memorial Pavilion-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Memorial Pavilion-2nd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Memorial Pavilion-3rd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Memorial Pavilion-Basement 1,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Parkade/Security Complex,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Parkade/Security Complex-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Parkade/Security Complex-2nd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Patient Care Center-0th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Patient Care Center-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Patient Care Center-2nd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Patient Care Center-3rd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Patient Care Center-4th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Patient Care Center-5th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Patient Care Center-6th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Patient Care Center-7th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Patient Care Center-8th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Richmond Pavilion,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Richmond Pavilion-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Richmond Pavilion-2nd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Richmond Pavilion-3rd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Richmond Pavilion-4th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Richmond Pavilion-Basement 1,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Rixford Building-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Rixford Building-Basement 1,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Royal Block,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Royal Block-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Royal Block-2nd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Royal Block-3rd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Royal Block-4th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Royal Block-Basement 1,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Royal Jubilee Main,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Royal Jubilee Main-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Royal Jubilee Main-2nd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Royal Jubilee Main-3rd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Royal Jubilee Main-4th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Royal Jubilee Main-5th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-West Block,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-West Block-1st Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-West Block-2nd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-West Block-3rd Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-West Block-4th Floor,Main Building,0,-
+Victoria,VIHA-RJH-Royal Jubilee Hospital-Wilson Block-1st Floor,Main Building,0,-
+Victoria,VIHA-RPS-Regional Printing Services,Main Building,0,-
+Victoria,VIHA-RPS-Regional Printing Services-Main Building,Main Building,0,-
+Victoria,VIHA-RPS-Regional Printing Services-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-SARF-Styles Street Apartments-Main Building,Main Building,0,-
+Victoria,VIHA-SARF-Styles Street Apartments-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-SD62-Sooke School Board-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-SHU-Saanich Centre Health Unit,Main Building,0,-
+Victoria,VIHA-SHU-Saanich Centre Health Unit-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-SHU-Saanich Centre Health Unit-Main Building-3rd Floor,Main Building,0,-
+Victoria,VIHA-SISC-South Island Surgical Centre,Main Building,0,-
+Victoria,VIHA-SISC-South Island Surgical Centre-Eagle Creek Village Building 7-4th Floor,Main Building,0,-
+Victoria,VIHA-SISC-South Island Surgical Centre-Eagle Creek Village Building 7-5th Floor,Main Building,0,-
+Victoria,VIHA-SOMH-Seven Oaks Tertiary Mental Health,Main Building,0,-
+Victoria,VIHA-SOMH-Seven Oaks Tertiary Mental Health-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-SOMH-Seven Oaks Tertiary Mental Health-Main Building-Basement,Main Building,0,-
+Victoria,VIHA-SOMH-Seven Oaks Tertiary Mental Health-Seven Oaks House 2,Main Building,0,-
+Victoria,VIHA-SOMH-Seven Oaks Tertiary Mental Health-Seven Oaks House 4-1st Floor,Main Building,0,-
+Victoria,VIHA-SOMH-Seven Oaks Tertiary Mental Health-Seven Oaks House 5-Basement,Main Building,0,-
+Victoria,VIHA-SOMH-Seven Oaks Tertiary Mental Health-Transition House-1st Floor,Main Building,0,-
+Victoria,VIHA-TARF-Tillicum Apartments Residential Facility,Main Building,0,-
+Victoria,VIHA-TARF-Tillicum Apartments Residential Facility-Main Building,Main Building,0,-
+Victoria,VIHA-TARF-Tillicum Apartments Residential Facility-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-TOLM-Mount Tolmie Hospital-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-TOLM-Mount Tolmie Hospital-Main Building-Basement 1,Main Building,0,-
+Victoria,VIHA-VADR-Victoria Allandale Road-Main Building,Main Building,0,-
+Victoria,VIHA-VADR-Victoria Allandale Road-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-VCA-Vancouver Island Cancer Centre-Main Building,Main Building,0,-
+Victoria,VIHA-VCDF-Victoria Community Dialysis Facility-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-VCS-Victoria Cook Street-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-VDMH-Victoria Detox-Main Building,Main Building,0,-
+Victoria,VIHA-VDSC-Victoria Douglas Street Clinic,Main Building,0,-
+Victoria,VIHA-VDSC-Victoria Douglas Street Clinic-Main,Main Building,0,-
+Victoria,VIHA-VDSC-Victoria Douglas Street Clinic-Main-1st Floor,Main Building,0,-
+Victoria,VIHA-VFS-Victoria Fort Street,Main Building,0,-
+Victoria,VIHA-VFS-Victoria Fort Street-Main Building,Main Building,0,-
+Victoria,VIHA-VFS-Victoria Fort Street-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-VGA-Victoria Glanford Avenue,Main Building,0,-
+Victoria,VIHA-VGA-Victoria Glanford Avenue-Main Building,Main Building,0,-
+Victoria,VIHA-VGA-Victoria Glanford Avenue-Main Building-3rd Floor,Main Building,0,-
+Victoria,VIHA-VGH-Victoria General Hospital,Main Building,0,-
+Victoria,VIHA-VGH-Victoria General Hospital-Main Building,Main Building,0,-
+Victoria,VIHA-VGH-Victoria General Hospital-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-VGH-Victoria General Hospital-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-VGH-Victoria General Hospital-Main Building-3rd Floor,Main Building,0,-
+Victoria,VIHA-VGH-Victoria General Hospital-Main Building-4th Floor,Main Building,0,-
+Victoria,VIHA-VGH-Victoria General Hospital-Main Building-5th Floor,Main Building,0,-
+Victoria,VIHA-VGH-Victoria General Hospital-Main Building-6th Floor,Main Building,0,-
+Victoria,VIHA-VGH-Victoria General Hospital-Main Building-7th Floor,Main Building,0,-
+Victoria,VIHA-VGH-Victoria General Hospital-Parking Office-1st Floor,Main Building,0,-
+Victoria,VIHA-VGH-Victoria General Hospital-Regional Laundry-1st Floor,Main Building,0,-
+Victoria,VIHA-VGH-Victoria General Hospital-Regional Laundry-Basement 1,Main Building,0,-
+Victoria,VIHA-VHCSC-Victoria Hospice Community Support Centre,Main Building,0,-
+Victoria,VIHA-VHCSC-Victoria Hospice Community Support Centre-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-VHF-Victoria Hospice Foundation-Main Building,Main Building,0,-
+Victoria,VIHA-VHU-Victoria Health Unit,Main Building,0,-
+Victoria,VIHA-VHU-Victoria Health Unit-Main Building,Main Building,0,-
+Victoria,VIHA-VHU-Victoria Health Unit-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-VHU-Victoria Health Unit-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-VJSHC-Victoria Johnson Street Health Centre-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-VJS-Victoria Johnson Street-The Dalmation-4th Floor,Main Building,0,-
+Victoria,VIHA-VMH-Victoria Mental Health Centre,Main Building,0,-
+Victoria,VIHA-VMS-Victoria Michigan Street (Her Way Home Program),Main Building,0,-
+Victoria,VIHA-VMS-Victoria Michigan Street (Her Way Home Program)-Main Building,Main Building,0,-
+Victoria,VIHA-VNPS-Victoria North Park Street-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-VNS-Victoria Nanaimo Street,Main Building,0,-
+Victoria,VIHA-VNS-Victoria Nanaimo Street-Main Building,Main Building,0,-
+Victoria,VIHA-VNS-Victoria Nanaimo Street-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-VOBA-Victoria Oak Bay Avenue-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-VPAHC-Victoria Pandora Avenue Health Centre,Main Building,0,-
+Victoria,VIHA-VPAHC-Victoria Pandora Avenue Health Centre-Main Building,Main Building,0,-
+Victoria,VIHA-VPAHC-Victoria Pandora Avenue Health Centre-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-VPCA-Victoria Princess Avenue-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-VQSC-Victoria Quadra Center-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-VSQV-Victoria Summit Quadra Village,Main Building,0,-
+Victoria,VIHA-VSQV-Victoria Summit Quadra Village-Main Building,Main Building,0,-
+Victoria,VIHA-VSQV-Victoria Summit Quadra Village-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-VSQV-Victoria Summit Quadra Village-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-VSQV-Victoria Summit Quadra Village-Main Building-3rd Floor,Main Building,0,-
+Victoria,VIHA-VSQV-Victoria Summit Quadra Village-Main Building-4th Floor,Main Building,0,-
+Victoria,VIHA-WCB-Wellness Centre at Belmont -Main-1st Floor,Main Building,0,-
+Victoria,VIHA-WHRF-Wascana House Residential Facility-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-WSC-West Shore Centre-Main Building,Main Building,0,-
+Victoria,VIHA-WSC-West Shore Centre-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-WSC-West Shore Centre-Main Building-2nd Floor,Main Building,0,-
+Victoria,VIHA-WUPCC-Westshore Urgent Primary Care Centre,Main Building,0,-
+Victoria,VIHA-WUPCC-Westshore Urgent Primary Care Centre-Main Building,Main Building,0,-
+Victoria,VIHA-WUPCC-Westshore Urgent Primary Care Centre-Main Building-1st Floor,Main Building,0,-
+Victoria,VIHA-YQIHC-Yates Quadra Integrated Health Centre,Main Building,0,-
+Victoria,VIHA-YQIHC-Yates Quadra Integrated Health Centre-Main Building,Main Building,0,-
+Victoria,VIHA-YQIHC-Yates Quadra Integrated Health Centre-Main Building-1st Floor,Main Building,0,-
+Woss,VIHA-WRH-Woss Rural Health-Main Building-1st Floor,Main Building,0,-
+Zeballos,VIHA-ZHU-Zeballos Health Unit,Main Building,0,-
+Zeballos,VIHA-ZHU-Zeballos Health Unit-Main Building-1st Floor,Main Building,0,-
