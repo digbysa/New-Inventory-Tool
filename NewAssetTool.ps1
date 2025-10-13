@@ -1961,6 +1961,7 @@ $chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate p
 $btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Size='150,36'; $btnCheckComplete.TabIndex = 8
 $btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Size='132,36'; $btnSave.TabIndex = 9
 $btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 10
+$btnRoundNow=New-Object ModernUI.RoundedButton; $btnRoundNow.Text="Round Now"; $btnRoundNow.Size='140,36'; $btnRoundNow.Enabled=$false; $btnRoundNow.TabIndex = 11
 
 $btnCheckComplete.BackColor = [System.Drawing.SystemColors]::Control
 $btnCheckComplete.ForeColor = [System.Drawing.SystemColors]::ControlText
@@ -1968,9 +1969,26 @@ $btnSave.BackColor = [System.Drawing.SystemColors]::Control
 $btnSave.ForeColor = [System.Drawing.SystemColors]::ControlText
 $btnManualRound.BackColor = [System.Drawing.SystemColors]::Control
 $btnManualRound.ForeColor = [System.Drawing.SystemColors]::ControlText
+$btnRoundNow.BackColor = [System.Drawing.SystemColors]::Control
+$btnRoundNow.ForeColor = [System.Drawing.SystemColors]::ControlText
 
-$lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 11
-$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=12; $txtComments.WordWrap = $true
+function Update-RoundNowButtonState {
+  if(-not $btnRoundNow){ return }
+  try {
+    $text = ''
+    if ($script:NewAssetToolSearchTextBox) {
+      $text = '' + $script:NewAssetToolSearchTextBox.Text
+    } elseif ($txtScan) {
+      $text = '' + $txtScan.Text
+    }
+    $btnRoundNow.Enabled = [string]::IsNullOrWhiteSpace($text)
+  } catch {
+    try { $btnRoundNow.Enabled = $false } catch {}
+  }
+}
+
+$lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 12
+$txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=13; $txtComments.WordWrap = $true
 
 $layoutMaint = New-Object System.Windows.Forms.TableLayoutPanel
 $layoutMaint.Dock = 'Fill'
@@ -2057,10 +2075,14 @@ $actionsPanel.FlowDirection = 'LeftToRight'
 $actionsPanel.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $btnCheckComplete.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
 $btnSave.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
-$btnManualRound.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+$btnManualRound.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
+$btnRoundNow.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 $actionsPanel.Controls.Add($btnCheckComplete)
 $actionsPanel.Controls.Add($btnSave)
 $actionsPanel.Controls.Add($btnManualRound)
+$actionsPanel.Controls.Add($btnRoundNow)
+
+Update-RoundNowButtonState
 
 $lblComments.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $txtComments.Margin = New-Object System.Windows.Forms.Padding(0,4,0,0)
@@ -3251,7 +3273,12 @@ function Clear-UI(){
 }
 # ---- Events ----
 $txtScan.Add_KeyDown({ if($_.KeyCode -eq 'Enter'){ Do-Lookup; $_.SuppressKeyPress=$true } })
-$txtScan.Add_TextChanged({ if([string]::IsNullOrWhiteSpace($txtScan.Text)){ Clear-UI } })
+$txtScan.Add_TextChanged({
+  if([string]::IsNullOrWhiteSpace($txtScan.Text)){ Clear-UI }
+  try {
+    if(Get-Command Update-RoundNowButtonState -ErrorAction SilentlyContinue){ Update-RoundNowButtonState }
+  } catch {}
+})
 $btnEditLoc.Add_Click({ Toggle-EditLocation })
 $btnAddPeripheral.Add_Click({
   $pc = $script:CurrentParent

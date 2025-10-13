@@ -161,6 +161,11 @@ if ($searchTextBox) {
     if ($txtScan -and $txtScan.Text -ne $sender.Text) {
       $txtScan.Text = $sender.Text
     }
+    try {
+      if (Get-Command Update-RoundNowButtonState -ErrorAction SilentlyContinue) {
+        Update-RoundNowButtonState
+      }
+    } catch {}
   })
   $searchTextBox.Add_KeyDown({
     param($sender,$eventArgs)
@@ -170,6 +175,11 @@ if ($searchTextBox) {
     }
   })
   try { Focus-ScanInput } catch {}
+  try {
+    if (Get-Command Update-RoundNowButtonState -ErrorAction SilentlyContinue) {
+      Update-RoundNowButtonState
+    }
+  } catch {}
 }
 
 $app = [System.Windows.Application]::Current
