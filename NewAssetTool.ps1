@@ -3383,12 +3383,18 @@ function Toggle-EditLocation(){
     foreach($c in @($cmbDept,$cmbDepartment,$ddlDept,$ddlDepartment)){ if ($c) { $c.Visible = $true } }
     $btnEditLoc.Text="Save Location"
   } else {
-    $city=$cmbCity.Text; $loc=$cmbLocation.Text; $b=$cmbBuilding.Text; $f=$cmbFloor.Text; $r=$cmbRoom.Text
+    $city = if($cmbCity.Text){ $cmbCity.Text.Trim() } else { '' }
+    $loc  = if($cmbLocation.Text){ $cmbLocation.Text.Trim() } else { '' }
+    $b    = if($cmbBuilding.Text){ $cmbBuilding.Text.Trim() } else { '' }
+    $f    = if($cmbFloor.Text){ $cmbFloor.Text.Trim() } else { '' }
+    $r    = if($cmbRoom.Text){ $cmbRoom.Text.Trim() } else { '' }
     $dept = ''
     if($cmbDept -and $cmbDept.Text){ $dept = $cmbDept.Text }
     elseif($txtDept -and $txtDept.Text){ $dept = $txtDept.Text }
+    $hasCityAndLocation = (-not [string]::IsNullOrWhiteSpace($city)) -and (-not [string]::IsNullOrWhiteSpace($loc))
+    $hasLocationDetails = (-not [string]::IsNullOrWhiteSpace($b)) -or (-not [string]::IsNullOrWhiteSpace($f)) -or (-not [string]::IsNullOrWhiteSpace($r))
     $exists = $script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'City')) -eq (Normalize-Field $city) -and (Normalize-Field (Get-LocVal $_ 'Location')) -eq (Normalize-Field $loc) -and (Normalize-Field (Get-LocVal $_ 'Building')) -eq (Normalize-Field $b) -and (Normalize-Field (Get-LocVal $_ 'Floor')) -eq (Normalize-Field $f) -and (Normalize-Field (Get-LocVal $_ 'Room')) -eq (Normalize-Field $r) }
-    if($exists.Count -eq 0 -and $city -and $loc -and $b -and $f -and $r){
+    if($exists.Count -eq 0 -and $hasCityAndLocation -and $hasLocationDetails){
       $new=[pscustomobject]@{City=$city;Location=$loc;Building=$b;Floor=$f;Room=$r}
       $script:LocationRows += $new
       Save-LocationUserAdd $city $loc $b $f $r
@@ -3430,19 +3436,19 @@ function Toggle-EditLocation(){
 }
 $cmbCity.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
-  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'City'
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'City' -PreserveInvalidSelections
 })
 $cmbLocation.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
-  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Location'
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Location' -PreserveInvalidSelections
 })
 $cmbBuilding.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
-  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Building'
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Building' -PreserveInvalidSelections
 })
 $cmbFloor.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
-  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Floor'
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Floor' -PreserveInvalidSelections
 })
 # ---- Actions ----
 function Focus-ScanInput(){
