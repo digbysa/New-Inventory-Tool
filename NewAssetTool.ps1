@@ -3495,19 +3495,25 @@ $btnEditLoc.Add_Click({ Toggle-EditLocation })
 $btnAddPeripheral.Add_Click({
   $pc = $script:CurrentParent
   if(-not $pc){ return }
-  try{
-    if(-not $chkShowExcluded.Checked){
+  if(-not $chkShowExcluded.Checked){
+    try {
       $mt = ('' + $pc.u_device_rounding).Trim()
       if($mt -match '^(?i)Excluded$'){ return }
-    }
-  } catch {}
+    } catch {}
+  }
   Show-AddPeripheralDialog $pc
 })
 $btnRemove.Add_Click({
   $pc = $script:CurrentParent
   if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
- Remove-Selected-Associations $pc }
+    if(-not $chkShowExcluded.Checked){
+      try {
+        $mt = ('' + $pc.u_device_rounding).Trim()
+        if($mt -match '^(?i)Excluded$'){ return }
+      } catch {}
+    }
+    Remove-Selected-Associations $pc
+  }
 })
 # Double-click a grid row to open that record
 $dgv.Add_CellDoubleClick({
@@ -3550,19 +3556,25 @@ $btnCheckComplete.Add_Click({
   }
 })
 $btnSave.Add_Click({
-  Stop-RoundingTimer
-  $out = $script:OutputFolder
-  if(-not (Test-Path $out)){ New-Item -ItemType Directory -Path $out -Force | Out-Null }
-$file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
-  $exists = Test-Path $file
-  if($exists){ Ensure-RoundingCommentsColumn $file }
   $pc = $script:CurrentParent
   if(-not $pc){ $pc = Resolve-ParentComputer (Find-RecordRaw $txtAT.Text) }
   if(-not $pc){ $pc = $script:CurrentDisplay }
+  if($pc -and -not $chkShowExcluded.Checked){
+    try {
+      $mt = ('' + $pc.u_device_rounding).Trim()
+      if($mt -match '^(?i)Excluded$'){ return }
+    } catch {}
+  }
+  Stop-RoundingTimer
+  $out = $script:OutputFolder
+  if(-not (Test-Path $out)){ New-Item -ItemType Directory -Path $out -Force | Out-Null }
+  $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
+  $exists = Test-Path $file
+  if($exists){ Ensure-RoundingCommentsColumn $file }
   $url = $null
   if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
- $url = Get-RoundingUrlForParent $pc }
+    try { $url = Get-RoundingUrlForParent $pc } catch {}
+  }
   $deptValue = ''
   if($cmbDept -and $cmbDept.Text){ $deptValue = $cmbDept.Text }
   elseif($txtDept -and $txtDept.Text){ $deptValue = $txtDept.Text }
@@ -3574,15 +3586,9 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
   }
   $row = [pscustomobject]@{
     Timestamp        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-    AssetTag         = if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
-$pc.asset_tag}else{$null}
-    Name             = if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
-$pc.name}else{$null}
-    Serial           = if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
-$pc.serial_number}else{$null}
+    AssetTag         = if($pc){ $pc.asset_tag }else{$null}
+    Name             = if($pc){ $pc.name }else{$null}
+    Serial           = if($pc){ $pc.serial_number }else{$null}
     City             = $txtCity.Text
     Location         = $txtLocation.Text
     Building         = $txtBldg.Text
