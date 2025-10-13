@@ -193,6 +193,9 @@ namespace ModernUI
   public class RoundedButton : Button
   {
     public int CornerRadius { get; set; }
+    public Color HoverBorderColor { get; set; }
+    public float HoverBorderThickness { get; set; }
+    public bool ShowHoverBorder { get; set; }
 
     private Color _baseBackColor;
     private Color _hoverBackColor;
@@ -208,6 +211,9 @@ namespace ModernUI
         FlatAppearance.BorderSize = 0;
         UseVisualStyleBackColor = false;
         CornerRadius = 12;
+        ShowHoverBorder = true;
+        HoverBorderColor = SystemColors.Highlight;
+        HoverBorderThickness = 1.5f;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
 
         _baseBackColor = BackColor;
@@ -238,6 +244,16 @@ namespace ModernUI
             using (SolidBrush brush = new SolidBrush(fill))
             {
                 e.Graphics.FillPath(brush, path);
+            }
+
+            if (ShowHoverBorder && Enabled && _isHovering && HoverBorderColor.A > 0)
+            {
+                float thickness = HoverBorderThickness > 0 ? HoverBorderThickness : 1f;
+                using (Pen hoverPen = new Pen(HoverBorderColor, thickness))
+                {
+                    hoverPen.Alignment = PenAlignment.Inset;
+                    e.Graphics.DrawPath(hoverPen, path);
+                }
             }
 
             if (Focused && ShowFocusCues)
@@ -315,6 +331,7 @@ namespace ModernUI
         _isHovering = true;
         Cursor = Cursors.Hand;
         BackColor = _hoverBackColor;
+        Invalidate();
     }
 
     protected override void OnMouseLeave(EventArgs e)
@@ -323,6 +340,7 @@ namespace ModernUI
         {
             _isHovering = false;
             BackColor = _baseBackColor;
+            Invalidate();
         }
 
         base.OnMouseLeave(e);
@@ -574,6 +592,8 @@ function Set-ModernTheme {
         }
         if ($ctl -is [ModernUI.RoundedButton]) {
           $ctl.CornerRadius = 4
+          try { $ctl.HoverBorderColor = $accentHv } catch {}
+          try { $ctl.HoverBorderThickness = 1.5 } catch {}
         }
       }
       'System\.Windows\.Forms\.TextBox' {
