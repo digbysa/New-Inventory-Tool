@@ -122,7 +122,7 @@ function Update-SearchDependentButtonStates {
 
   if ($btnRoundNow) {
     try {
-      $shouldEnableRoundNow = $hasDeviceType
+      $shouldEnableRoundNow = -not $hasDeviceType
       if ($btnRoundNow.Enabled -ne $shouldEnableRoundNow) {
         $btnRoundNow.Enabled = $shouldEnableRoundNow
       }
