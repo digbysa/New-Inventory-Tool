@@ -3293,6 +3293,30 @@ function Get-ValidLocationSelection {
   return $null
 }
 
+function Restore-ComboSelectionLater {
+  param(
+    [System.Windows.Forms.ComboBox]$Combo,
+    [object]$SelectionStart,
+    [object]$SelectionLength
+  )
+  if(-not $Combo){ return }
+  if($SelectionStart -eq $null){ return }
+  $apply = {
+    param($ctrl, $start, $length)
+    try {
+      $resolvedStart = [math]::Min($start, $ctrl.Text.Length)
+      $ctrl.SelectionStart = $resolvedStart
+      if($length -ne $null){
+        $ctrl.SelectionLength = [math]::Min($length, $ctrl.Text.Length - $resolvedStart)
+      }
+    } catch {}
+  }
+  & $apply $Combo $SelectionStart $SelectionLength
+  try {
+    $null = $Combo.BeginInvoke($apply, @($Combo, $SelectionStart, $SelectionLength))
+  } catch {}
+}
+
 function Set-ComboTextIfChanged {
   param(
     [System.Windows.Forms.ComboBox]$Combo,
@@ -3309,15 +3333,7 @@ function Set-ComboTextIfChanged {
     $selLength = $Combo.SelectionLength
   } catch {}
   $Combo.Text = $target
-  if($selStart -ne $null){
-    $restoreStart = [math]::Min($selStart, $Combo.Text.Length)
-    try {
-      $Combo.SelectionStart = $restoreStart
-      if($selLength -ne $null){
-        $Combo.SelectionLength = [math]::Min($selLength, $Combo.Text.Length - $restoreStart)
-      }
-    } catch {}
-  }
+  Restore-ComboSelectionLater $Combo $selStart $selLength
 }
 
 function Populate-Location-Combos {
@@ -3480,19 +3496,31 @@ $btnRemove.Add_Click({
 })
 $cmbCity.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
+  $selStart = $null; $selLength = $null
+  try { $selStart = $cmbCity.SelectionStart; $selLength = $cmbCity.SelectionLength } catch {}
   Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'City' -PreserveInvalidSelections
+  Restore-ComboSelectionLater $cmbCity $selStart $selLength
 })
 $cmbLocation.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
+  $selStart = $null; $selLength = $null
+  try { $selStart = $cmbLocation.SelectionStart; $selLength = $cmbLocation.SelectionLength } catch {}
   Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Location' -PreserveInvalidSelections
+  Restore-ComboSelectionLater $cmbLocation $selStart $selLength
 })
 $cmbBuilding.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
+  $selStart = $null; $selLength = $null
+  try { $selStart = $cmbBuilding.SelectionStart; $selLength = $cmbBuilding.SelectionLength } catch {}
   Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Building' -PreserveInvalidSelections
+  Restore-ComboSelectionLater $cmbBuilding $selStart $selLength
 })
 $cmbFloor.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
+  $selStart = $null; $selLength = $null
+  try { $selStart = $cmbFloor.SelectionStart; $selLength = $cmbFloor.SelectionLength } catch {}
   Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Floor' -PreserveInvalidSelections
+  Restore-ComboSelectionLater $cmbFloor $selStart $selLength
 })
 # ---- Actions ----
 function Focus-ScanInput(){
