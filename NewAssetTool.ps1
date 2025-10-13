@@ -3252,69 +3252,6 @@ function Populate-UI($displayRec,$parentRec){
 }
 # ---- Location cascading (City > Location > Building > Floor > Room) ----
 $script:IsPopulatingLocationCombos = $false
-$script:LocationComboCaretState = @{}
-
-function Remember-LocationComboCaret {
-  param(
-    [System.Windows.Forms.ComboBox]$Combo,
-    [string]$Key
-  )
-  if(-not $Combo -or [string]::IsNullOrWhiteSpace($Key)){ return }
-  try {
-    $script:LocationComboCaretState[$Key] = [pscustomobject]@{
-      Start  = $Combo.SelectionStart
-      Length = $Combo.SelectionLength
-    }
-  } catch {}
-}
-
-function Restore-LocationComboCaret {
-  param(
-    [System.Windows.Forms.ComboBox]$Combo,
-    [string]$Key
-  )
-  if(-not $Combo -or [string]::IsNullOrWhiteSpace($Key)){ return }
-  try {
-    $state = $null
-    if($script:LocationComboCaretState.ContainsKey($Key)){
-      $state = $script:LocationComboCaretState[$Key]
-      [void]$script:LocationComboCaretState.Remove($Key)
-    }
-    $length = if($Combo.Text){ $Combo.Text.Length } else { 0 }
-    if($state){
-      $start = [System.Math]::Max(0,[int]$state.Start)
-      $start = [System.Math]::Min($start,$length)
-      $selLength = [System.Math]::Max(0,[int]$state.Length)
-      if(($start + $selLength) -gt $length){
-        $selLength = [System.Math]::Max(0,$length - $start)
-      }
-      try { $Combo.SelectionStart = $start } catch {}
-      try { $Combo.SelectionLength = $selLength } catch {}
-    } else {
-      if($Combo.SelectedIndex -lt 0){
-        try { $Combo.SelectionStart = $length } catch {}
-        try { $Combo.SelectionLength = 0 } catch {}
-      }
-    }
-  } catch {}
-}
-
-function Set-LocationComboText {
-  param(
-    [System.Windows.Forms.ComboBox]$Combo,
-    [string]$Value,
-    [string]$Key
-  )
-  if(-not $Combo){ return }
-  $target = if($Value){ $Value } else { '' }
-  $current = '' + $Combo.Text
-  if($current -ceq $target){
-    Restore-LocationComboCaret $Combo $Key
-    return
-  }
-  try { $Combo.Text = $target } catch {}
-  Restore-LocationComboCaret $Combo $Key
-}
 
 function Filter-LocationRows {
   param(
@@ -3364,7 +3301,6 @@ function Populate-Location-Combos {
     [string]$f,
     [string]$r,
     [switch]$PreserveInvalidSelections,
-    [switch]$PreserveDownstream,
     [ValidateSet('City','Location','Building','Floor','Room')]
     [string]$ChangedLevel
   )
@@ -3373,16 +3309,16 @@ function Populate-Location-Combos {
     $cmbCity.Items.Clear(); $cmbLocation.Items.Clear(); $cmbBuilding.Items.Clear(); $cmbFloor.Items.Clear(); $cmbRoom.Items.Clear()
 
     switch ($ChangedLevel) {
-      'City'      { if(-not $PreserveDownstream){ $loc = $null; $b = $null; $f = $null; $r = $null } }
-      'Location'  { if(-not $PreserveDownstream){ $b = $null; $f = $null; $r = $null } }
-      'Building'  { if(-not $PreserveDownstream){ $f = $null; $r = $null } }
-      'Floor'     { if(-not $PreserveDownstream){ $r = $null } }
+      'City'      { $loc = $null; $b = $null; $f = $null; $r = $null }
+      'Location'  { $b = $null; $f = $null; $r = $null }
+      'Building'  { $f = $null; $r = $null }
+      'Floor'     { $r = $null }
     }
 
     # City
     $cities = $script:LocationRows | ForEach-Object { Get-LocVal $_ 'City' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
     $cmbCity.Items.AddRange(@($cities))
-    Set-LocationComboText $cmbCity $city 'City'
+    $cmbCity.Text = if($city){ $city } else { '' }
     $validCity = Get-ValidLocationSelection $cmbCity.Text $cities
     if(-not $validCity -and -not $PreserveInvalidSelections){ $cmbCity.Text = '' }
     $filterCity = if($validCity){ $validCity } else { $null }
@@ -3391,7 +3327,7 @@ function Populate-Location-Combos {
     $locRows = Filter-LocationRows $filterCity $null $null $null
     $locs = $locRows | ForEach-Object { Get-LocVal $_ 'Location' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
     $cmbLocation.Items.AddRange(@($locs))
-    Set-LocationComboText $cmbLocation $loc 'Location'
+    $cmbLocation.Text = if($loc){ $loc } else { '' }
     $validLocation = Get-ValidLocationSelection $cmbLocation.Text $locs
     if(-not $validLocation -and -not $PreserveInvalidSelections){ $cmbLocation.Text = '' }
     $filterLocation = if($validLocation){ $validLocation } else { $null }
@@ -3403,7 +3339,7 @@ function Populate-Location-Combos {
       $blds = $bldRows | ForEach-Object { Get-LocVal $_ 'Building' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
     }
     $cmbBuilding.Items.AddRange(@($blds))
-    Set-LocationComboText $cmbBuilding $b 'Building'
+    $cmbBuilding.Text = if($b){ $b } else { '' }
     $validBuilding = Get-ValidLocationSelection $cmbBuilding.Text $blds
     if(-not $validBuilding -and -not $PreserveInvalidSelections){ $cmbBuilding.Text = '' }
     $filterBuilding = if($validBuilding){ $validBuilding } else { $null }
@@ -3416,7 +3352,7 @@ function Populate-Location-Combos {
       $floors = Sort-Floors $floors
     }
     $cmbFloor.Items.AddRange(@($floors))
-    Set-LocationComboText $cmbFloor $f 'Floor'
+    $cmbFloor.Text = if($f){ $f } else { '' }
     $validFloor = Get-ValidLocationSelection $cmbFloor.Text $floors
     if(-not $validFloor -and -not $PreserveInvalidSelections){ $cmbFloor.Text = '' }
     $filterFloor = if($validFloor){ $validFloor } else { $null }
@@ -3428,7 +3364,7 @@ function Populate-Location-Combos {
       $rooms = $roomRows | ForEach-Object { Get-LocVal $_ 'Room' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
     }
     $cmbRoom.Items.AddRange(@($rooms))
-    Set-LocationComboText $cmbRoom $r 'Room'
+    $cmbRoom.Text = if($r){ $r } else { '' }
     $validRoom = Get-ValidLocationSelection $cmbRoom.Text $rooms
     if(-not $validRoom -and -not $PreserveInvalidSelections){ $cmbRoom.Text = '' }
   }
@@ -3509,17 +3445,11 @@ $cmbLocation.Add_TextChanged({
 })
 $cmbBuilding.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
-  Remember-LocationComboCaret $cmbBuilding 'Building'
-  $manual = $true
-  try { $manual = ($cmbBuilding.SelectedIndex -lt 0) } catch { $manual = $true }
-  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Building' -PreserveInvalidSelections -PreserveDownstream:$manual
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Building' -PreserveInvalidSelections
 })
 $cmbFloor.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
-  Remember-LocationComboCaret $cmbFloor 'Floor'
-  $manual = $true
-  try { $manual = ($cmbFloor.SelectedIndex -lt 0) } catch { $manual = $true }
-  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Floor' -PreserveInvalidSelections -PreserveDownstream:$manual
+  Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'Floor' -PreserveInvalidSelections
 })
 # ---- Actions ----
 function Focus-ScanInput(){
