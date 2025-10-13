@@ -3293,6 +3293,33 @@ function Get-ValidLocationSelection {
   return $null
 }
 
+function Set-ComboTextIfChanged {
+  param(
+    [System.Windows.Forms.ComboBox]$Combo,
+    [string]$Text
+  )
+  if(-not $Combo){ return }
+  $target = if($Text){ $Text } else { '' }
+  $current = if($Combo.Text){ $Combo.Text } else { '' }
+  if($current -eq $target){ return }
+  $selStart = $null
+  $selLength = $null
+  try {
+    $selStart = $Combo.SelectionStart
+    $selLength = $Combo.SelectionLength
+  } catch {}
+  $Combo.Text = $target
+  if($selStart -ne $null){
+    $restoreStart = [math]::Min($selStart, $Combo.Text.Length)
+    try {
+      $Combo.SelectionStart = $restoreStart
+      if($selLength -ne $null){
+        $Combo.SelectionLength = [math]::Min($selLength, $Combo.Text.Length - $restoreStart)
+      }
+    } catch {}
+  }
+}
+
 function Populate-Location-Combos {
   param(
     [string]$city,
@@ -3311,25 +3338,23 @@ function Populate-Location-Combos {
     switch ($ChangedLevel) {
       'City'      { $loc = $null; $b = $null; $f = $null; $r = $null }
       'Location'  { $b = $null; $f = $null; $r = $null }
-      'Building'  { $f = $null; $r = $null }
-      'Floor'     { $r = $null }
     }
 
     # City
     $cities = $script:LocationRows | ForEach-Object { Get-LocVal $_ 'City' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
     $cmbCity.Items.AddRange(@($cities))
-    $cmbCity.Text = if($city){ $city } else { '' }
+    Set-ComboTextIfChanged $cmbCity ($city)
     $validCity = Get-ValidLocationSelection $cmbCity.Text $cities
-    if(-not $validCity -and -not $PreserveInvalidSelections){ $cmbCity.Text = '' }
+    if(-not $validCity -and -not $PreserveInvalidSelections){ Set-ComboTextIfChanged $cmbCity '' }
     $filterCity = if($validCity){ $validCity } else { $null }
 
     # Location (filtered by City if present)
     $locRows = Filter-LocationRows $filterCity $null $null $null
     $locs = $locRows | ForEach-Object { Get-LocVal $_ 'Location' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
     $cmbLocation.Items.AddRange(@($locs))
-    $cmbLocation.Text = if($loc){ $loc } else { '' }
+    Set-ComboTextIfChanged $cmbLocation ($loc)
     $validLocation = Get-ValidLocationSelection $cmbLocation.Text $locs
-    if(-not $validLocation -and -not $PreserveInvalidSelections){ $cmbLocation.Text = '' }
+    if(-not $validLocation -and -not $PreserveInvalidSelections){ Set-ComboTextIfChanged $cmbLocation '' }
     $filterLocation = if($validLocation){ $validLocation } else { $null }
 
     # Building
@@ -3339,9 +3364,9 @@ function Populate-Location-Combos {
       $blds = $bldRows | ForEach-Object { Get-LocVal $_ 'Building' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
     }
     $cmbBuilding.Items.AddRange(@($blds))
-    $cmbBuilding.Text = if($b){ $b } else { '' }
+    Set-ComboTextIfChanged $cmbBuilding ($b)
     $validBuilding = Get-ValidLocationSelection $cmbBuilding.Text $blds
-    if(-not $validBuilding -and -not $PreserveInvalidSelections){ $cmbBuilding.Text = '' }
+    if(-not $validBuilding -and -not $PreserveInvalidSelections){ Set-ComboTextIfChanged $cmbBuilding '' }
     $filterBuilding = if($validBuilding){ $validBuilding } else { $null }
 
     # Floor
@@ -3352,9 +3377,9 @@ function Populate-Location-Combos {
       $floors = Sort-Floors $floors
     }
     $cmbFloor.Items.AddRange(@($floors))
-    $cmbFloor.Text = if($f){ $f } else { '' }
+    Set-ComboTextIfChanged $cmbFloor ($f)
     $validFloor = Get-ValidLocationSelection $cmbFloor.Text $floors
-    if(-not $validFloor -and -not $PreserveInvalidSelections){ $cmbFloor.Text = '' }
+    if(-not $validFloor -and -not $PreserveInvalidSelections){ Set-ComboTextIfChanged $cmbFloor '' }
     $filterFloor = if($validFloor){ $validFloor } else { $null }
 
     # Room
@@ -3364,13 +3389,25 @@ function Populate-Location-Combos {
       $rooms = $roomRows | ForEach-Object { Get-LocVal $_ 'Room' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
     }
     $cmbRoom.Items.AddRange(@($rooms))
-    $cmbRoom.Text = if($r){ $r } else { '' }
+    Set-ComboTextIfChanged $cmbRoom ($r)
     $validRoom = Get-ValidLocationSelection $cmbRoom.Text $rooms
-    if(-not $validRoom -and -not $PreserveInvalidSelections){ $cmbRoom.Text = '' }
+    if(-not $validRoom -and -not $PreserveInvalidSelections){ Set-ComboTextIfChanged $cmbRoom '' }
   }
   finally {
     $script:IsPopulatingLocationCombos = $false
   }
+}
+
+function Should-SkipExcludedDevice {
+  param([object]$device)
+  if(-not $device){ return $false }
+  try {
+    if($chkShowExcluded -and -not $chkShowExcluded.Checked){
+      $mt = ('' + $device.u_device_rounding).Trim()
+      if($mt -match '^(?i)Excluded$'){ return $true }
+    }
+  } catch {}
+  return $false
 }
 function Toggle-EditLocation(){
   $script:editing = -not $script:editing
@@ -3435,6 +3472,12 @@ function Toggle-EditLocation(){
     $btnEditLoc.Text="Edit Location"
   }
 }
+$btnRemove.Add_Click({
+  $pc = $script:CurrentParent
+  if(-not $pc){ return }
+  if(Should-SkipExcludedDevice $pc){ return }
+  Remove-Selected-Associations $pc
+})
 $cmbCity.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
   Populate-Location-Combos $cmbCity.Text $cmbLocation.Text $cmbBuilding.Text $cmbFloor.Text $cmbRoom.Text -ChangedLevel 'City' -PreserveInvalidSelections
@@ -3524,12 +3567,6 @@ $btnAddPeripheral.Add_Click({
   } catch {}
   Show-AddPeripheralDialog $pc
 })
-$btnRemove.Add_Click({
-  $pc = $script:CurrentParent
-  if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
- Remove-Selected-Associations $pc }
-})
 # Double-click a grid row to open that record
 $dgv.Add_CellDoubleClick({
   if($_.RowIndex -lt 0){ return }
@@ -3580,10 +3617,14 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
   $pc = $script:CurrentParent
   if(-not $pc){ $pc = Resolve-ParentComputer (Find-RecordRaw $txtAT.Text) }
   if(-not $pc){ $pc = $script:CurrentDisplay }
-  $url = $null
-  if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
- $url = Get-RoundingUrlForParent $pc }
+  $shouldSkip = $false
+  if($pc){ $shouldSkip = Should-SkipExcludedDevice $pc }
+  if($shouldSkip){
+    [System.Windows.Forms.MessageBox]::Show("This device is marked as Excluded. Enable 'Excluded' to log rounding.","Save Event") | Out-Null
+    Focus-ScanInput
+    return
+  }
+  $url = if($pc){ Get-RoundingUrlForParent $pc } else { $null }
   $deptValue = ''
   if($cmbDept -and $cmbDept.Text){ $deptValue = $cmbDept.Text }
   elseif($txtDept -and $txtDept.Text){ $deptValue = $txtDept.Text }
@@ -3595,15 +3636,9 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
   }
   $row = [pscustomobject]@{
     Timestamp        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-    AssetTag         = if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
-$pc.asset_tag}else{$null}
-    Name             = if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
-$pc.name}else{$null}
-    Serial           = if($pc){
-      try{ if(-not $chkShowExcluded.Checked){ $mt = ('' + $pc.u_device_rounding).Trim(); if($mt -match '^(?i)Excluded$'){ continue } } } catch {}
-$pc.serial_number}else{$null}
+    AssetTag         = if($pc){ $pc.asset_tag } else { $null }
+    Name             = if($pc){ $pc.name } else { $null }
+    Serial           = if($pc){ $pc.serial_number } else { $null }
     City             = $txtCity.Text
     Location         = $txtLocation.Text
     Building         = $txtBldg.Text
