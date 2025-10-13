@@ -4110,7 +4110,9 @@ $dgvNearby.Columns.Add((New-NearCol 'Location' 'Location' 120))      | Out-Null
 $dgvNearby.Columns.Add((New-NearCol 'Building' 'Building' 110))      | Out-Null
 $dgvNearby.Columns.Add((New-NearCol 'Floor' 'Floor' 80))             | Out-Null
 $dgvNearby.Columns.Add((New-NearCol 'Room' 'Room' 90))               | Out-Null
-$dgvNearby.Columns.Add((New-NearCol 'Department' 'Department' 160)) | Out-Null; $dgvNearby.Columns.Add((New-NearCol 'LastRounded' 'Last Rounded' 130))| Out-Null
+$dgvNearby.Columns.Add((New-NearCol 'Department' 'Department' 160)) | Out-Null
+$dgvNearby.Columns.Add((New-NearCol 'MaintenanceType' 'Maintenance Type' 160)) | Out-Null
+$dgvNearby.Columns.Add((New-NearCol 'LastRounded' 'Last Rounded' 130)) | Out-Null
 $dgvNearby.Columns.Add((New-NearCol 'DaysAgo' 'Days Ago' 90))        | Out-Null
 # Status Combo column
 $colStatus = New-Object System.Windows.Forms.DataGridViewComboBoxColumn
@@ -4303,7 +4305,8 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $r.Cells['Building'].Value  = $pc.u_building
     $r.Cells['Floor'].Value     = $pc.u_floor
     $r.Cells['Room'].Value      = $pc.u_room
-      $r.Cells['Department'].Value = $pc.u_department_location
+    $r.Cells['Department'].Value = $pc.u_department_location
+    $r.Cells['MaintenanceType'].Value = ('' + $pc.u_device_rounding).Trim()
     $r.Cells['LastRounded'].Value = (Fmt-DateLong $lr)
     $r.Cells['DaysAgo'].Value   = $days
     $r.Cells['Status'].Value    = "—"
