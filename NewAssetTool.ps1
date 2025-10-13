@@ -964,6 +964,7 @@ function Get-DetectedType($rec){
   if($rec.Type -eq 'Mic' -or $rec.Kind -eq 'Mic'){ return 'Microphone' }
   if($rec.Type -eq 'Scanner' -or $rec.Kind -eq 'Scanner'){ return 'Scanner' }
   if($rec.Type -eq 'Computer' -or $rec.Kind -eq 'Computer'){
+    if($rec.name -match '^(?i)WT'){ return 'Thin Client' }
     if($rec.name -match '^(?i)PC'){ return 'Desktop' }
     if($rec.name -match '^(?i)LD'){ return 'Laptop' }
     if($rec.name -match '^(?i)AO'){ return 'Tangent' }
