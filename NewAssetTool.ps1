@@ -746,6 +746,18 @@ function HostnameKeyVariants([string]$raw){
   }
   return $out
 }
+function Get-AssetKeyVariants([string]$raw){
+  $variants = New-Object System.Collections.ArrayList
+  if([string]::IsNullOrWhiteSpace($raw)){ return $variants }
+  $key = $raw.Trim().ToUpper()
+  if([string]::IsNullOrWhiteSpace($key)){ return $variants }
+  if(-not $variants.Contains($key)){ [void]$variants.Add($key) }
+  $canon = Canonical-Asset $key
+  if($canon -and -not $variants.Contains($canon)){ [void]$variants.Add($canon) }
+  $compact = ($key -replace '[-\s]','')
+  if($compact -and -not $variants.Contains($compact)){ [void]$variants.Add($compact) }
+  return $variants
+}
 function Normalize-Scan([string]$raw){
   if([string]::IsNullOrWhiteSpace($raw)){return $null}
   $s=$raw.Trim().ToUpper()
@@ -824,12 +836,10 @@ function Build-Indices {
   $script:ComputerByAsset.Clear(); $script:ComputerByName.Clear()
   foreach($rec in $script:Computers){
     if($rec.asset_tag){
-      $rawKey = $rec.asset_tag.Trim().ToUpper()
-      $canon  = Canonical-Asset $rawKey
-      $script:IndexByAsset[$rawKey] = $rec
-      if($canon){ $script:IndexByAsset[$canon] = $rec }
-      $script:ComputerByAsset[$rawKey] = $rec
-      if($canon){ $script:ComputerByAsset[$canon] = $rec }
+      foreach($variant in (Get-AssetKeyVariants $rec.asset_tag)){
+        $script:IndexByAsset[$variant] = $rec
+        $script:ComputerByAsset[$variant] = $rec
+      }
     }
     if($rec.serial_number){ $script:IndexBySerial[$rec.serial_number.ToUpper()] = $rec }
     if($rec.name){
@@ -844,10 +854,9 @@ function Build-Indices {
     if(-not $collection){ continue }
     foreach($rec in $collection){
       if($rec.asset_tag){
-        $rawKey = $rec.asset_tag.Trim().ToUpper()
-        $canon  = Canonical-Asset $rawKey
-        $script:IndexByAsset[$rawKey] = $rec
-        if($canon){ $script:IndexByAsset[$canon] = $rec }
+        foreach($variant in (Get-AssetKeyVariants $rec.asset_tag)){
+          $script:IndexByAsset[$variant] = $rec
+        }
       }
       if($rec.serial_number){ $script:IndexBySerial[$rec.serial_number.ToUpper()] = $rec }
       if($rec.name){
