@@ -831,6 +831,16 @@ function Sort-Floors {
   }
   return ($pairs | Sort-Object G,R,S | Select-Object -ExpandProperty Orig)
 }
+function Register-SerialIndex([string]$serial,$record){
+  if([string]::IsNullOrWhiteSpace($serial) -or -not $record){ return }
+  $serialKey = $serial.Trim().ToUpper()
+  if([string]::IsNullOrWhiteSpace($serialKey)){ return }
+  $script:IndexBySerial[$serialKey] = $record
+  $compactSerial = ($serialKey -replace '[-\s]','')
+  if($compactSerial -and ($compactSerial -ne $serialKey)){
+    $script:IndexBySerial[$compactSerial] = $record
+  }
+}
 function Build-Indices {
   $script:IndexByAsset.Clear(); $script:IndexBySerial.Clear(); $script:IndexByName.Clear()
   $script:ComputerByAsset.Clear(); $script:ComputerByName.Clear()
@@ -841,7 +851,7 @@ function Build-Indices {
         $script:ComputerByAsset[$variant] = $rec
       }
     }
-    if($rec.serial_number){ $script:IndexBySerial[$rec.serial_number.ToUpper()] = $rec }
+    if($rec.serial_number){ Register-SerialIndex $rec.serial_number $rec }
     if($rec.name){
       foreach($k in (HostnameKeyVariants $rec.name)){
         $script:IndexByName[$k] = $rec
@@ -858,7 +868,7 @@ function Build-Indices {
           $script:IndexByAsset[$variant] = $rec
         }
       }
-      if($rec.serial_number){ $script:IndexBySerial[$rec.serial_number.ToUpper()] = $rec }
+      if($rec.serial_number){ Register-SerialIndex $rec.serial_number $rec }
       if($rec.name){
         foreach($k in (HostnameKeyVariants $rec.name)){ $script:IndexByName[$k] = $rec }
       }
