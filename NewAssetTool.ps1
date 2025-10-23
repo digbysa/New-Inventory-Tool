@@ -740,6 +740,8 @@ function HostnameKeyVariants([string]$raw){
   if([string]::IsNullOrWhiteSpace($raw)){ return $out }
   $u = $raw.Trim().ToUpper()
   [void]$out.Add($u)
+  $compact = ($u -replace '[-\s]','')
+  if($compact -and -not $out.Contains($compact)){ [void]$out.Add($compact) }
   if($u -match '^(AO)-?(.+)$'){
     [void]$out.Add(('{0}-{1}' -f $matches[1],$matches[2]))
     [void]$out.Add(('{0}{1}'  -f $matches[1],$matches[2]))
@@ -2811,30 +2813,72 @@ function Normalize-UniversalSearch([string]$raw){
 }
 function Resolve-PeripheralLookup([string]$query){
   $normalizedInput = Normalize-UniversalSearch $query
-  if([string]::IsNullOrWhiteSpace($normalizedInput)){
+  $rawUpper = $null
+  if(-not [string]::IsNullOrWhiteSpace($query)){
+    $rawUpper = $query.Trim().ToUpper()
+  }
+  if([string]::IsNullOrWhiteSpace($normalizedInput) -and [string]::IsNullOrWhiteSpace($rawUpper)){
     return [pscustomobject]@{ NormalizedInput=$null; LinkValue=$null; Candidate=$null; Kind=$null; LookupKey=$null }
   }
-  $scan = Normalize-Scan $normalizedInput
+
+  $scan = $null
+  try { $scan = Normalize-Scan $query } catch {}
   $value = $null; $kind = $null
+  $keys = New-Object System.Collections.ArrayList
+  $addKey = {
+    param($candidate)
+    if([string]::IsNullOrWhiteSpace($candidate)){ return }
+    $upper = $candidate.Trim().ToUpper()
+    if([string]::IsNullOrWhiteSpace($upper)){ return }
+    if(-not $keys.Contains($upper)){ [void]$keys.Add($upper) }
+  }
+
   if($scan){
     $value = $scan.Value
     $kind  = $scan.Kind
+    if(-not [string]::IsNullOrWhiteSpace($value)){
+      if($scan.Kind -eq 'AssetTag'){
+        foreach($variant in (Get-AssetKeyVariants $value)){ & $addKey $variant }
+      } elseif($scan.Kind -eq 'Hostname'){
+        foreach($variant in (HostnameKeyVariants $value)){ & $addKey $variant }
+      } else {
+        & $addKey $value
+      }
+    }
   }
-  if([string]::IsNullOrWhiteSpace($value)){ $value = $normalizedInput }
-  $key = $null
-  if(-not [string]::IsNullOrWhiteSpace($value)){ $key = $value.Trim().ToUpper() }
+
+  if([string]::IsNullOrWhiteSpace($value)){
+    if(-not [string]::IsNullOrWhiteSpace($normalizedInput)){ $value = $normalizedInput }
+    elseif(-not [string]::IsNullOrWhiteSpace($rawUpper)){ $value = $rawUpper }
+  }
+
+  if(-not [string]::IsNullOrWhiteSpace($normalizedInput)){ & $addKey $normalizedInput }
+  if(-not [string]::IsNullOrWhiteSpace($rawUpper)){
+    & $addKey $rawUpper
+    $compactRaw = ($rawUpper -replace '[-\s]','')
+    if($compactRaw -and ($compactRaw -ne $rawUpper)){ & $addKey $compactRaw }
+  }
+
   $cand = $null
-  if($key){
-    if($script:IndexByAsset.ContainsKey($key))      { $cand = $script:IndexByAsset[$key] }
-    elseif($script:IndexBySerial.ContainsKey($key)) { $cand = $script:IndexBySerial[$key] }
-    elseif($script:IndexByName.ContainsKey($key))   { $cand = $script:IndexByName[$key] }
+  $matchedKey = $null
+  foreach($key in $keys){
+    if($script:IndexByAsset.ContainsKey($key))      { $cand = $script:IndexByAsset[$key];      $matchedKey = $key; break }
+    if($script:IndexBySerial.ContainsKey($key))     { $cand = $script:IndexBySerial[$key];     $matchedKey = $key; break }
+    if($script:IndexByName.ContainsKey($key))       { $cand = $script:IndexByName[$key];       $matchedKey = $key; break }
   }
+
+  if(-not $kind -and $cand){
+    if(-not [string]::IsNullOrWhiteSpace($cand.name)){ $kind = 'Name' }
+    elseif(-not [string]::IsNullOrWhiteSpace($cand.asset_tag)){ $kind = 'AssetTag' }
+    elseif(-not [string]::IsNullOrWhiteSpace($cand.serial_number)){ $kind = 'Serial' }
+  }
+
   return [pscustomobject]@{
-    NormalizedInput = $normalizedInput
+    NormalizedInput = if($normalizedInput){ $normalizedInput } else { $rawUpper }
     LinkValue       = $value
     Candidate       = $cand
     Kind            = $kind
-    LookupKey       = $key
+    LookupKey       = $matchedKey
   }
 }
 function Get-ProposedParentToken($cand,$parentRec){
@@ -2972,7 +3016,7 @@ function Link-Peripheral([string]$query,$parentRec,$lookupResult=$null){
 function Show-AddPeripheralDialog($parentRec){
   if(-not $parentRec){ return }
   $dialog = New-Object System.Windows.Forms.Form
-  $dialog.Text = 'Add Peripheral (AssetTag/Serial)'
+  $dialog.Text = 'Add Peripheral (Name/Asset/Serial)'
   $dialog.StartPosition = 'CenterParent'
   $dialog.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
   $dialog.MaximizeBox = $false
@@ -3003,14 +3047,14 @@ function Show-AddPeripheralDialog($parentRec){
   $inputPanel.RowStyles.Clear()
   for($i=0;$i -lt 3;$i++){ [void]$inputPanel.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) ) }
   $lblSearch = New-Object System.Windows.Forms.Label
-  $lblSearch.Text = 'Universal Search:'
+  $lblSearch.Text = 'Universal Search (name / asset / serial):'
   $lblSearch.AutoSize = $true
   $lblSearch.Margin = '0,0,0,2'
   $txtSearch = New-Object System.Windows.Forms.TextBox
   $txtSearch.Width = 260
   $txtSearch.Margin = '0,0,0,4'
   $lblHint = New-Object System.Windows.Forms.Label
-  $lblHint.Text = 'Press Enter to search.'
+  $lblHint.Text = 'Press Enter to search by cart name, asset tag, or serial number.'
   $lblHint.AutoSize = $true
   $lblHint.ForeColor = $script:ThemeColors.MutedText
   $lblHint.Margin = '0,0,0,0'
