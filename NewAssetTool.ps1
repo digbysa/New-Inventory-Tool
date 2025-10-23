@@ -2890,17 +2890,57 @@ function Get-PeripheralLinkPreview($cand,$parentRec){
     ProposedParentDisplay = if([string]::IsNullOrWhiteSpace($parentDisplay)){ '' } else { $parentDisplay }
   }
 }
+function Resolve-ParentAssetTag([string]$token){
+  if([string]::IsNullOrWhiteSpace($token)){ return '' }
+  $trimmed = $token.Trim()
+
+  $assetKeys = New-Object System.Collections.ArrayList
+  foreach($variant in (Get-AssetKeyVariants $trimmed)){
+    if(-not $assetKeys.Contains($variant)){ [void]$assetKeys.Add($variant) }
+  }
+  $upper = $trimmed.ToUpper()
+  if(-not $assetKeys.Contains($upper)){ [void]$assetKeys.Add($upper) }
+
+  foreach($key in $assetKeys){
+    if($script:IndexByAsset.ContainsKey($key)){
+      $rec = $script:IndexByAsset[$key]
+      if($rec -and -not [string]::IsNullOrWhiteSpace($rec.asset_tag)){
+        return $rec.asset_tag
+      }
+    }
+  }
+
+  $nameKeys = New-Object System.Collections.ArrayList
+  foreach($variant in (HostnameKeyVariants $trimmed)){
+    if(-not $nameKeys.Contains($variant)){ [void]$nameKeys.Add($variant) }
+  }
+  if(-not $nameKeys.Contains($upper)){ [void]$nameKeys.Add($upper) }
+
+  foreach($nameKey in $nameKeys){
+    if($script:IndexByName.ContainsKey($nameKey)){
+      $rec = $script:IndexByName[$nameKey]
+      if($rec -and -not [string]::IsNullOrWhiteSpace($rec.asset_tag)){
+        return $rec.asset_tag
+      }
+    }
+  }
+
+  return $trimmed
+}
+
 function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[string]$oldParent,[string]$newParent,[string]$oldName,[string]$newName){
   $out = if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder}
   if(-not $out){ return }
   $file = Join-Path $out 'CMDBUpdates.csv'
+  $oldParentTag = Resolve-ParentAssetTag $oldParent
+  $newParentTag = Resolve-ParentAssetTag $newParent
   $row = [pscustomobject]@{
     Timestamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
     Action    = $action
     DeviceType= $deviceType
     AssetTag  = $childAT
-    OldParent = $oldParent
-    NewParent = $newParent
+    OldParent = $oldParentTag
+    NewParent = $newParentTag
     OldName   = $oldName
     NewName   = $newName
   }
