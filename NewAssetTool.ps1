@@ -4074,6 +4074,24 @@ function Get-ExcludedDevices-Set {
   }
   return $set
 }
+function Update-NearbyCheckboxLabels {
+  param(
+    [int]$todayCount,
+    [int]$excludedCount
+  )
+
+  try {
+    if ($chkTodayRounded) {
+      $chkTodayRounded.Text = "Today's Rounded ({0})" -f $todayCount
+    }
+  } catch {}
+
+  try {
+    if ($chkShowExcluded) {
+      $chkShowExcluded.Text = "Excluded ({0})" -f $excludedCount
+    }
+  } catch {}
+}
 function Get-LatestRoundForAsset([string]$assetTag,[Nullable[datetime]]$fallback){
   $best = $null
 if($assetTag -and $script:RoundingEvents){
@@ -4148,6 +4166,7 @@ $btnClearScopes.Text = "Clear List"
 $btnClearScopes.AutoSize = $true
 $btnClearScopes.Location = '700,6'
 $nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$btnClearScopes))
+Update-NearbyCheckboxLabels 0 0
 $btnNearbyShowAll.Add_Click({
   try {
     if (-not $script:NearbyShowAllChanges) {
@@ -4479,6 +4498,8 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   Load-RoundingEvents
   $todaySet = Get-RoundedToday-Set
   $excludedSet = Get-ExcludedDevices-Set
+  $todayCount = 0
+  $excludedCount = 0
   $dgvNearby.Rows.Clear()
   $seen = New-Object System.Collections.Generic.HashSet[string]
   foreach ($pc in $script:Computers) {
@@ -4502,6 +4523,8 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
       if ($roundingFlag -match '^(?i)Excluded$') { $isExcluded = $true }
     } catch {}
     if (-not $isExcluded -and $atKey -and $excludedSet.Contains($atKey)) { $isExcluded = $true }
+    if ($isToday) { $todayCount++ }
+    if ($isExcluded) { $excludedCount++ }
     if (-not $chkTodayRounded.Checked -and $isToday) { continue }
     if (-not $chkShowExcluded.Checked -and $isExcluded) { continue }
     $rowIdx = $dgvNearby.Rows.Add()
@@ -4537,6 +4560,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   # Apply sort and filters
   Apply-NearbySort
   Apply-NearbyFilters
+  Update-NearbyCheckboxLabels $todayCount $excludedCount
 try { $dgvNearby.ResumeLayout() } catch {}
 try { $form.Cursor = [System.Windows.Forms.Cursors]::Default } catch {}}
 function Apply-NearbySort {
