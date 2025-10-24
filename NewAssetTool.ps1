@@ -2701,7 +2701,7 @@ function Refresh-AssocGrid($parentRec){
   $dgv.Rows.Clear(); if(-not $parentRec){ Size-AssocForRows(1) | Out-Null; return }
   $prow = $dgv.Rows.Add()
   $dgv.Rows[$prow].Cells['Role'].Value='Parent'
-  $dgv.Rows[$prow].Cells['Type'].Value='Computer'
+  $dgv.Rows[$prow].Cells['Type'].Value=(Get-DetectedType $parentRec)
   $dgv.Rows[$prow].Cells['Name'].Value=$parentRec.name
   $dgv.Rows[$prow].Cells['AssetTag'].Value=$parentRec.asset_tag
   $dgv.Rows[$prow].Cells['Serial'].Value=$parentRec.serial_number
