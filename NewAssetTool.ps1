@@ -2715,6 +2715,27 @@ function Refresh-AssocGrid($parentRec){
     $r.Cells['Role'].Value='Child'
     $r.Cells['Type'].Value=$ch.Type
     if($ch.name){ $r.Cells['Name'].Value = $ch.name } else { $r.Cells['Name'].Value = '' }
+    try {
+      $expectedName = Compute-ProposedName $ch $parentRec
+      $defaultNameColor = if($dgv.DefaultCellStyle -and $dgv.DefaultCellStyle.ForeColor){
+        $dgv.DefaultCellStyle.ForeColor
+      } else {
+        [System.Drawing.Color]::FromArgb(32,32,32)
+      }
+      if(-not [string]::IsNullOrWhiteSpace($expectedName)){
+        $actualName = if($ch.name){ $ch.name.Trim() } else { '' }
+        if([string]::IsNullOrWhiteSpace($actualName) -or ($actualName.Trim().ToUpper() -ne $expectedName.Trim().ToUpper())){
+          $r.Cells['Name'].Style.ForeColor = [System.Drawing.Color]::IndianRed
+          $r.Cells['Name'].ToolTipText = "Expected name: " + $expectedName
+        } else {
+          $r.Cells['Name'].Style.ForeColor = $defaultNameColor
+          $r.Cells['Name'].ToolTipText = ''
+        }
+      } else {
+        $r.Cells['Name'].Style.ForeColor = $defaultNameColor
+        $r.Cells['Name'].ToolTipText = ''
+      }
+    } catch {}
     $r.Cells['AssetTag'].Value=$ch.asset_tag
     $r.Cells['Serial'].Value=$ch.serial_number
     if(($ch.Type -eq 'Mic') -or ($ch.Type -eq 'Scanner')){
