@@ -3944,6 +3944,12 @@ if (-not $script:ActiveNearbyScopes) {
 if (-not (Get-Variable -Scope Script -Name NearbyShowAllChanges -ErrorAction SilentlyContinue)) {
   $script:NearbyShowAllChanges = New-Object System.Collections.Generic.List[string]
 }
+if (-not (Get-Variable -Scope Script -Name NearbyLastSortColumn -ErrorAction SilentlyContinue)) {
+  $script:NearbyLastSortColumn = $null
+}
+if (-not (Get-Variable -Scope Script -Name NearbyLastSortDirection -ErrorAction SilentlyContinue)) {
+  $script:NearbyLastSortDirection = 'Asc'
+}
 if (-not $script:NEAR_STATUSES) {
   # Full set minus "Complete"
   $script:NEAR_STATUSES = @(
@@ -4413,6 +4419,8 @@ try {
     $name = $col.Name
     $dir = if ($script:NearbySortDir[$name] -eq 'Asc') { 'Desc' } else { 'Asc' }
     $script:NearbySortDir[$name] = $dir
+    $script:NearbyLastSortColumn = $name
+    $script:NearbyLastSortDirection = $dir
     $lsd = if ($dir -eq 'Asc') { [System.ComponentModel.ListSortDirection]::Ascending } else { [System.ComponentModel.ListSortDirection]::Descending }
     $sender.Sort($col, $lsd)
     $col.HeaderCell.SortGlyphDirection = if ($dir -eq 'Asc') { [System.Windows.Forms.SortOrder]::Ascending } else { [System.Windows.Forms.SortOrder]::Descending }
@@ -4585,6 +4593,25 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
 try { $dgvNearby.ResumeLayout() } catch {}
 try { $form.Cursor = [System.Windows.Forms.Cursors]::Default } catch {}}
 function Apply-NearbySort {
+  if ($dgvNearby -and $script:NearbyLastSortColumn) {
+    $col = $dgvNearby.Columns[$script:NearbyLastSortColumn]
+    if ($col) {
+      try {
+        $lsd = if ($script:NearbyLastSortDirection -eq 'Desc') { [System.ComponentModel.ListSortDirection]::Descending } else { [System.ComponentModel.ListSortDirection]::Ascending }
+        $dgvNearby.Sort($col, $lsd)
+        foreach ($otherCol in $dgvNearby.Columns) {
+          if (-not $otherCol -or $otherCol -eq $col) { continue }
+          try { $otherCol.HeaderCell.SortGlyphDirection = [System.Windows.Forms.SortOrder]::None } catch {}
+        }
+        $col.HeaderCell.SortGlyphDirection = if ($lsd -eq [System.ComponentModel.ListSortDirection]::Ascending) { [System.Windows.Forms.SortOrder]::Ascending } else { [System.Windows.Forms.SortOrder]::Descending }
+        return
+      } catch {
+        $script:NearbyLastSortColumn = $null
+      }
+    } else {
+      $script:NearbyLastSortColumn = $null
+    }
+  }
   $items = @()
   foreach ($row in $dgvNearby.Rows) {
     if ($row.IsNewRow) { continue }
