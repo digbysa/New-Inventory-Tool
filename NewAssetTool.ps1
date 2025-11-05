@@ -925,15 +925,21 @@ function Resolve-ParentComputer($rec){
   return $null
 }
 function Get-ChildrenForParent($parentRec){
-  $kids = New-Object System.Collections.ArrayList
-  if(-not $parentRec){ return $kids }
+  $relationships = New-Object System.Collections.ArrayList
+  if(-not $parentRec){ return $relationships }
   $parATKey = (Canonical-Asset $parentRec.asset_tag)
-  if([string]::IsNullOrWhiteSpace($parATKey)){ return $kids }
-  # Direct children by canonical AssetTag
-  if($script:ChildrenByParent.ContainsKey($parATKey)){
-    foreach($ch in $script:ChildrenByParent[$parATKey]){ if(-not $kids.Contains($ch)){ [void]$kids.Add($ch) } }
+  if([string]::IsNullOrWhiteSpace($parATKey)){ return $relationships }
+
+  $direct = New-Object System.Collections.ArrayList
+  $addDirect = {
+    param($item)
+    if($item -and -not $direct.Contains($item)){ [void]$direct.Add($item) }
   }
-  # Hostname/serial token matching (direct links)
+
+  if($script:ChildrenByParent.ContainsKey($parATKey)){
+    foreach($ch in $script:ChildrenByParent[$parATKey]){ & $addDirect $ch }
+  }
+
   foreach($tbl in @('Monitors','Mics','Scanners','Carts')){
     $collection = (Get-Variable -Scope Script -Name $tbl -ErrorAction SilentlyContinue).Value
     if(-not $collection){ continue }
@@ -947,16 +953,36 @@ function Get-ChildrenForParent($parentRec){
       if(-not $matchHost -and $parentRec.serial_number){
         if(($parentRec.serial_number.Trim().ToUpper()) -eq ($upa.Trim().ToUpper())){ $matchHost = $true }
       }
-      if($matchHost -and -not $kids.Contains($rec)){ [void]$kids.Add($rec) }
+      if($matchHost){ & $addDirect $rec }
     }
   }
-  # Pull in grandchildren under any Cart child (Mic/Scanner only)
-  $cartKids = @($kids | Where-Object { $_.Type -eq 'Cart' })
-  foreach($cart in $cartKids){
+
+  $getObjKey = {
+    param($obj)
+    if(-not $obj){ return $null }
+    try { return [System.Runtime.CompilerServices.RuntimeHelpers]::GetHashCode($obj) } catch {}
+    try { return $obj.GetHashCode() } catch { return $null }
+  }
+
+  $peripheralAssignments = @{}
+  $peripheralSet = New-Object System.Collections.ArrayList
+  $addPeripheral = {
+    param($peripheral,$cart)
+    if(-not $peripheral){ return }
+    if(($peripheral.Type -ne 'Mic') -and ($peripheral.Type -ne 'Scanner')){ return }
+    if(-not $peripheralSet.Contains($peripheral)){ [void]$peripheralSet.Add($peripheral) }
+    if($cart){
+      $key = & $getObjKey $peripheral
+      if($key -ne $null){ $peripheralAssignments[$key] = $cart }
+    }
+  }
+
+  $carts = @($direct | Where-Object { $_.Type -eq 'Cart' })
+  foreach($cart in $carts){
     $cartKey = Canonical-Asset $cart.asset_tag
     if($cartKey -and $script:ChildrenByParent.ContainsKey($cartKey)){
       foreach($gch in $script:ChildrenByParent[$cartKey]){
-        if(($gch.Type -eq 'Mic' -or $gch.Type -eq 'Scanner') -and -not $kids.Contains($gch)){ [void]$kids.Add($gch) }
+        if($gch -and ($gch.Type -eq 'Mic' -or $gch.Type -eq 'Scanner')){ & $addPeripheral $gch $cart }
       }
     }
     foreach($tbl in @('Mics','Scanners')){
@@ -966,11 +992,76 @@ function Get-ChildrenForParent($parentRec){
         if(-not $rec.u_parent_asset){ continue }
         $upa = $rec.u_parent_asset.Trim().ToUpper()
         $cartNameU = if($cart.name){ $cart.name.Trim().ToUpper() } else { '' }
-        if($cartNameU -and $upa -eq $cartNameU){ if(-not $kids.Contains($rec)){ [void]$kids.Add($rec) } }
+        if($cartNameU -and $upa -eq $cartNameU){ & $addPeripheral $rec $cart }
       }
     }
   }
-  return $kids
+
+  foreach($rec in $direct){
+    if(($rec.Type -eq 'Mic') -or ($rec.Type -eq 'Scanner')){
+      $key = & $getObjKey $rec
+      if($key -eq $null -or -not $peripheralAssignments.ContainsKey($key)){
+        $matchedCart = $null
+        if($rec.u_parent_asset){
+          $token = $rec.u_parent_asset.Trim()
+          $canon = Canonical-Asset $token
+          foreach($cart in $carts){
+            if($canon){
+              $cartCanon = Canonical-Asset $cart.asset_tag
+              if($cartCanon -and ($cartCanon.Trim().ToUpper() -eq $canon.Trim().ToUpper())){ $matchedCart = $cart; break }
+            }
+            if(-not $matchedCart -and $cart.name){
+              foreach($variant in (HostnameKeyVariants $cart.name)){
+                if($variant -and ($variant.Trim().ToUpper() -eq $token.Trim().ToUpper())){ $matchedCart = $cart; break }
+              }
+              if($matchedCart){ break }
+            }
+          }
+        }
+        if($matchedCart){ & $addPeripheral $rec $matchedCart } else { & $addPeripheral $rec $null }
+      }
+    }
+  }
+
+  $isTangentParent = ((Get-DetectedType $parentRec) -eq 'Tangent')
+
+  $addRelation = {
+    param($child,$immediateParent,$role)
+    if(-not $child -or -not $immediateParent){ return }
+    $rel = [pscustomobject]@{
+      Record = $child
+      Parent = $immediateParent
+      Role   = $role
+    }
+    [void]$relationships.Add($rel)
+  }
+
+  if(-not $isTangentParent){
+    foreach($rec in $direct){ & $addRelation $rec $parentRec 'Child' }
+    foreach($peripheral in $peripheralSet){
+      if(-not $direct.Contains($peripheral)){ & $addRelation $peripheral $parentRec 'Child' }
+    }
+  } else {
+    foreach($cart in $carts){ & $addRelation $cart $parentRec 'Child' }
+    foreach($rec in $direct){
+      if($rec.Type -eq 'Cart'){ continue }
+      $key = & $getObjKey $rec
+      if($key -ne $null -and $peripheralAssignments.ContainsKey($key)){ continue }
+      & $addRelation $rec $parentRec 'Child'
+    }
+    foreach($peripheral in $peripheralSet){
+      $key = & $getObjKey $peripheral
+      $cartParent = $null
+      if($key -ne $null -and $peripheralAssignments.ContainsKey($key)){ $cartParent = $peripheralAssignments[$key] }
+      if($cartParent){
+        & $addRelation $peripheral $cartParent 'Grandchild'
+      } else {
+        & $addRelation $peripheral $parentRec 'Child'
+      }
+    }
+  }
+
+  return $relationships
 }
 function Compute-ProposedName($rec,$parent){
   if(-not $rec -or -not $parent){ return $null }
@@ -2713,14 +2804,25 @@ function Refresh-AssocGrid($parentRec){
   $dgv.Rows[$prow].Cells['Retire'].Value= (Fmt-DateLong $parentRec.Retire)
   $dgv.Rows[$prow].DefaultCellStyle.BackColor = $script:ThemeColors.Header
   $kids = Get-ChildrenForParent $parentRec
-  foreach($ch in $kids){
+  foreach($childInfo in $kids){
+    $ch = $null
+    try { $ch = $childInfo.Record } catch { $ch = $null }
+    if(-not $ch){ continue }
+    $immediateParent = $parentRec
+    try {
+      if($childInfo.Parent){ $immediateParent = $childInfo.Parent }
+    } catch {}
+    $roleLabel = 'Child'
+    try {
+      if($childInfo.Role){ $roleLabel = $childInfo.Role }
+    } catch {}
     $rowIdx = $dgv.Rows.Add()
     $r = $dgv.Rows[$rowIdx]
-    $r.Cells['Role'].Value='Child'
+    $r.Cells['Role'].Value=$roleLabel
     $r.Cells['Type'].Value=$ch.Type
     if($ch.name){ $r.Cells['Name'].Value = $ch.name } else { $r.Cells['Name'].Value = '' }
     try {
-      $expectedName = Compute-ProposedName $ch $parentRec
+      $expectedName = Compute-ProposedName $ch $immediateParent
       $defaultNameColor = if($dgv.DefaultCellStyle -and $dgv.DefaultCellStyle.ForeColor){
         $dgv.DefaultCellStyle.ForeColor
       } else {
@@ -2806,14 +2908,21 @@ function Refresh-AssocCards($parentRec){
     ) ([System.Drawing.Color]::Black) $true $true @{asset=$parentRec.asset_tag;serial=$parentRec.serial_number;name=$parentRec.name}) )
     $pRITM = $parentRec.RITM
     $kids = Get-ChildrenForParent $parentRec
-    foreach($ch in $kids){
+    foreach($childInfo in $kids){
+      $ch = $null
+      try { $ch = $childInfo.Record } catch { $ch = $null }
+      if(-not $ch){ continue }
+      $roleLabel = 'Child'
+      try {
+        if($childInfo.Role){ $roleLabel = $childInfo.Role }
+      } catch {}
       $ritm = $ch.RITM
       $col = [System.Drawing.Color]::Black
       if(-not [string]::IsNullOrWhiteSpace($ritm)){
         if($pRITM -and $ritm -eq $pRITM){ $col=[System.Drawing.Color]::ForestGreen } else { $col=[System.Drawing.Color]::IndianRed }
       }
       $showR = ($ch.Type -eq 'Monitor')
-      $cards.Controls.Add( (Make-Card ("Child - " + (Get-DetectedType $ch)) @(
+      $cards.Controls.Add( (Make-Card (($roleLabel + " - " + (Get-DetectedType $ch))) @(
         @{Key='Name';Value=$ch.name},
         @{Key='Asset';Value=$ch.asset_tag},
         @{Key='Serial';Value=$ch.serial_number},
@@ -3294,7 +3403,7 @@ function Remove-Selected-Associations($parentRec){
   if($dgv.SelectedRows.Count -eq 0){ return }
   foreach($row in $dgv.SelectedRows){
     $role = [string]$row.Cells['Role'].Value
-    if($role -ne 'Child'){ continue }
+    if(($role -ne 'Child') -and ($role -ne 'Grandchild')){ continue }
     $asset = [string]$row.Cells['AssetTag'].Value
     if([string]::IsNullOrWhiteSpace($asset)){ continue }
     $key=$asset.ToUpper()
