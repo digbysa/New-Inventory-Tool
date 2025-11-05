@@ -2621,8 +2621,12 @@ function Update-ManualRoundButton($parentRec){
 function Get-City-ForLocation([string]$loc){
   if([string]::IsNullOrWhiteSpace($loc)){ return '' }
   $nLoc = Normalize-Field $loc
-  $row = $script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'Location')) -eq $nLoc } | Select-Object -First 1
-  if($row){ return ([string](Get-LocVal $row 'City')) } else { return '' }
+  $matches = @($script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'Location')) -eq $nLoc })
+  if($matches.Count -gt 0){
+    $row = $matches[$matches.Count - 1]
+    return ([string](Get-LocVal $row 'City'))
+  }
+  return ''
 }
 function Validate-Location($rec){
   # In edit mode, do not actively validate or repaint to avoid flicker; just reflect current text.
@@ -3570,9 +3574,8 @@ function Toggle-EditLocation(){
     if($cmbDept -and $cmbDept.Text){ $dept = $cmbDept.Text }
     elseif($txtDept -and $txtDept.Text){ $dept = $txtDept.Text }
     $hasCityAndLocation = (-not [string]::IsNullOrWhiteSpace($city)) -and (-not [string]::IsNullOrWhiteSpace($loc))
-    $hasLocationDetails = (-not [string]::IsNullOrWhiteSpace($b)) -or (-not [string]::IsNullOrWhiteSpace($f)) -or (-not [string]::IsNullOrWhiteSpace($r))
     $exists = $script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'City')) -eq (Normalize-Field $city) -and (Normalize-Field (Get-LocVal $_ 'Location')) -eq (Normalize-Field $loc) -and (Normalize-Field (Get-LocVal $_ 'Building')) -eq (Normalize-Field $b) -and (Normalize-Field (Get-LocVal $_ 'Floor')) -eq (Normalize-Field $f) -and (Normalize-Field (Get-LocVal $_ 'Room')) -eq (Normalize-Field $r) }
-    if($exists.Count -eq 0 -and $hasCityAndLocation -and $hasLocationDetails){
+    if($exists.Count -eq 0 -and $hasCityAndLocation){
       $new=[pscustomobject]@{City=$city;Location=$loc;Building=$b;Floor=$f;Room=$r}
       $script:LocationRows += $new
       Save-LocationUserAdd $city $loc $b $f $r
