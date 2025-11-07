@@ -710,7 +710,9 @@ $script:IndexByName = @{}
 $script:ComputerByAsset = @{}
 $script:ComputerByName = @{} 
 $script:ChildrenByParent = @{}
-$script:LocationRows = @()
+$script:LocationRows = @()             # dynamic dropdown data (Computers + user adds)
+$script:LocationMasterRows = @()       # authoritative master data for validation
+$script:UserAddedLocationRows = @()
 $script:RoundingByAssetTag = @{}
 $script:CurrentDisplay = $null
 $script:CurrentParent  = $null
@@ -1424,8 +1426,15 @@ function Populate-Department-Combo([string]$current){
 function Rebuild-RoomCaches(){
   $rooms = New-Object System.Collections.Generic.List[string]
   $codes = New-Object System.Collections.Generic.List[string]
-  foreach($row in $script:LocationRows){
-    $raw = Get-LocVal $row 'Room'
+  foreach($row in $script:LocationMasterRows){
+    if(-not $row){ continue }
+    $raw = $null
+    try {
+      $raw = $row.Room
+      if(-not $raw -and $row.PSObject -and $row.PSObject.Properties['Room']){
+        $raw = $row.PSObject.Properties['Room'].Value
+      }
+    } catch {}
     if([string]::IsNullOrWhiteSpace($raw)){ continue }
     $n = Normalize-Field $raw
     if($n){ [void]$rooms.Add($n) }
@@ -1437,13 +1446,15 @@ function Rebuild-RoomCaches(){
 }
 # ------------------ Load & Save ------------------
 function Load-LocationMaster($folder){
-  $script:LocationRows=@()
+  $script:LocationMasterRows = @()
+  $script:UserAddedLocationRows = @()
   $lm = Join-Path $folder 'LocationMaster.csv'
-  if(Test-Path $lm){ $script:LocationRows += Import-Csv $lm }
+  if(Test-Path $lm){ $script:LocationMasterRows += Import-Csv $lm }
   $lm2 = Join-Path $folder 'LocationMaster-UserAdds.csv'
-  if(Test-Path $lm2){ $script:LocationRows += Import-Csv $lm2 }
+  if(Test-Path $lm2){ $script:UserAddedLocationRows += Import-Csv $lm2 }
   $script:LocCols = @{}
   Rebuild-RoomCaches
+  Rebuild-LocationDropdownRows
 }
 function Save-LocationUserAdd([string]$city,[string]$loc,[string]$b,[string]$f,[string]$r){
   try{
@@ -1476,6 +1487,81 @@ function Save-LocationUserAdd([string]$city,[string]$loc,[string]$b,[string]$f,[
       ('"{0}","{1}","{2}","{3}","{4}"' -f $city,$loc,$b,$f,$r) | Add-Content -Path $file -Encoding UTF8
     }
   } catch {}
+  try {
+    $newRow = [pscustomobject]@{ City=$city; Location=$loc; Building=$b; Floor=$f; Room=$r }
+    $script:UserAddedLocationRows += $newRow
+  } catch {}
+  Rebuild-LocationDropdownRows
+}
+
+function Rebuild-LocationDropdownRows(){
+  $unique = @{}
+  $rows = New-Object 'System.Collections.Generic.List[object]'
+  $addRow = {
+    param($city,$location,$building,$floor,$room)
+    $locVal = if($location){ ([string]$location).Trim() } else { '' }
+    if([string]::IsNullOrWhiteSpace($locVal)){ return }
+    $cityVal = if($city){ ([string]$city).Trim() } else { '' }
+    $bldVal = if($building){ ([string]$building).Trim() } else { '' }
+    $floorVal = if($floor){ ([string]$floor).Trim() } else { '' }
+    $roomVal = if($room){ ([string]$room).Trim() } else { '' }
+    $key = '{0}|{1}|{2}|{3}|{4}' -f `
+      (Normalize-LocationComparisonValue $cityVal),
+      (Normalize-LocationComparisonValue $locVal),
+      (Normalize-LocationComparisonValue $bldVal),
+      (Normalize-LocationComparisonValue $floorVal),
+      (Normalize-LocationComparisonValue $roomVal)
+    if(-not $unique.ContainsKey($key)){
+      $unique[$key] = $true
+      [void]$rows.Add([pscustomobject]@{
+        City = $cityVal
+        Location = $locVal
+        Building = $bldVal
+        Floor = $floorVal
+        Room = $roomVal
+      })
+    }
+  }
+
+  foreach($row in $script:UserAddedLocationRows){
+    if(-not $row){ continue }
+    $cityVal = $null
+    $locVal = $null
+    $bldVal = $null
+    $floorVal = $null
+    $roomVal = $null
+    try { $cityVal = $row.City } catch {}
+    try { $locVal = $row.Location } catch {}
+    try { $bldVal = $row.Building } catch {}
+    try { $floorVal = $row.Floor } catch {}
+    try { $roomVal = $row.Room } catch {}
+    & $addRow $cityVal $locVal $bldVal $floorVal $roomVal
+  }
+
+  foreach($pc in $script:Computers){
+    if(-not $pc){ continue }
+    $cityVal = $null
+    try {
+      if($pc.PSObject.Properties['City']){ $cityVal = $pc.City }
+      elseif($pc.PSObject.Properties['location.city']){ $cityVal = $pc.PSObject.Properties['location.city'].Value }
+    } catch {}
+    $locVal = $null
+    $bldVal = $null
+    $floorVal = $null
+    $roomVal = $null
+    try { $locVal = $pc.location } catch {}
+    try { $bldVal = $pc.u_building } catch {}
+    try { $floorVal = $pc.u_floor } catch {}
+    try { $roomVal = $pc.u_room } catch {}
+    & $addRow $cityVal $locVal $bldVal $floorVal $roomVal
+  }
+
+  try {
+    $script:LocationRows = $rows.ToArray()
+  } catch {
+    $script:LocationRows = @()
+  }
+  $script:LocCols = @{}
 }
 function Load-RoundingMapping([string]$folder){
   $script:RoundingByAssetTag.Clear()
@@ -1517,6 +1603,7 @@ if(Test-Path $cfile){
         location=$r.location; u_building=$r.u_building; u_room=$r.u_room; u_floor=$r.u_floor
         po_number=$r.po_number; u_scheduled_retirement=$r.u_scheduled_retirement
         u_last_rounded_date=$r.u_last_rounded_date
+        City=$(if($r.'location.city'){ $r.'location.city'.Trim() } else { '' })
       }
       $obj | Add-Member -NotePropertyName RITM -NotePropertyValue (Extract-RITM $obj.po_number) -Force
       $obj | Add-Member -NotePropertyName Retire -NotePropertyValue (Parse-DateLoose $obj.u_scheduled_retirement) -Force
@@ -1593,6 +1680,7 @@ if(Test-Path $cfile){
       $script:Carts += $obj
     }
   }
+  Rebuild-LocationDropdownRows
   Build-Indices
 }
 function Save-AllCSVs {
@@ -2745,13 +2833,27 @@ function Get-City-ForLocation([string]$loc){
     $row = $matches[$matches.Count - 1]
     return ([string](Get-LocVal $row 'City'))
   }
+  if($script:LocationMasterRows.Count -gt 0){
+    $masterRow = $script:LocationMasterRows | Where-Object { (Normalize-Field ([string]$_.'Location')) -eq $nLoc } | Select-Object -First 1
+    if($masterRow){
+      try { return '' + $masterRow.City } catch {}
+    }
+  }
   return ''
 }
 function Validate-Location($rec){
   # In edit mode, do not actively validate or repaint to avoid flicker; just reflect current text.
   if($script:editing){ return }
   # Show raw values in UI
-  $txtCity.Text     = Get-City-ForLocation $rec.location
+  $cityText = ''
+  try {
+    if($rec -and $rec.PSObject.Properties['City']){ $cityText = '' + $rec.City }
+    elseif($rec -and $rec.PSObject.Properties['location.city']){ $cityText = '' + $rec.PSObject.Properties['location.city'].Value }
+  } catch {}
+  if([string]::IsNullOrWhiteSpace($cityText)){
+    $cityText = Get-City-ForLocation $rec.location
+  }
+  $txtCity.Text = $cityText
   $deptVal = ''
   try{
     if($rec){
@@ -2772,22 +2874,27 @@ function Validate-Location($rec){
   $nBld  = Normalize-Field $rec.u_building
   $nFlr  = Normalize-Field ([string]$rec.u_floor)
   $nRoom = Normalize-Field $rec.u_room
-  if($script:LocationRows.Count -gt 0){
-    $rowsL = $script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'Location')) -eq $nLoc }
+  if($script:LocationMasterRows.Count -gt 0){
+    $rowsL = $script:LocationMasterRows | Where-Object { (Normalize-Field ([string]$_.'Location')) -eq $nLoc }
     $okL   = ($rowsL.Count -gt 0)
-    # City based on Location
     if($okL){
-      $c = Get-LocVal ($rowsL | Select-Object -First 1) 'City'
-      if(-not [string]::IsNullOrWhiteSpace($c)){ $okC = $true; $txtCity.Text = $c }
+      $okC = $true
+      $masterCity = ''
+      try {
+        $masterCity = '' + ($rowsL | Select-Object -First 1).City
+      } catch {}
+      if(-not [string]::IsNullOrWhiteSpace($masterCity) -and [string]::IsNullOrWhiteSpace($txtCity.Text)){
+        $txtCity.Text = $masterCity
+      }
     }
     $rowsB = @()
     if($okL -and $nBld){
-      $rowsB = $rowsL | Where-Object { (Normalize-Field (Get-LocVal $_ 'Building')) -eq $nBld }
+      $rowsB = $rowsL | Where-Object { (Normalize-Field ([string]$_.'Building')) -eq $nBld }
       $okB   = ($rowsB.Count -gt 0)
     }
     $rowsF = @()
     if($okB -and $nFlr){
-      $rowsF = $rowsB | Where-Object { (Normalize-Field (Get-LocVal $_ 'Floor')) -eq $nFlr }
+      $rowsF = $rowsB | Where-Object { (Normalize-Field ([string]$_.'Floor')) -eq $nFlr }
       $okF   = ($rowsF.Count -gt 0)
     }
     if($nRoom){
@@ -2803,7 +2910,7 @@ function Validate-Location($rec){
       }
     } else { $okR = $false }
   }
-  $txtCity.BackColor     = if($okL){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
+  $txtCity.BackColor     = if($okC){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
   $txtLocation.BackColor = if($okL){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
   $txtBldg.BackColor     = if($okB){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
   $txtFloor.BackColor    = if($okF){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
@@ -3775,10 +3882,7 @@ function Toggle-EditLocation(){
     $hasCityAndLocation = (-not [string]::IsNullOrWhiteSpace($city)) -and (-not [string]::IsNullOrWhiteSpace($loc))
     $exists = $script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'City')) -eq (Normalize-Field $city) -and (Normalize-Field (Get-LocVal $_ 'Location')) -eq (Normalize-Field $loc) -and (Normalize-Field (Get-LocVal $_ 'Building')) -eq (Normalize-Field $b) -and (Normalize-Field (Get-LocVal $_ 'Floor')) -eq (Normalize-Field $f) -and (Normalize-Field (Get-LocVal $_ 'Room')) -eq (Normalize-Field $r) }
     if($exists.Count -eq 0 -and $hasCityAndLocation){
-      $new=[pscustomobject]@{City=$city;Location=$loc;Building=$b;Floor=$f;Room=$r}
-      $script:LocationRows += $new
       Save-LocationUserAdd $city $loc $b $f $r
-      Rebuild-RoomCaches
     }
     $txtCity.Text=$city; $txtLocation.Text=$loc; $txtBldg.Text=$b; $txtFloor.Text=$f; $txtRoom.Text=$r
     Update-LastLocationSelections $city $loc $b $f $r
