@@ -1210,6 +1210,34 @@ function Normalize-Header([string]$s){
   $t = $t -replace '\s+', ' '
   return $t.ToUpperInvariant()
 }
+
+if(-not (Get-Variable -Scope Script -Name LastLocationSelections -ErrorAction SilentlyContinue)){
+  $script:LastLocationSelections = @{
+    City      = ''
+    Location  = ''
+    Building  = ''
+    Floor     = ''
+    Room      = ''
+  }
+}
+function Normalize-LocationComparisonValue([string]$value){
+  if([string]::IsNullOrWhiteSpace($value)){ return '' }
+  return Normalize-Field $value
+}
+function Update-LastLocationSelections {
+  param(
+    [string]$City,
+    [string]$Location,
+    [string]$Building,
+    [string]$Floor,
+    [string]$Room
+  )
+  $script:LastLocationSelections.City     = Normalize-LocationComparisonValue $City
+  $script:LastLocationSelections.Location = Normalize-LocationComparisonValue $Location
+  $script:LastLocationSelections.Building = Normalize-LocationComparisonValue $Building
+  $script:LastLocationSelections.Floor    = Normalize-LocationComparisonValue $Floor
+  $script:LastLocationSelections.Room     = Normalize-LocationComparisonValue $Room
+}
 function Get-LocColName([string]$wanted){
   if(-not $script:LocCols){ $script:LocCols = @{} }
   if($script:LocCols.ContainsKey($wanted)){ return $script:LocCols[$wanted] }
@@ -2791,6 +2819,7 @@ function Validate-Location($rec){
     if($txtDept){ $txtDept.BackColor = $colorD }
     if($cmbDept){ $cmbDept.BackColor = $colorD }
   } catch {}
+  Update-LastLocationSelections $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text
 }
 function Refresh-AssocGrid($parentRec){
   $dgv.Rows.Clear(); if(-not $parentRec){ Size-AssocForRows(1) | Out-Null; return }
@@ -3588,22 +3617,57 @@ function Populate-Location-Combos {
   try {
     $cmbCity.Items.Clear(); $cmbLocation.Items.Clear(); $cmbBuilding.Items.Clear(); $cmbFloor.Items.Clear(); $cmbRoom.Items.Clear()
 
-    switch ($ChangedLevel) {
-      'City'      { $loc = $null; $b = $null; $f = $null; $r = $null }
-      'Location'  { $b = $null; $f = $null; $r = $null }
-    }
+    $origLoc = $loc
+    $origBuilding = $b
+    $origFloor = $f
+    $origRoom = $r
+
+    $clearLocation = $false
+    $clearBuilding = $false
+    $clearFloor = $false
+    $clearRoom = $false
 
     # City
     $cities = $script:LocationRows | ForEach-Object { Get-LocVal $_ 'City' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
-    $cmbCity.Items.AddRange(@($cities))
+    $validCityInput = Get-ValidLocationSelection $city $cities
+    if($ChangedLevel -eq 'City'){
+      $prevCityNorm = $script:LastLocationSelections.City
+      if([string]::IsNullOrWhiteSpace($city)){
+        if($prevCityNorm -ne ''){ $clearLocation = $true; $clearBuilding = $true; $clearFloor = $true; $clearRoom = $true }
+      } elseif($validCityInput){
+        $validCityNorm = Normalize-LocationComparisonValue $validCityInput
+        if($validCityNorm -ne $prevCityNorm){ $clearLocation = $true; $clearBuilding = $true; $clearFloor = $true; $clearRoom = $true }
+      }
+    }
     Set-ComboTextIfChanged $cmbCity ($city)
     $validCity = Get-ValidLocationSelection $cmbCity.Text $cities
     if(-not $validCity -and -not $PreserveInvalidSelections){ Set-ComboTextIfChanged $cmbCity '' }
     $filterCity = if($validCity){ $validCity } else { $null }
+    if($clearLocation){
+      $loc = $null
+      $clearBuilding = $true
+      $clearFloor = $true
+      $clearRoom = $true
+    }
 
     # Location (filtered by City if present)
     $locRows = Filter-LocationRows $filterCity $null $null $null
     $locs = $locRows | ForEach-Object { Get-LocVal $_ 'Location' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
+    $validLocationInput = Get-ValidLocationSelection $origLoc $locs
+    if($ChangedLevel -eq 'Location'){
+      $prevLocationNorm = $script:LastLocationSelections.Location
+      if([string]::IsNullOrWhiteSpace($origLoc)){
+        if($prevLocationNorm -ne ''){ $clearBuilding = $true; $clearFloor = $true; $clearRoom = $true }
+      } elseif($validLocationInput){
+        $validLocationNorm = Normalize-LocationComparisonValue $validLocationInput
+        if($validLocationNorm -ne $prevLocationNorm){ $clearBuilding = $true; $clearFloor = $true; $clearRoom = $true }
+      }
+    }
+    if($clearBuilding){
+      $b = $null
+      $clearFloor = $true
+      $clearRoom = $true
+    }
     $cmbLocation.Items.AddRange(@($locs))
     Set-ComboTextIfChanged $cmbLocation ($loc)
     $validLocation = Get-ValidLocationSelection $cmbLocation.Text $locs
@@ -3615,6 +3679,20 @@ function Populate-Location-Combos {
     if($filterLocation){
       $bldRows = Filter-LocationRows $filterCity $filterLocation $null $null
       $blds = $bldRows | ForEach-Object { Get-LocVal $_ 'Building' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
+    }
+    $validBuildingInput = Get-ValidLocationSelection $origBuilding $blds
+    if($ChangedLevel -eq 'Building'){
+      $prevBuildingNorm = $script:LastLocationSelections.Building
+      if([string]::IsNullOrWhiteSpace($origBuilding)){
+        if($prevBuildingNorm -ne ''){ $clearFloor = $true; $clearRoom = $true }
+      } elseif($validBuildingInput){
+        $validBuildingNorm = Normalize-LocationComparisonValue $validBuildingInput
+        if($validBuildingNorm -ne $prevBuildingNorm){ $clearFloor = $true; $clearRoom = $true }
+      }
+    }
+    if($clearFloor){
+      $f = $null
+      $clearRoom = $true
     }
     $cmbBuilding.Items.AddRange(@($blds))
     Set-ComboTextIfChanged $cmbBuilding ($b)
@@ -3629,6 +3707,17 @@ function Populate-Location-Combos {
       $floors = $floorRows | ForEach-Object { Get-LocVal $_ 'Floor' } | Where-Object { $_ } | Select-Object -Unique
       $floors = Sort-Floors $floors
     }
+    $validFloorInput = Get-ValidLocationSelection $origFloor $floors
+    if($ChangedLevel -eq 'Floor'){
+      $prevFloorNorm = $script:LastLocationSelections.Floor
+      if([string]::IsNullOrWhiteSpace($origFloor)){
+        if($prevFloorNorm -ne ''){ $clearRoom = $true }
+      } elseif($validFloorInput){
+        $validFloorNorm = Normalize-LocationComparisonValue $validFloorInput
+        if($validFloorNorm -ne $prevFloorNorm){ $clearRoom = $true }
+      }
+    }
+    if($clearRoom){ $r = $null }
     $cmbFloor.Items.AddRange(@($floors))
     Set-ComboTextIfChanged $cmbFloor ($f)
     $validFloor = Get-ValidLocationSelection $cmbFloor.Text $floors
@@ -3665,6 +3754,7 @@ function Should-SkipExcludedDevice {
 function Toggle-EditLocation(){
   $script:editing = -not $script:editing
   if($script:editing){
+    Update-LastLocationSelections $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text
     Populate-Location-Combos $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text -PreserveInvalidSelections
     try { Populate-Department-Combo ($txtDept.Text) } catch {}
     $cmbCity.Visible=$true; $cmbLocation.Visible=$true; $cmbBuilding.Visible=$true; $cmbFloor.Visible=$true; $cmbRoom.Visible=$true
@@ -3691,6 +3781,7 @@ function Toggle-EditLocation(){
       Rebuild-RoomCaches
     }
     $txtCity.Text=$city; $txtLocation.Text=$loc; $txtBldg.Text=$b; $txtFloor.Text=$f; $txtRoom.Text=$r
+    Update-LastLocationSelections $city $loc $b $f $r
     if($dept){
       try { Save-DepartmentUserAdd $dept } catch {}
       try { Populate-Department-Combo $dept } catch {}
@@ -3796,6 +3887,7 @@ function Clear-UI(){
       }
     } catch {}
   }
+  Update-LastLocationSelections '' '' '' '' ''
   if($cmbMaintType){
     try {
       $cmbMaintType.SelectedIndex = -1
