@@ -3661,9 +3661,31 @@ function Get-ValidLocationSelection {
   if(-not $value){ return $null }
   $norm = Normalize-Field $value
   foreach($opt in $options){
-    if((Normalize-Field $opt) -eq $norm){ return $value }
+    if($null -eq $opt){ continue }
+    $optText = '' + $opt
+    if((Normalize-Field $optText) -eq $norm){ return $optText }
   }
   return $null
+}
+
+function Set-ComboSelectedIndexForText {
+  param(
+    [System.Windows.Forms.ComboBox]$Combo,
+    [string]$Text
+  )
+  if(-not $Combo){ return }
+  if([string]::IsNullOrEmpty($Text)){
+    try {
+      if($Combo.SelectedIndex -ne -1){ $Combo.SelectedIndex = -1 }
+    } catch {}
+    return
+  }
+  try {
+    $index = $Combo.FindStringExact($Text)
+    if($index -ge 0 -and $Combo.SelectedIndex -ne $index){
+      $Combo.SelectedIndex = $index
+    }
+  } catch {}
 }
 
 function Restore-ComboSelectionLater {
@@ -3698,7 +3720,10 @@ function Set-ComboTextIfChanged {
   if(-not $Combo){ return }
   $target = if($Text){ $Text } else { '' }
   $current = if($Combo.Text){ $Combo.Text } else { '' }
-  if($current -eq $target){ return }
+  if($current -eq $target){
+    Set-ComboSelectedIndexForText $Combo $target
+    return
+  }
   $selStart = $null
   $selLength = $null
   try {
@@ -3706,6 +3731,7 @@ function Set-ComboTextIfChanged {
     $selLength = $Combo.SelectionLength
   } catch {}
   $Combo.Text = $target
+  Set-ComboSelectedIndexForText $Combo $target
   Restore-ComboSelectionLater $Combo $selStart $selLength
 }
 
