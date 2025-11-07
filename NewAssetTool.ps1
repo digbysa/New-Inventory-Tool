@@ -3736,6 +3736,7 @@ function Populate-Location-Combos {
 
     # City
     $cities = $script:LocationRows | ForEach-Object { Get-LocVal $_ 'City' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
+    $cmbCity.Items.AddRange(@($cities))
     $validCityInput = Get-ValidLocationSelection $city $cities
     if($ChangedLevel -eq 'City'){
       $prevCityNorm = $script:LastLocationSelections.City
