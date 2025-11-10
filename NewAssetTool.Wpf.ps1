@@ -90,9 +90,19 @@ $rootScaleTransform = $window.FindName('RootScaleTransform')
 $applyWpfScale = {
   param([string]$Source = 'unspecified')
 
-  if (-not $global:NewAssetToolPerMonitorDpiContextEnabled) { return }
   if (-not $rootScaleTransform) {
     Write-Verbose "[DPI][WPF] Root scale transform not located; skipping scale." -Verbose
+    return
+  }
+
+  $scale = 1.0
+  try {
+    if (Get-Command Get-NewAssetToolChromeScale -ErrorAction SilentlyContinue) {
+      $scale = Get-NewAssetToolChromeScale
+    }
+  } catch {}
+
+  if (-not $global:NewAssetToolPerMonitorDpiContextEnabled -and [Math]::Abs($scale - 1.0) -lt 0.0001) {
     return
   }
 
@@ -104,21 +114,25 @@ $applyWpfScale = {
   } catch {}
 
   try {
-    $rootScaleTransform.ScaleX = 0.8
-    $rootScaleTransform.ScaleY = 0.8
+    $rootScaleTransform.ScaleX = $scale
+    $rootScaleTransform.ScaleY = $scale
     Write-Verbose (
-      "[DPI][WPF] Applied root layout scale 0.8 ({0}) context={1}" -f $Source, $contextDescription
+      "[DPI][WPF] Applied root layout scale {0:n3} ({1}) context={2}" -f $scale, $Source, $contextDescription
     ) -Verbose
   } catch {
     Write-Verbose "[DPI][WPF] Failed to apply layout scale ({0}): $($_.Exception.Message)" -Verbose
   }
 }
 
-if ($global:NewAssetToolPerMonitorDpiContextEnabled -and $window) {
-  try {
-    $window.Add_DpiChanged({ param($sender,$eventArgs) & $applyWpfScale 'Window.DpiChanged' })
-  } catch {
-    Write-Verbose "[DPI][WPF] Failed to attach DpiChanged handler: $($_.Exception.Message)" -Verbose
+Set-Variable -Scope Global -Name NewAssetToolApplyWpfScale -Value $applyWpfScale
+
+if ($window) {
+  if ($global:NewAssetToolPerMonitorDpiContextEnabled) {
+    try {
+      $window.Add_DpiChanged({ param($sender,$eventArgs) & $applyWpfScale 'Window.DpiChanged' })
+    } catch {
+      Write-Verbose "[DPI][WPF] Failed to attach DpiChanged handler: $($_.Exception.Message)" -Verbose
+    }
   }
   & $applyWpfScale 'Window.Initial'
 }
@@ -199,6 +213,7 @@ $cleanupAction = {
         Remove-Variable -Scope Global -Name NewAssetToolSuppressShow -ErrorAction SilentlyContinue
       }
     } catch {}
+    try { Remove-Variable -Scope Global -Name NewAssetToolApplyWpfScale -ErrorAction SilentlyContinue } catch {}
   }
 }
 
