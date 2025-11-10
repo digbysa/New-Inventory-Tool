@@ -87,6 +87,7 @@ function Set-ScanSearchControl {
 $script:DeviceTypeSummaryControl = $null
 $script:SearchTextButtonStates = @{}
 $script:RoundNowDisabledTooltip = 'A detected device type is required to use this feature.'
+$script:EditLocationOriginal = $null
 
 function Get-CurrentSearchInputText {
   try {
@@ -2162,11 +2163,38 @@ if(-not $btnEditLoc){
   $btnEditLoc.Text = 'Edit Location'
   $btnEditLoc.Size = '120,26'
 }
-$btnEditLoc.Anchor = 'Top,Right'
-$btnEditLoc.Margin = New-Object System.Windows.Forms.Padding(0,8,0,0)
+$btnEditLoc.Margin = New-Object System.Windows.Forms.Padding(0)
+
+if(-not $btnCancelEditLoc){
+  $btnCancelEditLoc = New-Object ModernUI.RoundedButton
+  $btnCancelEditLoc.Text = 'Cancel'
+  $btnCancelEditLoc.Size = '120,26'
+  $btnCancelEditLoc.Visible = $false
+}
+$btnCancelEditLoc.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+
+if(-not $locButtonsPanel){
+  $locButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
+  $locButtonsPanel.FlowDirection = 'RightToLeft'
+  $locButtonsPanel.WrapContents = $false
+  $locButtonsPanel.AutoSize = $true
+  $locButtonsPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $locButtonsPanel.Dock = 'Fill'
+  $locButtonsPanel.Anchor = 'Top,Right'
+  $locButtonsPanel.Margin = New-Object System.Windows.Forms.Padding(0,8,0,0)
+  $locButtonsPanel.Padding = New-Object System.Windows.Forms.Padding(0)
+}
+
+if(-not $locButtonsPanel.Controls.Contains($btnEditLoc)){
+  $locButtonsPanel.Controls.Add($btnEditLoc)
+}
+if(-not $locButtonsPanel.Controls.Contains($btnCancelEditLoc)){
+  $locButtonsPanel.Controls.Add($btnCancelEditLoc)
+}
+
 $tlpLoc.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$tlpLoc.Controls.Add($btnEditLoc, 0, $tlpLoc.RowCount)
-$tlpLoc.SetColumnSpan($btnEditLoc, 2)
+$tlpLoc.Controls.Add($locButtonsPanel, 0, $tlpLoc.RowCount)
+$tlpLoc.SetColumnSpan($locButtonsPanel, 2)
 $tlpLoc.RowCount++
 
 # Editable combos
@@ -3907,6 +3935,14 @@ function Should-SkipExcludedDevice {
 function Toggle-EditLocation(){
   $script:editing = -not $script:editing
   if($script:editing){
+    $script:EditLocationOriginal = [pscustomobject]@{
+      City        = '' + $txtCity.Text
+      Location    = '' + $txtLocation.Text
+      Building    = '' + $txtBldg.Text
+      Floor       = '' + $txtFloor.Text
+      Room        = '' + $txtRoom.Text
+      Department  = if($txtDept){ '' + $txtDept.Text } elseif($cmbDept){ '' + $cmbDept.Text } else { '' }
+    }
     Update-LastLocationSelections $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text
     Populate-Location-Combos $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text -PreserveInvalidSelections
     try { Populate-Department-Combo ($txtDept.Text) } catch {}
@@ -3916,6 +3952,7 @@ function Toggle-EditLocation(){
     foreach($t in @($txtDept,$txtDepartment)){ if ($t) { $t.Visible = $false } }
     foreach($c in @($cmbDept,$cmbDepartment,$ddlDept,$ddlDepartment)){ if ($c) { $c.Visible = $true } }
     $btnEditLoc.Text="Save Location"
+    if($btnCancelEditLoc){ $btnCancelEditLoc.Visible = $true }
   } else {
     $city = if($cmbCity.Text){ $cmbCity.Text.Trim() } else { '' }
     $loc  = if($cmbLocation.Text){ $cmbLocation.Text.Trim() } else { '' }
@@ -3962,8 +3999,37 @@ function Toggle-EditLocation(){
     $txtCity.Visible=$true; $txtLocation.Visible=$true; $txtBldg.Visible=$true; $txtFloor.Visible=$true; $txtRoom.Visible=$true
     if ($cmbDept) { $cmbDept.Visible=$false }
     if ($txtDept) { $txtDept.Visible=$true }
+    if($btnCancelEditLoc){ $btnCancelEditLoc.Visible = $false }
+    $script:EditLocationOriginal = $null
     $btnEditLoc.Text="Edit Location"
   }
+}
+
+function Cancel-EditLocation(){
+  if(-not $script:editing){ return }
+  $snapshot = $script:EditLocationOriginal
+  if($snapshot){
+    $txtCity.Text = $snapshot.City
+    $txtLocation.Text = $snapshot.Location
+    $txtBldg.Text = $snapshot.Building
+    $txtFloor.Text = $snapshot.Floor
+    $txtRoom.Text = $snapshot.Room
+    if($txtDept){ $txtDept.Text = $snapshot.Department }
+    if($cmbDept){ $cmbDept.Text = $snapshot.Department }
+    if($cmbCity){ $cmbCity.Text = $snapshot.City }
+    if($cmbLocation){ $cmbLocation.Text = $snapshot.Location }
+    if($cmbBuilding){ $cmbBuilding.Text = $snapshot.Building }
+    if($cmbFloor){ $cmbFloor.Text = $snapshot.Floor }
+    if($cmbRoom){ $cmbRoom.Text = $snapshot.Room }
+  }
+  $cmbCity.Visible=$false; $cmbLocation.Visible=$false; $cmbBuilding.Visible=$false; $cmbFloor.Visible=$false; $cmbRoom.Visible=$false
+  $txtCity.Visible=$true; $txtLocation.Visible=$true; $txtBldg.Visible=$true; $txtFloor.Visible=$true; $txtRoom.Visible=$true
+  if ($cmbDept) { $cmbDept.Visible=$false }
+  if ($txtDept) { $txtDept.Visible=$true }
+  if($btnCancelEditLoc){ $btnCancelEditLoc.Visible = $false }
+  $btnEditLoc.Text = 'Edit Location'
+  $script:EditLocationOriginal = $null
+  $script:editing = $false
 }
 $btnRemove.Add_Click({
   $pc = $script:CurrentParent
@@ -4062,6 +4128,7 @@ $txtScan.Add_TextChanged({
   } catch {}
 })
 $btnEditLoc.Add_Click({ Toggle-EditLocation })
+if($btnCancelEditLoc){ $btnCancelEditLoc.Add_Click({ Cancel-EditLocation }) }
 $btnAddPeripheral.Add_Click({
   $pc = $script:CurrentParent
   if(-not $pc){ return }
