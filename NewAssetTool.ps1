@@ -63,9 +63,53 @@ function Get-NewAssetToolDpiContextDescription {
 }
 
 $script:ThemeFontName = 'Segoe UI'
-$script:ThemeFontSize = 10
-$script:ThemeFont = New-Object System.Drawing.Font($script:ThemeFontName, $script:ThemeFontSize)
-$script:ThemeFontSemibold = New-Object System.Drawing.Font('Segoe UI Semibold', $script:ThemeFontSize)
+$script:ThemeFontBaseSize = 10
+$script:ThemeFontSize = $script:ThemeFontBaseSize
+$script:ThemeFont = $null
+$script:ThemeFontSemibold = $null
+$script:UiZoomFactor = 1.0
+$script:UiZoomMin = 0.5
+$script:UiZoomMax = 2.0
+
+function New-ScaledFont {
+  param(
+    [string]$Family,
+    [double]$BaseSize,
+    [System.Drawing.FontStyle]$Style = [System.Drawing.FontStyle]::Regular
+  )
+
+  $scale = $script:UiZoomFactor
+  if ([Math]::Abs([double]$scale) -lt [double]::Epsilon) { $scale = 1.0 }
+  $size = [Math]::Max(1.0, $BaseSize * [double]$scale)
+  return New-Object System.Drawing.Font($Family, $size, $Style)
+}
+
+function Update-ThemeFonts {
+  $script:ThemeFontSize = [Math]::Max(1.0, $script:ThemeFontBaseSize * [double]$script:UiZoomFactor)
+  $script:ThemeFont = New-ScaledFont -Family $script:ThemeFontName -BaseSize $script:ThemeFontBaseSize
+  $script:ThemeFontSemibold = New-ScaledFont -Family 'Segoe UI Semibold' -BaseSize $script:ThemeFontBaseSize
+}
+
+Update-ThemeFonts
+
+function Get-NewAssetToolUiScale { [double]$script:UiZoomFactor }
+
+function Get-NewAssetToolChromeScale {
+  $baseline = if ($global:NewAssetToolPerMonitorDpiContextEnabled) { 0.8 } else { 1.0 }
+  $scale = $baseline * [double](Get-NewAssetToolUiScale)
+  if ([Math]::Abs($scale) -lt [double]::Epsilon) { return 1.0 }
+  return $scale
+}
+
+function Invoke-NewAssetToolWpfScale {
+  param([string]$Source = 'unspecified')
+
+  try {
+    if (Test-Path Variable:\global:NewAssetToolApplyWpfScale) {
+      & $global:NewAssetToolApplyWpfScale $Source
+    }
+  } catch {}
+}
 $script:ThemeColors = @{
   Background = [System.Drawing.Color]::FromArgb(248, 249, 251)
   Surface    = [System.Drawing.Color]::FromArgb(255, 255, 255)
@@ -643,7 +687,7 @@ function Set-ModernTheme {
 function Set-IconText {
   param([System.Windows.Forms.Control]$Control, [int]$Codepoint)
   try {
-    $Control.Font = New-Object System.Drawing.Font('Segoe MDL2 Assets', 12)
+    $Control.Font = New-ScaledFont -Family 'Segoe MDL2 Assets' -BaseSize 12
     $Control.Text = [char]$Codepoint
   } catch {}
 }
@@ -1730,15 +1774,17 @@ $RIGHT_COL_PERCENT  = 54
 $GAP                = 6
 $form = New-Object System.Windows.Forms.Form
 $script:NewAssetToolManualScaleFactor = 1.0
-$desiredChromeScale = 0.8
 $applyWinFormsManualScale = {
-  param([string]$Source = 'unspecified')
+  param([string]$Source = 'unspecified', [switch]$Force)
 
-  if (-not $global:NewAssetToolPerMonitorDpiContextEnabled) { return }
+  if (-not $Force -and -not $global:NewAssetToolPerMonitorDpiContextEnabled) { return }
+  if (-not $form) { return }
 
+  $targetScale = Get-NewAssetToolChromeScale
   $current = $script:NewAssetToolManualScaleFactor
   if ([Math]::Abs([double]$current) -lt [double]::Epsilon) { $current = 1.0 }
-  $ratio = $desiredChromeScale / [double]$current
+  if ([Math]::Abs([double]$targetScale) -lt [double]::Epsilon) { $targetScale = 1.0 }
+  $ratio = $targetScale / [double]$current
 
   $contextDescription = 'unknown'
   try {
@@ -1749,18 +1795,67 @@ $applyWinFormsManualScale = {
 
   if ([Math]::Abs($ratio - 1.0) -gt 0.0001) {
     Write-Verbose (
-      "[DPI][WinForms] Scaling form by ratio {0:n3} from {1:n3} to {2:n3} ({3}) context={4}" -f 
-      $ratio, $current, $desiredChromeScale, $Source, $contextDescription
+      "[DPI][WinForms] Scaling form by ratio {0:n3} from {1:n3} to {2:n3} ({3}) context={4}" -f
+      $ratio, $current, $targetScale, $Source, $contextDescription
     ) -Verbose
-    try { $form.Scale([float]$ratio) } catch {}
+    try {
+      $form.SuspendLayout()
+      $form.Scale([float]$ratio)
+    } catch {
+    } finally {
+      try { $form.ResumeLayout($true) } catch {}
+    }
   } else {
     Write-Verbose (
-      "[DPI][WinForms] Scale already at target {0:n3} ({1}) context={2}" -f 
-      $desiredChromeScale, $Source, $contextDescription
+      "[DPI][WinForms] Scale already at target {0:n3} ({1}) context={2}" -f
+      $targetScale, $Source, $contextDescription
     ) -Verbose
   }
 
-  $script:NewAssetToolManualScaleFactor = $desiredChromeScale
+  $script:NewAssetToolManualScaleFactor = $targetScale
+}
+
+function Set-NewAssetToolUiScale {
+  param(
+    [double]$Scale,
+    [string]$Source = 'manual'
+  )
+
+  if ([double]::IsNaN($Scale) -or [double]::IsInfinity($Scale)) { $Scale = 1.0 }
+  $clamped = [Math]::Min($script:UiZoomMax, [Math]::Max($script:UiZoomMin, [double]$Scale))
+  $clamped = [Math]::Round($clamped, 2)
+  if ([Math]::Abs($clamped - $script:UiZoomFactor) -lt 0.0001) {
+    return $script:UiZoomFactor
+  }
+
+  $script:UiZoomFactor = $clamped
+  Update-ThemeFonts
+
+  try {
+    if ($form) { Set-ModernTheme $form }
+  } catch {}
+
+  & $applyWinFormsManualScale $Source -Force
+  Invoke-NewAssetToolWpfScale $Source
+
+  try {
+    if (Get-Command Update-NearToolbarButtons -ErrorAction SilentlyContinue) {
+      Update-NearToolbarButtons
+    }
+  } catch {}
+
+  return $script:UiZoomFactor
+}
+
+function Adjust-NewAssetToolUiScale {
+  param(
+    [double]$Delta,
+    [string]$Source = 'manual'
+  )
+
+  if ([double]::IsNaN($Delta) -or [double]::IsInfinity($Delta)) { $Delta = 0.0 }
+  $target = $script:UiZoomFactor + [double]$Delta
+  return Set-NewAssetToolUiScale -Scale $target -Source $Source
 }
 $form.Text = "Inventory Assoc Finder - OMI"
 $statusPathLabelDefault = "Data: (not set)    |    Output: (not set)"
@@ -2285,7 +2380,7 @@ try {
   $headerStyle = New-Object System.Windows.Forms.DataGridViewCellStyle
   $headerStyle.BackColor = [System.Drawing.Color]::FromArgb(246,247,249)
   $headerStyle.ForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
-  $headerStyle.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 9)
+  $headerStyle.Font = New-ScaledFont -Family 'Segoe UI Semibold' -BaseSize 9
   $headerStyle.SelectionBackColor = [System.Drawing.Color]::FromArgb(229,241,251)
   $headerStyle.SelectionForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
   $headerStyle.Alignment = [System.Windows.Forms.DataGridViewContentAlignment]::MiddleLeft
@@ -2297,7 +2392,7 @@ try {
   $cellStyle.ForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
   $cellStyle.SelectionBackColor = [System.Drawing.Color]::FromArgb(229,241,251)
   $cellStyle.SelectionForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
-  $cellStyle.Font = New-Object System.Drawing.Font('Segoe UI', 9)
+  $cellStyle.Font = New-ScaledFont -Family 'Segoe UI' -BaseSize 9
   $dgv.DefaultCellStyle = $cellStyle
 } catch {}
 try {
@@ -4612,8 +4707,35 @@ $cmbSort.Width = 210
 $btnClearScopes = New-Object ModernUI.RoundedButton
 $btnClearScopes.Text = "Clear List"
 $btnClearScopes.AutoSize = $true
-$btnClearScopes.Location = '700,6'
-$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$btnClearScopes))
+$btnClearScopes.Anchor = 'Top,Right'
+$btnClearScopes.Margin = '0,0,0,0'
+$btnZoomOut = New-Object ModernUI.RoundedButton
+$btnZoomOut.Text = '-'
+$btnZoomOut.AutoSize = $true
+$btnZoomOut.Anchor = 'Top,Right'
+$btnZoomOut.Margin = '0,0,0,0'
+$btnZoomOut.Add_Click({
+  try {
+    [void](Adjust-NewAssetToolUiScale -Delta -0.1 -Source 'ZoomOutButton')
+  } catch {}
+})
+$btnZoomIn = New-Object ModernUI.RoundedButton
+$btnZoomIn.Text = '+'
+$btnZoomIn.AutoSize = $true
+$btnZoomIn.Anchor = 'Top,Right'
+$btnZoomIn.Margin = '0,0,0,0'
+$btnZoomIn.Add_Click({
+  try {
+    [void](Adjust-NewAssetToolUiScale -Delta 0.1 -Source 'ZoomInButton')
+  } catch {}
+})
+try {
+  if ($tip) {
+    $tip.SetToolTip($btnZoomOut, 'Zoom out (-10%)')
+    $tip.SetToolTip($btnZoomIn, 'Zoom in (+10%)')
+  }
+} catch {}
+$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$btnClearScopes,$btnZoomOut,$btnZoomIn))
 Update-NearbyCheckboxLabels 0 0
 $btnNearbyShowAll.Add_Click({
   try {
@@ -4659,8 +4781,51 @@ $extraWidth = 12
 $desiredWidth = [Math]::Max($multiStatusPreferred.Width + $extraWidth, $clearPreferred.Width)
 $btnSetStatus.MinimumSize = New-Object System.Drawing.Size($multiStatusPreferred.Width, $clearPreferred.Height)
 $btnSetStatus.Size = New-Object System.Drawing.Size($desiredWidth, $clearPreferred.Height)
-$btnSetStatus.Location = New-Object System.Drawing.Point(560, $btnClearScopes.Location.Y)
 $nearToolbar.Controls.Add($btnSetStatus)
+function Update-NearToolbarButtons {
+  if (-not $nearToolbar) { return }
+  $buttons = @()
+  foreach ($button in @($btnZoomIn, $btnZoomOut, $btnClearScopes, $btnSetStatus)) {
+    if ($button -and $button.Visible) { $buttons += $button }
+  }
+  if (-not $buttons) { return }
+
+  try {
+    if ($btnSetStatus -and $btnClearScopes) {
+      $preferredStatus = $btnSetStatus.GetPreferredSize([System.Drawing.Size]::Empty)
+      $preferredClear = $btnClearScopes.GetPreferredSize([System.Drawing.Size]::Empty)
+      $statusWidth = [Math]::Max($preferredStatus.Width + 12, $preferredClear.Width)
+      $statusHeight = [Math]::Max($preferredClear.Height, $preferredStatus.Height)
+      if ($statusWidth -gt 0 -and $statusHeight -gt 0) {
+        $btnSetStatus.MinimumSize = New-Object System.Drawing.Size($preferredStatus.Width, $preferredClear.Height)
+        $btnSetStatus.Size = New-Object System.Drawing.Size($statusWidth, $statusHeight)
+      }
+    }
+  } catch {}
+
+  $spacing = 8
+  $rightPadding = 12
+  $x = [Math]::Max(0, $nearToolbar.ClientSize.Width - $rightPadding)
+  foreach ($button in $buttons) {
+    try {
+      if ($button.AutoSize) {
+        $preferred = $button.PreferredSize
+        if ($preferred.Width -gt 0 -and $preferred.Height -gt 0) {
+          $button.Size = $preferred
+        }
+      }
+    } catch {}
+
+    $x -= $button.Width
+    if ($x -lt 0) { $x = 0 }
+    try { $button.Location = New-Object System.Drawing.Point($x, 6) } catch {}
+    $x -= $spacing
+  }
+}
+
+try { $nearToolbar.Add_SizeChanged({ Update-NearToolbarButtons }) } catch {}
+try { $form.Add_Load({ Update-NearToolbarButtons }) } catch {}
+Update-NearToolbarButtons
 if (-not $menuStatus) { $menuStatus = New-Object System.Windows.Forms.ContextMenuStrip }
 
 function Set-NearbySelectedStatus {
