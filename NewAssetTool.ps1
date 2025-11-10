@@ -897,6 +897,25 @@ function Build-Indices {
 function Find-RecordRaw([string]$q){
   $n=Normalize-Scan $q; if(-not $n){ return $null }
   $key=$n.Value.ToUpper()
+  $preferComputer = $false
+  if($n.Kind -eq 'Hostname'){
+    if($key -match '^(PC|LD|TD|AO)'){
+      $preferComputer = $true
+    }
+  }
+  if(-not $preferComputer -and $key -match '^(PC|LD|TD|AO)'){
+    $preferComputer = $true
+  }
+  if($preferComputer){
+    foreach($variant in (HostnameKeyVariants $n.Value)){
+      $variantKey = $variant
+      if(-not $variantKey){ continue }
+      $variantUpper = $variantKey.ToUpper()
+      if($script:ComputerByName.ContainsKey($variantUpper)){
+        return $script:ComputerByName[$variantUpper]
+      }
+    }
+  }
   if($script:IndexByAsset.ContainsKey($key)){ return $script:IndexByAsset[$key] }
   elseif($script:IndexBySerial.ContainsKey($key)){ return $script:IndexBySerial[$key] }
   elseif($script:IndexByName.ContainsKey($key)){ return $script:IndexByName[$key] }
