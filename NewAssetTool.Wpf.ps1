@@ -129,7 +129,41 @@ Set-Variable -Scope Global -Name NewAssetToolApplyWpfScale -Value $applyWpfScale
 if ($window) {
   if ($global:NewAssetToolPerMonitorDpiContextEnabled) {
     try {
-      $window.Add_DpiChanged({ param($sender,$eventArgs) & $applyWpfScale 'Window.DpiChanged' })
+      if (Get-Command Set-NewAssetToolMonitorScale -ErrorAction SilentlyContinue) {
+        $dpiInfo = [System.Windows.Media.VisualTreeHelper]::GetDpi($window)
+        $initialScale = $null
+        try { $initialScale = [double]$dpiInfo.DpiScaleX } catch {}
+        if ($null -ne $initialScale -and $initialScale -gt 0) {
+          Set-NewAssetToolMonitorScale -Scale $initialScale -Source 'Wpf.Initial' | Out-Null
+        }
+      }
+    } catch {}
+  }
+
+  if ($global:NewAssetToolPerMonitorDpiContextEnabled) {
+    try {
+      $window.Add_DpiChanged({
+        param($sender,$eventArgs)
+
+        if (Get-Command Set-NewAssetToolMonitorScale -ErrorAction SilentlyContinue) {
+          $scale = $null
+          try {
+            $dpiScale = $eventArgs.NewDpi.DpiScaleX
+            if ($dpiScale -gt 0) { $scale = [double]$dpiScale }
+          } catch {}
+          if ($null -eq $scale) {
+            try {
+              $pixelsPerDip = $eventArgs.NewDpi.PixelsPerDip
+              if ($pixelsPerDip -gt 0) { $scale = [double]$pixelsPerDip }
+            } catch {}
+          }
+          if ($null -ne $scale -and $scale -gt 0) {
+            Set-NewAssetToolMonitorScale -Scale $scale -Source 'Wpf.DpiChanged' | Out-Null
+          }
+        }
+
+        & $applyWpfScale 'Window.DpiChanged'
+      })
     } catch {
       Write-Verbose "[DPI][WPF] Failed to attach DpiChanged handler: $($_.Exception.Message)" -Verbose
     }
