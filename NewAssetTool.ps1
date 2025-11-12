@@ -4231,7 +4231,11 @@ function Clear-UI(){
 # ---- Events ----
 $txtScan.Add_KeyDown({ if($_.KeyCode -eq 'Enter'){ Do-Lookup; $_.SuppressKeyPress=$true } })
 $txtScan.Add_TextChanged({
-  if([string]::IsNullOrWhiteSpace($txtScan.Text)){ Clear-UI }
+  if([string]::IsNullOrWhiteSpace($txtScan.Text)){
+    Clear-UI
+  } else {
+    if($script:editing){ Cancel-EditLocation }
+  }
   try {
     if(Get-Command Update-RoundNowButtonState -ErrorAction SilentlyContinue){ Update-RoundNowButtonState }
   } catch {}
