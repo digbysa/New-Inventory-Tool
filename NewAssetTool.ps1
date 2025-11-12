@@ -94,6 +94,88 @@ Update-ThemeFonts
 
 function Get-NewAssetToolUiScale { [double]$script:UiZoomFactor }
 
+if (-not (Get-Variable -Name NewAssetToolScaledDataGrids -Scope Script -ErrorAction SilentlyContinue)) {
+  $script:NewAssetToolScaledDataGrids = New-Object System.Collections.Generic.List[object]
+}
+
+function Update-NewAssetToolScaledDataGrid {
+  param(
+    [Parameter(Mandatory)][System.Windows.Forms.DataGridView]$DataGrid,
+    [double]$CellBaseSize = 9,
+    [double]$HeaderBaseSize = 9
+  )
+
+  if (-not $DataGrid) { return }
+
+  try { $DataGrid.SuspendLayout() } catch {}
+  try {
+    $cellFont = New-ScaledFont -Family 'Segoe UI' -BaseSize $CellBaseSize
+    $headerFont = New-ScaledFont -Family 'Segoe UI Semibold' -BaseSize $HeaderBaseSize
+
+    try { $DataGrid.DefaultCellStyle.Font = $cellFont } catch {}
+    try { $DataGrid.ColumnHeadersDefaultCellStyle.Font = $headerFont } catch {}
+    try { $DataGrid.RowTemplate.DefaultCellStyle.Font = $cellFont } catch {}
+
+    foreach ($column in $DataGrid.Columns) {
+      try {
+        if ($column -and $column.DefaultCellStyle) { $column.DefaultCellStyle.Font = $cellFont }
+      } catch {}
+      try {
+        if ($column -and $column.HeaderCell -and $column.HeaderCell.Style) { $column.HeaderCell.Style.Font = $headerFont }
+      } catch {}
+    }
+  } catch {}
+  finally {
+    try { $DataGrid.ResumeLayout($true) } catch {}
+    try { $DataGrid.Refresh() } catch {}
+  }
+}
+
+function Register-NewAssetToolScaledDataGrid {
+  param(
+    [Parameter(Mandatory)][System.Windows.Forms.DataGridView]$DataGrid,
+    [double]$CellBaseSize = 9,
+    [double]$HeaderBaseSize = 9
+  )
+
+  if (-not $DataGrid) { return }
+
+  if (-not $script:NewAssetToolScaledDataGrids) {
+    $script:NewAssetToolScaledDataGrids = New-Object System.Collections.Generic.List[object]
+  }
+
+  $existing = $null
+  foreach ($entry in $script:NewAssetToolScaledDataGrids) {
+    if ($entry -and $entry.Grid -eq $DataGrid) { $existing = $entry; break }
+  }
+
+  if ($existing) {
+    $existing.CellBaseSize = $CellBaseSize
+    $existing.HeaderBaseSize = $HeaderBaseSize
+  } else {
+    $entry = [pscustomobject]@{
+      Grid          = $DataGrid
+      CellBaseSize  = $CellBaseSize
+      HeaderBaseSize= $HeaderBaseSize
+    }
+    [void]$script:NewAssetToolScaledDataGrids.Add($entry)
+  }
+
+  Update-NewAssetToolScaledDataGrid -DataGrid $DataGrid -CellBaseSize $CellBaseSize -HeaderBaseSize $HeaderBaseSize
+}
+
+function Update-NewAssetToolScaledDataGrids {
+  if (-not $script:NewAssetToolScaledDataGrids) { return }
+
+  foreach ($entry in @($script:NewAssetToolScaledDataGrids)) {
+    try {
+      if ($entry -and $entry.Grid) {
+        Update-NewAssetToolScaledDataGrid -DataGrid $entry.Grid -CellBaseSize $entry.CellBaseSize -HeaderBaseSize $entry.HeaderBaseSize
+      }
+    } catch {}
+  }
+}
+
 function Get-NewAssetToolChromeScale {
   $baseline = if ($global:NewAssetToolPerMonitorDpiContextEnabled) { 0.8 } else { 1.0 }
   $scale = $baseline * [double](Get-NewAssetToolUiScale)
@@ -1839,6 +1921,12 @@ function Set-NewAssetToolUiScale {
   Invoke-NewAssetToolWpfScale $Source
 
   try {
+    if (Get-Command Update-NewAssetToolScaledDataGrids -ErrorAction SilentlyContinue) {
+      Update-NewAssetToolScaledDataGrids
+    }
+  } catch {}
+
+  try {
     if (Get-Command Update-NearToolbarButtons -ErrorAction SilentlyContinue) {
       Update-NearToolbarButtons
     }
@@ -2425,6 +2513,8 @@ try{
   $dgv.Columns['RITM'].FillWeight   = 170
   $dgv.Columns['Retire'].FillWeight = 110
 } catch {}
+Register-NewAssetToolScaledDataGrid -DataGrid $dgv -CellBaseSize 9 -HeaderBaseSize 9
+
 $assocGridPanel.Controls.Add($dgv)
 $cards = New-Object System.Windows.Forms.FlowLayoutPanel
 $cards.AutoScroll=$true; $cards.WrapContents=$true; $cards.FlowDirection='LeftToRight'
@@ -4981,6 +5071,8 @@ $colStatus.MinimumWidth = 160
 $colStatus.DataSource = $script:NEAR_STATUSES
 $colStatus.ReadOnly = $false
 $dgvNearby.Columns.Add($colStatus) | Out-Null
+Register-NewAssetToolScaledDataGrid -DataGrid $dgvNearby -CellBaseSize 9 -HeaderBaseSize 9
+
 # Hidden helper columns
 # --- Enable header-click sorting on the unbound grid ---
 try {
