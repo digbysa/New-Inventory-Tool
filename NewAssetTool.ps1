@@ -62,6 +62,39 @@ function Get-NewAssetToolDpiContextDescription {
   }
 }
 
+$script:NewAssetToolMonitorScale = 1.0
+
+function Set-NewAssetToolMonitorScale {
+  param(
+    [double]$Scale,
+    [string]$Source = 'unspecified'
+  )
+
+  $current = 1.0
+  try { $current = [double]$script:NewAssetToolMonitorScale } catch {}
+  if ([double]::IsNaN($Scale) -or [double]::IsInfinity($Scale) -or $Scale -le 0) {
+    return $current
+  }
+
+  $rounded = [Math]::Round([double]$Scale, 4)
+  if ([Math]::Abs($rounded - $current) -lt 0.0001) {
+    return $current
+  }
+
+  $script:NewAssetToolMonitorScale = $rounded
+  Write-Verbose (
+    "[DPI] Monitor scale updated to {0:n3} (source={1})" -f $script:NewAssetToolMonitorScale, $Source
+  ) -Verbose
+  return $script:NewAssetToolMonitorScale
+}
+
+function Get-NewAssetToolMonitorScale {
+  $current = 1.0
+  try { $current = [double]$script:NewAssetToolMonitorScale } catch {}
+  if ($current -le 0) { $current = 1.0 }
+  return $current
+}
+
 $script:ThemeFontName = 'Segoe UI'
 $script:ThemeFontBaseSize = 10
 $script:ThemeFontSize = $script:ThemeFontBaseSize
@@ -298,8 +331,20 @@ function Update-NewAssetToolScaledDataGrids {
 }
 
 function Get-NewAssetToolChromeScale {
-  $baseline = if ($global:NewAssetToolPerMonitorDpiContextEnabled) { 0.8 } else { 1.0 }
-  $scale = $baseline * [double](Get-NewAssetToolUiScale)
+  $uiScale = [double](Get-NewAssetToolUiScale)
+  if ([Math]::Abs($uiScale) -lt [double]::Epsilon) { $uiScale = 1.0 }
+
+  $baseline = 1.0
+  if ($global:NewAssetToolPerMonitorDpiContextEnabled) {
+    $monitorScale = Get-NewAssetToolMonitorScale
+    if ($monitorScale -gt 1.35) {
+      $baseline = 1.0
+    } else {
+      $baseline = 0.8
+    }
+  }
+
+  $scale = $baseline * $uiScale
   if ([Math]::Abs($scale) -lt [double]::Epsilon) { return 1.0 }
   return $scale
 }
@@ -2145,12 +2190,38 @@ $splitter.Add_SizeChanged({ Set-SplitterMinimums -target $splitter -panel1Desire
 $form.Add_Shown({ Set-SplitterMinimums -target $splitter -panel1Desired $LEFT_COL_WIDTH -panel2Desired $PANEL2_MIN_WIDTH })
 
 if ($global:NewAssetToolPerMonitorDpiContextEnabled) {
-  $form.Add_Shown({ & $applyWinFormsManualScale 'Form.Shown' })
+  $form.Add_Shown({
+    param($sender, $eventArgs)
+
+    $scale = $null
+    try {
+      $dpi = $sender.DeviceDpi
+      if ($dpi -gt 0) { $scale = [double]$dpi / 96.0 }
+    } catch {}
+    if ($null -ne $scale) {
+      Set-NewAssetToolMonitorScale -Scale $scale -Source 'Form.Shown' | Out-Null
+    }
+
+    & $applyWinFormsManualScale 'Form.Shown'
+    Invoke-NewAssetToolWpfScale 'Form.Shown'
+  })
   try {
     $form.Add_DpiChanged({
       param($sender, $eventArgs)
+
       $script:NewAssetToolManualScaleFactor = 1.0
+
+      $scale = $null
+      try {
+        $dpiNew = $eventArgs.DeviceDpiNew
+        if ($dpiNew -gt 0) { $scale = [double]$dpiNew / 96.0 }
+      } catch {}
+      if ($null -ne $scale) {
+        Set-NewAssetToolMonitorScale -Scale $scale -Source 'Form.DpiChanged' | Out-Null
+      }
+
       & $applyWinFormsManualScale 'Form.DpiChanged'
+      Invoke-NewAssetToolWpfScale 'Form.DpiChanged'
     })
   } catch {
     Write-Verbose "[DPI][WinForms] Failed to attach DpiChanged handler: $($_.Exception.Message)" -Verbose
