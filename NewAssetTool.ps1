@@ -2468,7 +2468,7 @@ try {
   $headerStyle = New-Object System.Windows.Forms.DataGridViewCellStyle
   $headerStyle.BackColor = [System.Drawing.Color]::FromArgb(246,247,249)
   $headerStyle.ForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
-  $headerStyle.Font = New-ScaledFont -Family 'Segoe UI Semibold' -BaseSize 9
+  $headerStyle.Font = New-ScaledFont -Family 'Segoe UI Semibold' -BaseSize $script:ThemeFontBaseSize
   $headerStyle.SelectionBackColor = [System.Drawing.Color]::FromArgb(229,241,251)
   $headerStyle.SelectionForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
   $headerStyle.Alignment = [System.Windows.Forms.DataGridViewContentAlignment]::MiddleLeft
@@ -2480,7 +2480,7 @@ try {
   $cellStyle.ForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
   $cellStyle.SelectionBackColor = [System.Drawing.Color]::FromArgb(229,241,251)
   $cellStyle.SelectionForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
-  $cellStyle.Font = New-ScaledFont -Family 'Segoe UI' -BaseSize 9
+  $cellStyle.Font = New-ScaledFont -Family 'Segoe UI' -BaseSize $script:ThemeFontBaseSize
   $dgv.DefaultCellStyle = $cellStyle
 } catch {}
 try {
@@ -2513,7 +2513,7 @@ try{
   $dgv.Columns['RITM'].FillWeight   = 170
   $dgv.Columns['Retire'].FillWeight = 110
 } catch {}
-Register-NewAssetToolScaledDataGrid -DataGrid $dgv -CellBaseSize 9 -HeaderBaseSize 9
+Register-NewAssetToolScaledDataGrid -DataGrid $dgv -CellBaseSize $script:ThemeFontBaseSize -HeaderBaseSize $script:ThemeFontBaseSize
 
 $assocGridPanel.Controls.Add($dgv)
 $cards = New-Object System.Windows.Forms.FlowLayoutPanel
@@ -5071,7 +5071,7 @@ $colStatus.MinimumWidth = 160
 $colStatus.DataSource = $script:NEAR_STATUSES
 $colStatus.ReadOnly = $false
 $dgvNearby.Columns.Add($colStatus) | Out-Null
-Register-NewAssetToolScaledDataGrid -DataGrid $dgvNearby -CellBaseSize 9 -HeaderBaseSize 9
+Register-NewAssetToolScaledDataGrid -DataGrid $dgvNearby -CellBaseSize $script:ThemeFontBaseSize -HeaderBaseSize $script:ThemeFontBaseSize
 
 # Hidden helper columns
 # --- Enable header-click sorting on the unbound grid ---
