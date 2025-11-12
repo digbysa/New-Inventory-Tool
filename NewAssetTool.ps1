@@ -98,6 +98,127 @@ if (-not (Get-Variable -Name NewAssetToolScaledDataGrids -Scope Script -ErrorAct
   $script:NewAssetToolScaledDataGrids = New-Object System.Collections.Generic.List[object]
 }
 
+if (-not (Get-Variable -Name NewAssetToolFixedHeightControls -Scope Script -ErrorAction SilentlyContinue)) {
+  $script:NewAssetToolFixedHeightControls = New-Object System.Collections.Generic.List[object]
+}
+
+function Apply-NewAssetToolFixedHeightControl {
+  param(
+    [Parameter(Mandatory)][object]$Entry
+  )
+
+  if (-not $Entry) { return }
+
+  $control = $Entry.Control
+  if (-not $control) { return }
+  try {
+    if ($control.IsDisposed) { return }
+  } catch {}
+
+  $baseMinWidth  = 0
+  $baseMinHeight = 0
+  $baseHeight    = 0
+  try { $baseMinWidth  = [int]$Entry.BaseMinimumWidth } catch {}
+  try { $baseMinHeight = [int]$Entry.BaseMinimumHeight } catch {}
+  try { $baseHeight    = [int]$Entry.BaseHeight } catch {}
+
+  if ($baseMinHeight -le 0 -and $baseHeight -le 0) { return }
+
+  if ($baseMinHeight -le 0) { $baseMinHeight = $baseHeight }
+  if ($baseMinHeight -le 0) { return }
+
+  $minWidthToApply = if ($baseMinWidth -gt 0) { $baseMinWidth } else { 0 }
+
+  try { $control.SuspendLayout() } catch {}
+  try {
+    $control.MinimumSize = New-Object System.Drawing.Size($minWidthToApply, $baseMinHeight)
+  } catch {}
+  if ($baseHeight -gt 0) {
+    try { $control.Height = $baseHeight } catch {}
+  }
+  try { $control.ResumeLayout($true) } catch {}
+  try { $control.Refresh() } catch {}
+}
+
+function Update-NewAssetToolFixedHeightControls {
+  if (-not $script:NewAssetToolFixedHeightControls) { return }
+
+  $entries = @()
+  try { $entries = $script:NewAssetToolFixedHeightControls.ToArray() } catch {}
+  if (-not $entries) { return }
+
+  foreach ($entry in $entries) {
+    if (-not $entry) { continue }
+
+    $control = $null
+    try { $control = $entry.Control } catch {}
+
+    $shouldRemove = $false
+    if (-not $control) { $shouldRemove = $true }
+    try {
+      if ($control -and $control.IsDisposed) { $shouldRemove = $true }
+    } catch {}
+
+    if ($shouldRemove) {
+      try { [void]$script:NewAssetToolFixedHeightControls.Remove($entry) } catch {}
+      continue
+    }
+
+    Apply-NewAssetToolFixedHeightControl -Entry $entry
+  }
+}
+
+function Register-NewAssetToolFixedHeightControl {
+  param(
+    [Parameter(Mandatory)][System.Windows.Forms.Control]$Control,
+    [int]$BaseHeight = 0,
+    [int]$BaseMinimumHeight = 0
+  )
+
+  if (-not $Control) { return }
+
+  if (-not $script:NewAssetToolFixedHeightControls) {
+    $script:NewAssetToolFixedHeightControls = New-Object System.Collections.Generic.List[object]
+  }
+
+  $existing = $null
+  foreach ($entry in $script:NewAssetToolFixedHeightControls) {
+    if ($entry -and $entry.Control -eq $Control) { $existing = $entry; break }
+  }
+
+  $currentMinWidth  = 0
+  $currentMinHeight = 0
+  try {
+    $currentMinWidth  = [int]$Control.MinimumSize.Width
+    $currentMinHeight = [int]$Control.MinimumSize.Height
+  } catch {}
+
+  $resolvedMinHeight = if ($BaseMinimumHeight -gt 0) { [int]$BaseMinimumHeight } elseif ($currentMinHeight -gt 0) { $currentMinHeight } else { 0 }
+  $resolvedHeight = if ($BaseHeight -gt 0) { [int]$BaseHeight } else { 0 }
+  if ($resolvedHeight -le 0) {
+    try { $resolvedHeight = [int]$Control.Height } catch {}
+  }
+  if ($resolvedHeight -le 0) { $resolvedHeight = $resolvedMinHeight }
+  if ($resolvedMinHeight -le 0) { $resolvedMinHeight = $resolvedHeight }
+
+  if ($existing) {
+    $existing.BaseMinimumWidth  = $currentMinWidth
+    $existing.BaseMinimumHeight = $resolvedMinHeight
+    $existing.BaseHeight        = $resolvedHeight
+    $entryToApply = $existing
+  } else {
+    $entryToApply = [pscustomobject]@{
+      Control          = $Control
+      BaseMinimumWidth = $currentMinWidth
+      BaseMinimumHeight= $resolvedMinHeight
+      BaseHeight       = $resolvedHeight
+    }
+    [void]$script:NewAssetToolFixedHeightControls.Add($entryToApply)
+  }
+
+  Apply-NewAssetToolFixedHeightControl -Entry $entryToApply
+}
+
 function Update-NewAssetToolScaledDataGrid {
   param(
     [Parameter(Mandatory)][System.Windows.Forms.DataGridView]$DataGrid,
@@ -1920,6 +2041,8 @@ function Set-NewAssetToolUiScale {
   & $applyWinFormsManualScale $Source -Force
   Invoke-NewAssetToolWpfScale $Source
 
+  try { Update-NewAssetToolFixedHeightControls } catch {}
+
   try {
     if (Get-Command Update-NewAssetToolScaledDataGrids -ErrorAction SilentlyContinue) {
       Update-NewAssetToolScaledDataGrids
@@ -2106,6 +2229,7 @@ function New-SummaryTextBox {
     $box.ReadOnly = $true
     $box.BackColor = [System.Drawing.Color]::White
   }
+  Register-NewAssetToolFixedHeightControl -Control $box -BaseHeight 24 -BaseMinimumHeight 24
   return $box
 }
 
@@ -2267,6 +2391,7 @@ function New-LocTextBox {
   $box.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(12,0,0,0) } else { New-Object System.Windows.Forms.Padding(12,8,0,0) }
   $box.MinimumSize = New-Object System.Drawing.Size(0,24)
   $box.Height = 24
+  Register-NewAssetToolFixedHeightControl -Control $box -BaseHeight 24 -BaseMinimumHeight 24
   return $box
 }
 
