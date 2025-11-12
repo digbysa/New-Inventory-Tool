@@ -4184,6 +4184,20 @@ function Do-Lookup(){
 function Clear-UI(){
   Reset-RoundingTimer
   $script:CurrentDisplay = $null; $script:CurrentParent  = $null
+  if($script:editing){
+    foreach($ctrl in @($cmbCity,$cmbLocation,$cmbBuilding,$cmbFloor,$cmbRoom)){
+      if($ctrl){ $ctrl.Visible = $false }
+    }
+    foreach($ctrl in @($txtCity,$txtLocation,$txtBldg,$txtFloor,$txtRoom)){
+      if($ctrl){ $ctrl.Visible = $true }
+    }
+    if ($cmbDept) { $cmbDept.Visible=$false }
+    if ($txtDept) { $txtDept.Visible=$true }
+    if($btnCancelEditLoc){ $btnCancelEditLoc.Visible = $false }
+    if($btnEditLoc){ $btnEditLoc.Text = 'Edit Location' }
+    $script:EditLocationOriginal = $null
+    $script:editing = $false
+  }
   foreach($tb in @($txtType,$txtHost,$txtAT,$txtSN,$txtParent,$txtRITM,$txtRetire,$txtRound,$txtCity,$txtLocation,$txtBldg,$txtFloor,$txtRoom,$txtDept,$txtDepartment,$txtComments)){
     if($tb -is [System.Windows.Forms.Control]){
       $tb.Text = ''
