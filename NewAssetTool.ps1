@@ -127,6 +127,14 @@ Update-ThemeFonts
 
 function Get-NewAssetToolUiScale { [double]$script:UiZoomFactor }
 
+function Restore-NearbyMultiSelect {
+  try {
+    if ($script:dgvNearby) {
+      $script:dgvNearby.MultiSelect = $true
+    }
+  } catch {}
+}
+
 if (-not (Get-Variable -Name NewAssetToolScaledDataGrids -Scope Script -ErrorAction SilentlyContinue)) {
   $script:NewAssetToolScaledDataGrids = New-Object System.Collections.Generic.List[object]
 }
@@ -2082,6 +2090,8 @@ function Set-NewAssetToolUiScale {
   try {
     if ($form) { Set-ModernTheme $form }
   } catch {}
+
+  Restore-NearbyMultiSelect
 
   & $applyWinFormsManualScale $Source -Force
   Invoke-NewAssetToolWpfScale $Source
@@ -5702,7 +5712,7 @@ Apply-ModernThemeToForm -Form $form
 # The theming utility enforces single-selection on all DataGridViews. Restore
 # multi-selection for the Nearby grid so Shift/Ctrl selection works as
 # intended.
-try { if ($dgvNearby) { $dgvNearby.MultiSelect = $true } } catch {}
+Restore-NearbyMultiSelect
 
 $form.BackColor = $script:ThemeColors.Background
 try {
