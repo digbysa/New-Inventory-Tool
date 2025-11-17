@@ -4595,7 +4595,10 @@ $btnSave.Add_Click({
   if(-not (Test-Path $out)){ New-Item -ItemType Directory -Path $out -Force | Out-Null }
 $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
   $exists = Test-Path $file
-  if($exists){ Ensure-RoundingCommentsColumn $file }
+  if($exists){
+    Ensure-RoundingCommentsColumn $file
+    Ensure-RoundingCsvNewline $file
+  }
   $pc = $script:CurrentParent
   if(-not $pc){ $pc = Resolve-ParentComputer (Find-RecordRaw $txtAT.Text) }
   if(-not $pc){ $pc = $script:CurrentDisplay }
@@ -4848,6 +4851,18 @@ function Ensure-RoundingCommentsColumn([string]$file){
     } else {
       $headerLine = ($columns -join ',')
       Set-Content -Path $file -Value $headerLine -Encoding UTF8
+    }
+  } catch { }
+}
+function Ensure-RoundingCsvNewline([string]$file){
+  try {
+    if([string]::IsNullOrWhiteSpace($file)){ return }
+    if(-not (Test-Path $file)){ return }
+    $raw = Get-Content -Path $file -Raw -Encoding UTF8
+    if(-not [string]::IsNullOrEmpty($raw)){
+      if(-not $raw.EndsWith("`n")){
+        Add-Content -Path $file -Value ''
+      }
     }
   } catch { }
 }
@@ -5584,7 +5599,10 @@ $btnNearSave.Add_Click({
   if (-not (Test-Path $out)) { New-Item -ItemType Directory -Path $out -Force | Out-Null }
 $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
   $exists = Test-Path $file
-  if($exists){ Ensure-RoundingCommentsColumn $file }
+  if($exists){
+    Ensure-RoundingCommentsColumn $file
+    Ensure-RoundingCsvNewline $file
+  }
   $todaySet = Get-RoundedToday-Set
   $saved = 0
   foreach ($row in $dgvNearby.Rows) {
