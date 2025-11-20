@@ -3407,7 +3407,15 @@ function Refresh-AssocGrid($parentRec){
     $r.Cells['Type'].Value=$ch.Type
     if($ch.name){ $r.Cells['Name'].Value = $ch.name } else { $r.Cells['Name'].Value = '' }
     try {
-      $expectedName = Compute-ProposedName $ch $immediateParent
+      $nameParent = $immediateParent
+      if(
+        ($roleLabel -eq 'Grandchild') -and
+        ($ch.Type -eq 'Mic' -or $ch.Type -eq 'Scanner') -and
+        $parentRec
+      ){
+        $nameParent = $parentRec
+      }
+      $expectedName = Compute-ProposedName $ch $nameParent
       $defaultNameColor = if($dgv.DefaultCellStyle -and $dgv.DefaultCellStyle.ForeColor){
         $dgv.DefaultCellStyle.ForeColor
       } else {
