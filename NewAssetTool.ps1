@@ -1038,6 +1038,16 @@ function Canonical-Asset([string]$raw){
   if($s -match '^CRT-?(.+)$'){  return ('CRT-{0}' -f $matches[1]) }
   return $s
 }
+function Apply-ScannerMicPolicy([string]$text){
+  if([string]::IsNullOrWhiteSpace($text)){ return $text }
+
+  $candidate = $text.Trim().ToUpper()
+  if($candidate -match '^C\d{6}$'){
+    return $candidate.Substring(0,6)
+  }
+
+  return $candidate
+}
 function HostnameKeyVariants([string]$raw){
   $out = New-Object System.Collections.ArrayList
   if([string]::IsNullOrWhiteSpace($raw)){ return $out }
@@ -1070,6 +1080,7 @@ function Normalize-Scan([string]$raw){
   $s=$s -replace '^(SN#?|S/N|SERIAL)\s*[:#]?\s*',''
   $s=$s -replace '^(ASSET\s*#?|ASSET#)\s*[:#]?\s*',''
   $s=$s -replace '\s',''
+  $s=Apply-ScannerMicPolicy $s
   if($s -match '^HSS[- ]?(\d+)$'){return @{Value=("HSS-{0}" -f $matches[1]);Kind='AssetTag'}}
   if($s -match '^C[- ]?0*(\d+)$'){return @{Value=("C{0}" -f $matches[1]);Kind='AssetTag'}}
   if($s -match '^(CRT[- ]?.+)$'){ return @{Value=($s -replace '^CRT[- ]?','CRT-');Kind='AssetTag'}}
@@ -3514,9 +3525,7 @@ function Normalize-UniversalSearch([string]$raw){
   $s = $raw.Trim().ToUpper()
   $s = $s -replace '\s',''
   $s = $s -replace '-',''
-  if($s.Length -ge 2 -and $s.StartsWith('C')){
-    $s = $s.Substring(0, $s.Length - 1)
-  }
+  $s = Apply-ScannerMicPolicy $s
   return $s
 }
 function Resolve-PeripheralLookup([string]$query){
