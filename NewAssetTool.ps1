@@ -1244,6 +1244,13 @@ function Resolve-ParentComputer($rec){
     if($script:IndexBySerial.ContainsKey($upa)){
       $cand=$script:IndexBySerial[$upa]; if($cand -and $cand.Type -eq 'Computer'){ return $cand }
     }
+    foreach($cart in $script:Carts){
+      if(-not $cart){ continue }
+      if(Match-Token-To-Record $upa $cart){
+        $cartParent = Resolve-ParentComputer $cart
+        if($cartParent){ return $cartParent }
+      }
+    }
   }
   if($rec.name){
     $nmU = $rec.name.ToUpper()
@@ -1423,7 +1430,16 @@ function Color-RoundCell([string]$s){
   if($s -eq 'Yellow'){ $txtRound.BackColor=[System.Drawing.Color]::LightYellow; return }
   $txtRound.BackColor=[System.Drawing.Color]::MistyRose
 }
-function Show-RoundingStatus($parentPC){
+function Show-RoundingStatus($parentPC, $displayRec = $null){
+  $target = if($displayRec){ $displayRec } else { $script:CurrentDisplay }
+  $detectedType = Get-DetectedType $target
+  $roundingEligibleTypes = @('Computer','Desktop','Laptop','Tablet','Thin Client','Tangent')
+  if(-not ($roundingEligibleTypes -contains $detectedType)){
+    $txtRound.Text = ''
+    $txtRound.BackColor = [System.Drawing.Color]::White
+    return
+  }
+
   $dt = $null
   if ($parentPC) { $dt = $parentPC.LastRounded }
   if ($dt) {
@@ -4069,7 +4085,7 @@ function Populate-UI($displayRec,$parentRec){
   }
   $txtRITM.Text=$displayRec.RITM
   $txtRetire.Text = Fmt-DateLong $displayRec.Retire
-  Show-RoundingStatus $parentRec
+  Show-RoundingStatus $parentRec $displayRec
   if($parentRec){ Validate-Location $parentRec } else { Validate-Location $displayRec }
   if($parentRec){ Refresh-AssocViews $parentRec }
   Update-CartCheckbox-State $parentRec
