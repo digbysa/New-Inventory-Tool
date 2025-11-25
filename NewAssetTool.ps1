@@ -5045,8 +5045,14 @@ $chkShowExcluded.Text = "Excluded"
 $chkShowExcluded.AutoSize = $true
 $chkShowExcluded.Location = '280,32'
 $chkShowExcluded.Checked = $false
+$chkRecentlyRounded = New-Object System.Windows.Forms.CheckBox
+$chkRecentlyRounded.Text = "Recently Rounded"
+$chkRecentlyRounded.AutoSize = $true
+$chkRecentlyRounded.Location = '400,32'
+$chkRecentlyRounded.Checked = $true
 $chkShowExcluded.Add_CheckedChanged({ Rebuild-Nearby })
 $chkTodayRounded.Add_CheckedChanged({ Rebuild-Nearby })
+$chkRecentlyRounded.Add_CheckedChanged({ Rebuild-Nearby })
 
 $lblSort = New-Object System.Windows.Forms.Label
 $lblSort.AutoSize = $true
@@ -5097,7 +5103,7 @@ try {
     $tip.SetToolTip($btnZoomIn, 'Zoom in (+10%)')
   }
 } catch {}
-$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$btnClearScopes,$btnZoomOut,$btnZoomIn))
+$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$chkRecentlyRounded,$btnClearScopes,$btnZoomOut,$btnZoomIn))
 Update-NearbyCheckboxLabels 0 0
 $btnNearbyShowAll.Add_Click({
   try {
@@ -5114,6 +5120,10 @@ $btnNearbyShowAll.Add_Click({
         $chkShowExcluded.Checked = $true
         [void]$script:NearbyShowAllChanges.Add('Excluded')
       }
+      if (-not $chkRecentlyRounded.Checked) {
+        $chkRecentlyRounded.Checked = $true
+        [void]$script:NearbyShowAllChanges.Add('Recent')
+      }
       $btnNearbyShowAll.Text = 'Hide Again'
     } else {
       foreach ($entry in @($script:NearbyShowAllChanges)) {
@@ -5123,6 +5133,9 @@ $btnNearbyShowAll.Add_Click({
           }
           'Excluded' {
             if ($chkShowExcluded.Checked) { $chkShowExcluded.Checked = $false }
+          }
+          'Recent' {
+            if ($chkRecentlyRounded.Checked) { $chkRecentlyRounded.Checked = $false }
           }
         }
       }
@@ -5490,9 +5503,10 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     }
     $lr = Get-LatestRoundForAsset $at $pc.LastRounded
     $days = ""
+    $recentDays = $null
     if ($lr) {
-      $d = [int]((Get-Date).Date - $lr.Date).TotalDays
-      $days = $d
+      $recentDays = [int]((Get-Date).Date - $lr.Date).TotalDays
+      $days = $recentDays
     }
     $isToday = $false
     if ($atKey -and $todaySet.Contains($atKey)) { $isToday = $true }
@@ -5506,6 +5520,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     if ($isExcluded) { $excludedCount++ }
     if (-not $chkTodayRounded.Checked -and $isToday) { continue }
     if (-not $chkShowExcluded.Checked -and $isExcluded) { continue }
+    if (-not $chkRecentlyRounded.Checked -and $null -ne $recentDays -and $recentDays -ge 1 -and $recentDays -le 35) { continue }
     $rowIdx = $dgvNearby.Rows.Add()
     $r = $dgvNearby.Rows[$rowIdx]
     $r.Cells['Host'].Value      = $pc.name
