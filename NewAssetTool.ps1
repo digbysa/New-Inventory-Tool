@@ -5017,7 +5017,8 @@ function Get-ExcludedDevices-Set {
 function Update-NearbyCheckboxLabels {
   param(
     [int]$todayCount,
-    [int]$excludedCount
+    [int]$excludedCount,
+    [int]$recentCount
   )
 
   try {
@@ -5029,6 +5030,12 @@ function Update-NearbyCheckboxLabels {
   try {
     if ($chkShowExcluded) {
       $chkShowExcluded.Text = "Excluded ({0})" -f $excludedCount
+    }
+  } catch {}
+
+  try {
+    if ($chkRecentlyRounded) {
+      $chkRecentlyRounded.Text = "Recently Rounded ({0})" -f $recentCount
     }
   } catch {}
 }
@@ -5139,7 +5146,7 @@ try {
   }
 } catch {}
 $nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$chkRecentlyRounded,$btnClearScopes,$btnZoomOut,$btnZoomIn))
-Update-NearbyCheckboxLabels 0 0
+Update-NearbyCheckboxLabels 0 0 0
 $btnNearbyShowAll.Add_Click({
   try {
     if (-not $script:NearbyShowAllChanges) {
@@ -5527,6 +5534,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   $excludedSet = Get-ExcludedDevices-Set
   $todayCount = 0
   $excludedCount = 0
+  $recentCount = 0
   $dgvNearby.Rows.Clear()
   $seen = New-Object System.Collections.Generic.HashSet[string]
   foreach ($pc in $script:Computers) {
@@ -5539,9 +5547,11 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $lr = Get-LatestRoundForAsset $at $pc.LastRounded
     $days = ""
     $recentDays = $null
+    $isRecent = $false
     if ($lr) {
       $recentDays = [int]((Get-Date).Date - $lr.Date).TotalDays
       $days = $recentDays
+      if ($recentDays -ge 1 -and $recentDays -le 35) { $isRecent = $true }
     }
     $isToday = $false
     if ($atKey -and $todaySet.Contains($atKey)) { $isToday = $true }
@@ -5553,9 +5563,10 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     if (-not $isExcluded -and $atKey -and $excludedSet.Contains($atKey)) { $isExcluded = $true }
     if ($isToday) { $todayCount++ }
     if ($isExcluded) { $excludedCount++ }
+    if ($isRecent) { $recentCount++ }
     if (-not $chkTodayRounded.Checked -and $isToday) { continue }
     if (-not $chkShowExcluded.Checked -and $isExcluded) { continue }
-    if (-not $chkRecentlyRounded.Checked -and $null -ne $recentDays -and $recentDays -ge 1 -and $recentDays -le 35) { continue }
+    if (-not $chkRecentlyRounded.Checked -and $isRecent) { continue }
     $rowIdx = $dgvNearby.Rows.Add()
     $r = $dgvNearby.Rows[$rowIdx]
     $r.Cells['Host'].Value      = $pc.name
@@ -5589,7 +5600,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   # Apply sort and filters
   Apply-NearbySort
   Apply-NearbyFilters
-  Update-NearbyCheckboxLabels $todayCount $excludedCount
+  Update-NearbyCheckboxLabels $todayCount $excludedCount $recentCount
 try { $dgvNearby.ResumeLayout() } catch {}
 try { $form.Cursor = [System.Windows.Forms.Cursors]::Default } catch {}}
 function Apply-NearbySort {
