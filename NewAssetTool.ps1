@@ -3718,21 +3718,24 @@ function Get-CmdbLink([string]$deviceType,[string]$assetTag){
   if([string]::IsNullOrWhiteSpace($assetTag)){ return '' }
 
   $assetValue = $assetTag.Trim()
-  $linkTemplate = $null
+  $innerPath  = $null
 
   $peripheralTypes = @('Monitor','Microphone','Scanner')
   $computerTypes   = @('Computer','Tangent','Desktop','Laptop','Thin Client')
 
   if($peripheralTypes -contains $deviceType){
-    $linkTemplate = 'https://healthbc.service-now.com/cmdb_ci_peripheral_list.do?sysparm_first_row=1&sysparm_query=GOTOasset_tagLIKE%DeviceAsset%&sysparm_query_encoded=GOTOasset_tagLIKE%DeviceAsset%&sysparm_view='
+    $innerPath = 'cmdb_ci_peripheral_list.do?sysparm_first_row=1&sysparm_query=GOTOasset_tagLIKE{0}&sysparm_query_encoded=GOTOasset_tagLIKE{0}&sysparm_view='
   } elseif($computerTypes -contains $deviceType){
-    $linkTemplate = 'https://healthbc.service-now.com/cmdb_ci_computer_list.do?sysparm_first_row=1&sysparm_query=companyINjavascript%3anew+inccompanysearchChange().getFilter()%3b%5eGOTOasset_tagLIKE%DeviceAsset%&sysparm_query_encoded=companyINjavascript%3anew+inccompanysearchChange().getFilter()%3b%5eGOTOasset_tagLIKE%DeviceAsset%&sysparm_view='
+    $innerPath = 'cmdb_ci_computer_list.do?sysparm_first_row=1&sysparm_query=companyINjavascript:new inccompanysearchChange().getFilter();^GOTOasset_tagLIKE{0}&sysparm_query_encoded=companyINjavascript:new inccompanysearchChange().getFilter();^GOTOasset_tagLIKE{0}&sysparm_view='
   } elseif($deviceType -eq 'Cart'){
-    $linkTemplate = 'https://healthbc.service-now.com/u_cmdb_ci_mobile_carts_list.do?sysparm_first_row=1&sysparm_query=companyINjavascript%3anew+inccompanysearchChange().getFilter()%3b%5eoperational_status!%3d6%5eGOTOasset_tagLIKE%DeviceAsset%&sysparm_query_encoded=companyINjavascript%3anew+inccompanysearchChange().getFilter()%3b%5eoperational_status!%3d6%5eGOTOasset_tagLIKE%DeviceAsset%&sysparm_view='
+    $innerPath = 'u_cmdb_ci_mobile_carts_list.do?sysparm_first_row=1&sysparm_query=companyINjavascript:new inccompanysearchChange().getFilter();^operational_status!=6^GOTOasset_tagLIKE{0}&sysparm_query_encoded=companyINjavascript:new inccompanysearchChange().getFilter();^operational_status!=6^GOTOasset_tagLIKE{0}&sysparm_view='
   }
 
-  if(-not $linkTemplate){ return '' }
-  return $linkTemplate.Replace('%DeviceAsset%',$assetValue)
+  if(-not $innerPath){ return '' }
+
+  $expandedInnerPath = [string]::Format($innerPath,$assetValue)
+  $encodedInnerPath  = [System.Uri]::EscapeDataString($expandedInnerPath)
+  return "https://healthbc.service-now.com/nav_to.do?uri=$encodedInnerPath"
 }
 
 function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[string]$oldParent,[string]$newParent,[string]$oldName,[string]$newName){
@@ -3740,6 +3743,11 @@ function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[s
   if(-not $out){ return }
   $file = Join-Path $out 'CMDBUpdates.csv'
   $cmdbLink = Get-CmdbLink $deviceType $childAT
+  $cmdbHyperlink = if([string]::IsNullOrWhiteSpace($cmdbLink)){
+    ''
+  } else {
+    "=HYPERLINK(\"$cmdbLink\",\"$childAT\")"
+  }
   $oldParentTag = Resolve-ParentAssetTag $oldParent
   $newParentTag = Resolve-ParentAssetTag $newParent
   $row = [pscustomobject]@{
@@ -3751,7 +3759,7 @@ function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[s
     NewParent = $newParentTag
     OldName   = $oldName
     NewName   = $newName
-    CMDBLink  = $cmdbLink
+    CMDBLink  = $cmdbHyperlink
   }
   if(Test-Path $file){ $row | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
   else { $row | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
