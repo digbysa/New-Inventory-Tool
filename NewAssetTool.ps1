@@ -3714,10 +3714,32 @@ function Resolve-ParentAssetTag([string]$token){
   return $trimmed
 }
 
+function Get-CmdbLink([string]$deviceType,[string]$assetTag){
+  if([string]::IsNullOrWhiteSpace($assetTag)){ return '' }
+
+  $assetValue = $assetTag.Trim()
+  $linkTemplate = $null
+
+  $peripheralTypes = @('Monitor','Microphone','Scanner')
+  $computerTypes   = @('Computer','Tangent','Desktop','Laptop','Thin Client')
+
+  if($peripheralTypes -contains $deviceType){
+    $linkTemplate = 'https://healthbc.service-now.com/cmdb_ci_peripheral_list.do?sysparm_first_row=1&sysparm_query=GOTOasset_tagLIKE%DeviceAsset%&sysparm_query_encoded=GOTOasset_tagLIKE%DeviceAsset%&sysparm_view='
+  } elseif($computerTypes -contains $deviceType){
+    $linkTemplate = 'https://healthbc.service-now.com/cmdb_ci_computer_list.do?sysparm_first_row=1&sysparm_query=companyINjavascript%3anew+inccompanysearchChange().getFilter()%3b%5eGOTOasset_tagLIKE%DeviceAsset%&sysparm_query_encoded=companyINjavascript%3anew+inccompanysearchChange().getFilter()%3b%5eGOTOasset_tagLIKE%DeviceAsset%&sysparm_view='
+  } elseif($deviceType -eq 'Cart'){
+    $linkTemplate = 'https://healthbc.service-now.com/u_cmdb_ci_mobile_carts_list.do?sysparm_first_row=1&sysparm_query=companyINjavascript%3anew+inccompanysearchChange().getFilter()%3b%5eoperational_status!%3d6%5eGOTOasset_tagLIKE%DeviceAsset%&sysparm_query_encoded=companyINjavascript%3anew+inccompanysearchChange().getFilter()%3b%5eoperational_status!%3d6%5eGOTOasset_tagLIKE%DeviceAsset%&sysparm_view='
+  }
+
+  if(-not $linkTemplate){ return '' }
+  return $linkTemplate.Replace('%DeviceAsset%',$assetValue)
+}
+
 function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[string]$oldParent,[string]$newParent,[string]$oldName,[string]$newName){
   $out = if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder}
   if(-not $out){ return }
   $file = Join-Path $out 'CMDBUpdates.csv'
+  $cmdbLink = Get-CmdbLink $deviceType $childAT
   $oldParentTag = Resolve-ParentAssetTag $oldParent
   $newParentTag = Resolve-ParentAssetTag $newParent
   $row = [pscustomobject]@{
@@ -3729,6 +3751,7 @@ function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[s
     NewParent = $newParentTag
     OldName   = $oldName
     NewName   = $newName
+    CMDBLink  = $cmdbLink
   }
   if(Test-Path $file){ $row | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
   else { $row | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
