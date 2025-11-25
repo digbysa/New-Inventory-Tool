@@ -3746,7 +3746,7 @@ function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[s
   $cmdbHyperlink = if([string]::IsNullOrWhiteSpace($cmdbLink)){
     ''
   } else {
-    "=HYPERLINK(\"$cmdbLink\",\"$childAT\")"
+    "=HYPERLINK(`"$cmdbLink`",`"$childAT`")"
   }
   $oldParentTag = Resolve-ParentAssetTag $oldParent
   $newParentTag = Resolve-ParentAssetTag $newParent
