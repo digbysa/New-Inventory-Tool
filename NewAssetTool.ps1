@@ -1433,7 +1433,10 @@ function Color-RoundCell([string]$s){
 }
 function Show-RoundingStatus($parentPC, $displayRec = $null){
   $target = if($displayRec){ $displayRec } else { $script:CurrentDisplay }
-  $detectedType = Get-DetectedType $target
+  # Use the parent to determine rounding eligibility when viewing a child so that
+  # the parent's Last Rounded value still appears for peripherals.
+  $eligibilityRec = if($parentPC){ $parentPC } else { $target }
+  $detectedType = Get-DetectedType $eligibilityRec
   $roundingEligibleTypes = @('Computer','Desktop','Laptop','Tablet','Thin Client','Tangent')
   if(-not ($roundingEligibleTypes -contains $detectedType)){
     $txtRound.Text = ''
