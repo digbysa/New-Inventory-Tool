@@ -1042,8 +1042,9 @@ function Apply-ScannerMicPolicy([string]$text){
   if([string]::IsNullOrWhiteSpace($text)){ return $text }
 
   $candidate = $text.Trim().ToUpper()
-  if($candidate -match '^C\d{6}$'){
-    return $candidate.Substring(0,6)
+  $assetMatch = [regex]::Match($candidate, '^C(?<digits>\d{6})(?<suffix>[A-Z])?$')
+  if($assetMatch.Success){
+    return 'C' + $assetMatch.Groups['digits'].Value
   }
 
   return $candidate
