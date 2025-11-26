@@ -1268,6 +1268,7 @@ function Resolve-ParentComputer($rec){
 function Get-ChildrenForParent($parentRec){
   $relationships = New-Object System.Collections.ArrayList
   if(-not $parentRec){ return $relationships }
+  if(-not (Is-AllowedParentType $parentRec)){ return $relationships }
   $parATKey = (Canonical-Asset $parentRec.asset_tag)
   if([string]::IsNullOrWhiteSpace($parATKey)){ return $relationships }
 
@@ -1278,14 +1279,14 @@ function Get-ChildrenForParent($parentRec){
   }
 
   if($script:ChildrenByParent.ContainsKey($parATKey)){
-    foreach($ch in $script:ChildrenByParent[$parATKey]){ & $addDirect $ch }
+    foreach($ch in $script:ChildrenByParent[$parATKey]){ if(Is-ValidChildType $ch){ & $addDirect $ch } }
   }
 
   foreach($tbl in @('Monitors','Mics','Scanners','Carts')){
     $collection = (Get-Variable -Scope Script -Name $tbl -ErrorAction SilentlyContinue).Value
     if(-not $collection){ continue }
     foreach($rec in $collection){
-      if(-not $rec.u_parent_asset){ continue }
+      if(-not $rec.u_parent_asset -or -not (Is-ValidChildType $rec)){ continue }
       $upa = $rec.u_parent_asset.Trim()
       $matchHost = $false
       foreach($k in (HostnameKeyVariants $upa)){
@@ -1394,6 +1395,9 @@ function Get-ChildrenForParent($parentRec){
       $key = & $getObjKey $peripheral
       $cartParent = $null
       if($key -ne $null -and $peripheralAssignments.ContainsKey($key)){ $cartParent = $peripheralAssignments[$key] }
+      if(-not $cartParent -and $carts.Count -gt 0 -and (($peripheral.Type -eq 'Mic') -or ($peripheral.Type -eq 'Scanner'))){
+        $cartParent = $carts[0]
+      }
       if($cartParent){
         & $addRelation $peripheral $cartParent 'Grandchild'
       } else {
@@ -1425,6 +1429,15 @@ function Get-DetectedType($rec){
   }
   if($rec.Type -eq 'Cart' -or $rec.Kind -eq 'Cart'){ return 'Cart' }
   return $rec.Type
+}
+function Is-AllowedParentType($rec){
+  if(-not $rec){ return $false }
+  $detected = Get-DetectedType $rec
+  return @('Desktop','Laptop','Tangent','Tablet','Thin Client') -contains $detected
+}
+function Is-ValidChildType($rec){
+  if(-not $rec){ return $false }
+  return @('Monitor','Cart','Mic','Scanner') -contains $rec.Type
 }
 function Color-RoundCell([string]$s){
   if($s -eq 'Green'){ $txtRound.BackColor=[System.Drawing.Color]::PaleGreen; return }
@@ -1492,23 +1505,30 @@ function Validate-ParentAndName($displayRec,$parentRec){
       $txtParent.Text=$raw
       $ok = $false
       $msg = ""
- if($parentRec -and (Match-ParentToken $raw $parentRec)){
+      if($parentRec -and -not (Is-AllowedParentType $parentRec)){
+        $msg = "Resolved parent type '" + (Get-DetectedType $parentRec) + "' is not eligible to be a parent."
+      } elseif($parentRec -and ($displayRec.Type -eq 'Mic' -or $displayRec.Type -eq 'Scanner') -and ($parentRec.name -match '^(?i)AO')){
+        $carts = Find-CartsForComputer $parentRec
+        if($carts.Count -gt 0){
+          foreach($ct in $carts){
+            if(Match-Token-To-Record $raw $ct){ $ok = $true; $msg = "u_parent_asset matches the resolved cart '"+$ct.name+"'."; break }
+          }
+          if(-not $ok){
+            if(Match-ParentToken $raw $parentRec){
+              $msg = "Microphones and scanners for a Tangent should link to its cart, not the Tangent directly."
+            } else {
+              $msg = "u_parent_asset does not match resolved cart for this Tangent."
+            }
+          }
+        } else {
+          $msg = "No Cart found for this Tangent; expected u_parent_asset to reference the cart child."
+          if(Match-ParentToken $raw $parentRec){ $msg += " (Currently points to the Tangent.)" }
+        }
+      } elseif($parentRec -and (Match-ParentToken $raw $parentRec)){
         $ok = $true
         $msg = "u_parent_asset matches the resolved parent."
       } else {
-        if($parentRec -and ($displayRec.Type -eq 'Mic' -or $displayRec.Type -eq 'Scanner') -and ($parentRec.name -match '^(?i)AO')){
-          $carts = Find-CartsForComputer $parentRec
-          if($carts.Count -gt 0){
-            foreach($ct in $carts){
-              if(Match-Token-To-Record $raw $ct){ $ok = $true; $msg = "u_parent_asset matches the resolved cart '"+$ct.name+"'."; break }
-            }
-            if(-not $ok){ $msg = "u_parent_asset does not match resolved cart for this Tangent." }
-          } else {
-            $msg = "No Cart found for this Tangent; expected u_parent_asset to match the Tangent or its Cart."
-          }
-        } else {
-          $msg = if($parentRec){ "u_parent_asset does not match resolved parent '" + $parentRec.name + "'." } else { "u_parent_asset could not be resolved to a known computer." }
-        }
+        $msg = if($parentRec){ "u_parent_asset does not match resolved parent '" + $parentRec.name + "'." } else { "u_parent_asset could not be resolved to a known computer." }
       }
       if($ok){ $txtParent.BackColor=[System.Drawing.Color]::PaleGreen } else { $txtParent.BackColor=[System.Drawing.Color]::MistyRose }
       $tip.SetToolTip($txtParent,$msg)
@@ -3629,6 +3649,7 @@ function Resolve-PeripheralLookup([string]$query){
 function Get-ProposedParentToken($cand,$parentRec){
   if(-not $cand){ return $null }
   if(-not $parentRec){ return $cand.u_parent_asset }
+  if(-not (Is-AllowedParentType $parentRec)){ return $cand.u_parent_asset }
   if($cand.Type -eq 'Cart'){ return $parentRec.asset_tag }
   if(($cand.Type -eq 'Mic') -or ($cand.Type -eq 'Scanner')){
     $targetParent = $parentRec.asset_tag
@@ -3769,6 +3790,10 @@ function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[s
 }
 function Link-Peripheral([string]$query,$parentRec,$lookupResult=$null){
   if(-not $parentRec){ return $false }
+  if(-not (Is-AllowedParentType $parentRec)){
+    [System.Windows.Forms.MessageBox]::Show("Selected parent type is not eligible for peripherals.","Link") | Out-Null
+    return $false
+  }
   if(-not $lookupResult){ $lookupResult = Resolve-PeripheralLookup $query }
   $cand = $null
   if($lookupResult){ $cand = $lookupResult.Candidate }
