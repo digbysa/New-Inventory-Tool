@@ -3653,12 +3653,31 @@ function Get-ProposedParentToken($cand,$parentRec){
   if($cand.Type -eq 'Cart'){ return $parentRec.asset_tag }
   if(($cand.Type -eq 'Mic') -or ($cand.Type -eq 'Scanner')){
     $targetParent = $parentRec.asset_tag
-    if($parentRec.name -match '^(?i)AO'){
+
+    $parentIsTangent = ((Get-DetectedType $parentRec) -eq 'Tangent')
+    if($parentIsTangent){
+      $cart = $null
+      $scannerChild = $null
+
       $carts = Find-CartsForComputer $parentRec
       if($carts.Count -gt 0){
         $cart = $carts[0]
-        if($cart.asset_tag){ $targetParent = $cart.asset_tag }
-        elseif($cart.name){ $targetParent = $cart.name }
+      }
+
+      $parentKey = Canonical-Asset $parentRec.asset_tag
+      if(-not $parentKey -and $parentRec.name){ $parentKey = $parentRec.name.Trim().ToUpper() }
+      if($parentKey -and $script:ChildrenByParent.ContainsKey($parentKey)){
+        foreach($child in $script:ChildrenByParent[$parentKey]){
+          if(-not $child){ continue }
+          if(-not $scannerChild -and ($child.Type -eq 'Scanner')){ $scannerChild = $child }
+          if($cart -and $scannerChild){ break }
+        }
+      }
+
+      $preferredParent = if($cart){ $cart } elseif($scannerChild){ $scannerChild } else { $null }
+      if($preferredParent){
+        if($preferredParent.asset_tag){ $targetParent = $preferredParent.asset_tag }
+        elseif($preferredParent.name){ $targetParent = $preferredParent.name }
       }
     }
     return $targetParent
