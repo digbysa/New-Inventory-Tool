@@ -2433,25 +2433,19 @@ function Start-NewAssetTool {
   $splitter.Orientation = [System.Windows.Forms.Orientation]::Vertical
   $splitter.FixedPanel = [System.Windows.Forms.FixedPanel]::Panel1
 
-  function Set-SplitterMinimums {
-    param(
-      [System.Windows.Forms.SplitContainer]$target,
-      [int]$panel1Desired,
-      [int]$panel2Desired
-    )
-
-    $available = [Math]::Max(0, $target.Width - $target.Padding.Horizontal - $target.SplitterWidth)
-    $panel1Min = [Math]::Min($panel1Desired, $available)
+  $applySplitterMinimums = {
+    $available = [Math]::Max(0, $splitter.Width - $splitter.Padding.Horizontal - $splitter.SplitterWidth)
+    $panel1Min = [Math]::Min($LEFT_COL_WIDTH, $available)
     $panel2Available = [Math]::Max(0, $available - $panel1Min)
-    $panel2Min = [Math]::Min($panel2Desired, $panel2Available)
+    $panel2Min = [Math]::Min($PANEL2_MIN_WIDTH, $panel2Available)
 
-    $target.Panel1MinSize = $panel1Min
-    $target.Panel2MinSize = $panel2Min
+    $splitter.Panel1MinSize = $panel1Min
+    $splitter.Panel2MinSize = $panel2Min
   }
 
-  Set-SplitterMinimums -target $splitter -panel1Desired $LEFT_COL_WIDTH -panel2Desired $PANEL2_MIN_WIDTH
-  $splitter.Add_SizeChanged({ Set-SplitterMinimums -target $splitter -panel1Desired $LEFT_COL_WIDTH -panel2Desired $PANEL2_MIN_WIDTH })
-  $form.Add_Shown({ Set-SplitterMinimums -target $splitter -panel1Desired $LEFT_COL_WIDTH -panel2Desired $PANEL2_MIN_WIDTH })
+  & $applySplitterMinimums
+  $splitter.Add_SizeChanged($applySplitterMinimums)
+  $form.Add_Shown($applySplitterMinimums)
 
   if ($global:NewAssetToolPerMonitorDpiContextEnabled) {
     $form.Add_Shown({
@@ -2497,7 +2491,7 @@ function Start-NewAssetTool {
   $splitter.IsSplitterFixed = $false
   $splitter.Padding = New-Object System.Windows.Forms.Padding(16)
   $splitter.BackColor = [System.Drawing.Color]::White
-  Set-SplitterMinimums -target $splitter -panel1Desired $LEFT_COL_WIDTH -panel2Desired $PANEL2_MIN_WIDTH
+  & $applySplitterMinimums
   function New-L($t,$x,$y){$l=New-Object System.Windows.Forms.Label;$l.Text=$t;$l.AutoSize=$true;$l.Location=New-Object System.Drawing.Point($x,$y);$l}
   function New-RO($x,$y,$w){$t=New-Object System.Windows.Forms.TextBox;$t.Location="$x,$y";$t.Size="$w,24";$t.ReadOnly=$true;$t.BackColor='White';$t}
   # Left column stack
@@ -5602,50 +5596,50 @@ function Start-NewAssetTool {
   $btnSetStatus.MinimumSize = New-Object System.Drawing.Size($multiStatusPreferred.Width, $clearPreferred.Height)
   $btnSetStatus.Size = New-Object System.Drawing.Size($desiredWidth, $clearPreferred.Height)
   $nearToolbar.Controls.Add($btnSetStatus)
-  function Update-NearToolbarButtons {
-    if (-not $nearToolbar) { return }
-    $buttons = @()
-    foreach ($button in @($btnZoomIn, $btnZoomOut, $btnClearScopes, $btnSetStatus)) {
-      if ($button -and $button.Visible) { $buttons += $button }
-    }
-    if (-not $buttons) { return }
-
-    try {
-      if ($btnSetStatus -and $btnClearScopes) {
-        $preferredStatus = $btnSetStatus.GetPreferredSize([System.Drawing.Size]::Empty)
-        $preferredClear = $btnClearScopes.GetPreferredSize([System.Drawing.Size]::Empty)
-        $statusWidth = [Math]::Max($preferredStatus.Width + 12, $preferredClear.Width)
-        $statusHeight = [Math]::Max($preferredClear.Height, $preferredStatus.Height)
-        if ($statusWidth -gt 0 -and $statusHeight -gt 0) {
-          $btnSetStatus.MinimumSize = New-Object System.Drawing.Size($preferredStatus.Width, $preferredClear.Height)
-          $btnSetStatus.Size = New-Object System.Drawing.Size($statusWidth, $statusHeight)
-        }
+    $updateNearToolbarButtons = {
+      if (-not $nearToolbar) { return }
+      $buttons = @()
+      foreach ($button in @($btnZoomIn, $btnZoomOut, $btnClearScopes, $btnSetStatus)) {
+        if ($button -and $button.Visible) { $buttons += $button }
       }
-    } catch {}
+      if (-not $buttons) { return }
 
-    $spacing = 8
-    $rightPadding = 12
-    $x = [Math]::Max(0, $nearToolbar.ClientSize.Width - $rightPadding)
-    foreach ($button in $buttons) {
       try {
-        if ($button.AutoSize) {
-          $preferred = $button.PreferredSize
-          if ($preferred.Width -gt 0 -and $preferred.Height -gt 0) {
-            $button.Size = $preferred
+        if ($btnSetStatus -and $btnClearScopes) {
+          $preferredStatus = $btnSetStatus.GetPreferredSize([System.Drawing.Size]::Empty)
+          $preferredClear = $btnClearScopes.GetPreferredSize([System.Drawing.Size]::Empty)
+          $statusWidth = [Math]::Max($preferredStatus.Width + 12, $preferredClear.Width)
+          $statusHeight = [Math]::Max($preferredClear.Height, $preferredStatus.Height)
+          if ($statusWidth -gt 0 -and $statusHeight -gt 0) {
+            $btnSetStatus.MinimumSize = New-Object System.Drawing.Size($preferredStatus.Width, $preferredClear.Height)
+            $btnSetStatus.Size = New-Object System.Drawing.Size($statusWidth, $statusHeight)
           }
         }
       } catch {}
 
-      $x -= $button.Width
-      if ($x -lt 0) { $x = 0 }
-      try { $button.Location = New-Object System.Drawing.Point($x, 6) } catch {}
-      $x -= $spacing
-    }
-  }
+      $spacing = 8
+      $rightPadding = 12
+      $x = [Math]::Max(0, $nearToolbar.ClientSize.Width - $rightPadding)
+      foreach ($button in $buttons) {
+        try {
+          if ($button.AutoSize) {
+            $preferred = $button.PreferredSize
+            if ($preferred.Width -gt 0 -and $preferred.Height -gt 0) {
+              $button.Size = $preferred
+            }
+          }
+        } catch {}
 
-  try { $nearToolbar.Add_SizeChanged({ Update-NearToolbarButtons }) } catch {}
-  try { $form.Add_Load({ Update-NearToolbarButtons }) } catch {}
-  Update-NearToolbarButtons
+        $x -= $button.Width
+        if ($x -lt 0) { $x = 0 }
+        try { $button.Location = New-Object System.Drawing.Point($x, 6) } catch {}
+        $x -= $spacing
+      }
+    }
+
+    try { $nearToolbar.Add_SizeChanged($updateNearToolbarButtons) } catch {}
+    try { $form.Add_Load($updateNearToolbarButtons) } catch {}
+    & $updateNearToolbarButtons
   if (-not $menuStatus) { $menuStatus = New-Object System.Windows.Forms.ContextMenuStrip }
 
   function Set-NearbySelectedStatus {
@@ -5861,7 +5855,11 @@ function Start-NewAssetTool {
   $btnNearSave.Anchor = 'Bottom,Right'
   $btnNearSave.Size = '120,30'
   $btnNearSave.Location = New-Object System.Drawing.Point(($form.ClientSize.Width - 160), 8)
-  $nearBottom.Add_Resize({ $btnNearSave.Location = New-Object System.Drawing.Point(($nearBottom.ClientSize.Width - 128 - 12), 8) })
+  $nearBottom.Add_Resize({
+    if ($btnNearSave -and $btnNearSave.PSObject.Properties['Location']) {
+      $btnNearSave.Location = New-Object System.Drawing.Point(($nearBottom.ClientSize.Width - 128 - 12), 8)
+    }
+  })
   $nearBottom.Controls.AddRange(@($lblNearNote,$btnNearSave))
   # Build Nearby tab page
   $tabTop = New-Object System.Windows.Forms.TabControl
