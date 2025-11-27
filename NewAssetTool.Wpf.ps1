@@ -18,49 +18,22 @@ function Get-LoaderScriptDir {
 }
 
 $scriptDir = Get-LoaderScriptDir
-$ps1Path   = Join-Path $scriptDir 'NewAssetTool.ps1'
-$xamlPath  = Join-Path $scriptDir 'NewAssetTool.xaml'
+$manifestPath = Join-Path $scriptDir 'NewAssetTool/NewAssetTool.psd1'
+$xamlPath      = Join-Path $scriptDir 'NewAssetTool.xaml'
 
-if (-not (Test-Path $ps1Path)) {
-  throw "Could not find NewAssetTool.ps1 at '$ps1Path'."
+if (-not (Test-Path $manifestPath)) {
+  throw "Could not find module manifest at '$manifestPath'."
 }
 if (-not (Test-Path $xamlPath)) {
   throw "Could not find NewAssetTool.xaml at '$xamlPath'."
 }
 
-$previousSuppress = $null
-$hadPrevious = $false
-try {
-  if (Test-Path Variable:\global:NewAssetToolSuppressShow) {
-    $previousSuppress = $global:NewAssetToolSuppressShow
-    $hadPrevious = $true
-  }
-} catch {}
-$global:NewAssetToolSuppressShow = $true
+Import-Module $manifestPath -Force
 
-try {
-  $scriptOutput = . $ps1Path
-} catch {
-  if ($hadPrevious) {
-    $global:NewAssetToolSuppressShow = $previousSuppress
-  } else {
-    Remove-Variable -Scope Global -Name NewAssetToolSuppressShow -ErrorAction SilentlyContinue
-  }
-  throw
-}
-
-if ($scriptOutput -is [System.Windows.Forms.Form]) {
-  $form = $scriptOutput
-} else {
-  $form = ($scriptOutput | Where-Object { $_ -is [System.Windows.Forms.Form] } | Select-Object -First 1)
-}
-
-if (-not $form -and $script:NewAssetToolMainForm -is [System.Windows.Forms.Form]) {
-  $form = $script:NewAssetToolMainForm
-}
+$form = Start-NewAssetTool -ShowDialog:$false
 
 if (-not $form -or -not ($form -is [System.Windows.Forms.Form])) {
-  throw "NewAssetTool.ps1 did not expose a main form instance."
+  throw "Start-NewAssetTool did not return a main form instance."
 }
 
 $form.TopLevel = $false
