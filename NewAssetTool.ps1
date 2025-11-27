@@ -4969,42 +4969,52 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
   try { $form.Cursor = [System.Windows.Forms.Cursors]::Default; $form.UseWaitCursor = $false } catch {}
 })
 $btnRoundNow.Add_Click({
-  $deviceTypeText = Get-CurrentDeviceTypeText
-  if (-not [string]::IsNullOrWhiteSpace($deviceTypeText)) {
-    [System.Windows.Forms.MessageBox]::Show(
-      "Clear the detected device type before starting the Rounding Tool Updater.",
+  try {
+    $deviceTypeText = Get-CurrentDeviceTypeText
+    if (-not [string]::IsNullOrWhiteSpace($deviceTypeText)) {
+      [System.Windows.Forms.MessageBox]::Show(
+        "Clear the detected device type before starting the Rounding Tool Updater.",
+        'Round Now',
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Information
+      ) | Out-Null
+      try { Update-RoundNowButtonState } catch {}
+      return
+    }
+
+    $dialogResult = [System.Windows.Forms.MessageBox]::Show(
+      "Start the Rounding Tool Updater flow now?",
       'Round Now',
-      [System.Windows.Forms.MessageBoxButtons]::OK,
-      [System.Windows.Forms.MessageBoxIcon]::Information
-    ) | Out-Null
-    try { Update-RoundNowButtonState } catch {}
-    return
-  }
+      [System.Windows.Forms.MessageBoxButtons]::YesNo,
+      [System.Windows.Forms.MessageBoxIcon]::Question
+    )
 
-  $dialogResult = [System.Windows.Forms.MessageBox]::Show(
-    "Start the Rounding Tool Updater flow now?",
-    'Round Now',
-    [System.Windows.Forms.MessageBoxButtons]::YesNo,
-    [System.Windows.Forms.MessageBoxIcon]::Question
-  )
+    if ($dialogResult -ne [System.Windows.Forms.DialogResult]::Yes) {
+      return
+    }
 
-  if ($dialogResult -ne [System.Windows.Forms.DialogResult]::Yes) {
-    return
-  }
-
-  $started = Start-RoundingToolUpdaterFlow
-  if ($started -and $statusLabel) {
-    try { $statusLabel.Text = 'Launching Rounding Tool Updater...'; $statusLabel.ForeColor = [System.Drawing.Color]::DarkGreen } catch {}
-  } elseif (-not $started) {
+    $started = Start-RoundingToolUpdaterFlow
+    if ($started -and $statusLabel) {
+      try { $statusLabel.Text = 'Launching Rounding Tool Updater...'; $statusLabel.ForeColor = [System.Drawing.Color]::DarkGreen } catch {}
+    } elseif (-not $started) {
+      [System.Windows.Forms.MessageBox]::Show(
+        "Rounding Tool Updater did not start. Confirm Power Automate Desktop is signed in and the flow exists.",
+        'Round Now',
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Error
+      ) | Out-Null
+      if ($statusLabel) {
+        try { $statusLabel.Text = 'Rounding Tool Updater failed to start.'; $statusLabel.ForeColor = [System.Drawing.Color]::Firebrick } catch {}
+      }
+    }
+  } catch {
     [System.Windows.Forms.MessageBox]::Show(
-      "Rounding Tool Updater did not start. Confirm Power Automate Desktop is signed in and the flow exists.",
+      "Round Now failed: " + $_.Exception.Message,
       'Round Now',
       [System.Windows.Forms.MessageBoxButtons]::OK,
       [System.Windows.Forms.MessageBoxIcon]::Error
     ) | Out-Null
-    if ($statusLabel) {
-      try { $statusLabel.Text = 'Rounding Tool Updater failed to start.'; $statusLabel.ForeColor = [System.Drawing.Color]::Firebrick } catch {}
-    }
+    try { Update-RoundNowButtonState } catch {}
   }
 })
 $btnManualRound.Add_Click({
