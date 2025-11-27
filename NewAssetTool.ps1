@@ -3383,6 +3383,39 @@ function Get-City-ForLocation([string]$loc){
   return ''
 }
 
+function Get-RoundingFlowLauncherPath {
+  foreach ($path in $script:RoundingFlowCandidates) {
+    try {
+      if (-not [string]::IsNullOrWhiteSpace($path) -and (Test-Path $path)) {
+        return $path
+      }
+    } catch {}
+  }
+  return $null
+}
+
+function Is-RoundingToolUpdaterRunning {
+  try {
+    if ($script:RoundingFlowProcess) {
+      if (-not $script:RoundingFlowProcess.HasExited) { return $true }
+      $script:RoundingFlowProcess = $null
+    }
+  } catch {}
+
+  try {
+    $processes = Get-Process -Name 'PAD.Console.Host' -ErrorAction SilentlyContinue
+    foreach ($process in $processes) {
+      $path = $null
+      try { $path = $process.Path } catch {}
+      if (-not [string]::IsNullOrWhiteSpace($path) -and ($script:RoundingFlowCandidates -contains $path)) {
+        return $true
+      }
+    }
+  } catch {}
+
+  return $false
+}
+
 function Start-RoundingToolUpdaterFlow {
   $launcher = Get-RoundingFlowLauncherPath
   if (-not $launcher) {
