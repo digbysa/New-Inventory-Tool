@@ -1248,6 +1248,67 @@ function Register-SerialIndex([string]$serial,$record){
     $script:IndexBySerial[$compactSerial] = $record
   }
 }
+function Remove-NameIndexEntries([string]$name,[object]$record,[hashtable]$index){
+  if([string]::IsNullOrWhiteSpace($name) -or -not $index){ return }
+  foreach($k in (HostnameKeyVariants $name)){
+    if([string]::IsNullOrWhiteSpace($k)){ continue }
+    $key = $k.ToUpper()
+    if($index.ContainsKey($key) -and ($index[$key] -eq $record)){
+      $index.Remove($key)
+    }
+  }
+}
+function Add-NameIndexEntries([object]$record,[hashtable]$index){
+  if(-not $record -or -not $index){ return }
+  $name = $null
+  try { $name = $record.name } catch {}
+  if([string]::IsNullOrWhiteSpace($name)){ return }
+  foreach($k in (HostnameKeyVariants $name)){
+    if([string]::IsNullOrWhiteSpace($k)){ continue }
+    $index[$k.ToUpper()] = $record
+  }
+}
+function Update-NameIndices([object]$record,[string]$oldName = $null){
+  if(-not $record){ return }
+  Remove-NameIndexEntries -name $oldName -record $record -index $script:IndexByName
+  if($record.Type -eq 'Computer'){
+    Remove-NameIndexEntries -name $oldName -record $record -index $script:ComputerByName
+  }
+  Add-NameIndexEntries -record $record -index $script:IndexByName
+  if($record.Type -eq 'Computer'){
+    Add-NameIndexEntries -record $record -index $script:ComputerByName
+  }
+}
+function Remove-ChildFromParentIndex([object]$record,[string]$parent){
+  if(-not $record -or [string]::IsNullOrWhiteSpace($parent)){ return }
+  $key = Canonical-Asset $parent
+  if([string]::IsNullOrWhiteSpace($key)){ return }
+  if(-not $script:ChildrenByParent.ContainsKey($key)){ return }
+  try {
+    [void]$script:ChildrenByParent[$key].Remove($record)
+    if($script:ChildrenByParent[$key].Count -le 0){
+      $script:ChildrenByParent.Remove($key) | Out-Null
+    }
+  } catch {}
+}
+function Add-ChildToParentIndex([object]$record,[string]$parent){
+  if(-not $record -or [string]::IsNullOrWhiteSpace($parent)){ return }
+  $key = Canonical-Asset $parent
+  if([string]::IsNullOrWhiteSpace($key)){ return }
+  if(-not $script:ChildrenByParent.ContainsKey($key)){
+    $script:ChildrenByParent[$key] = New-Object System.Collections.ArrayList
+  }
+  try { [void]$script:ChildrenByParent[$key].Add($record) } catch {}
+}
+function Update-ChildrenIndex([object]$record,[string]$oldParent,[string]$newParent){
+  if([string]::IsNullOrWhiteSpace($oldParent) -and [string]::IsNullOrWhiteSpace($newParent)){ return }
+  if($oldParent -and ($oldParent -ne $newParent)){
+    Remove-ChildFromParentIndex -record $record -parent $oldParent
+  }
+  if(-not [string]::IsNullOrWhiteSpace($newParent)){
+    Add-ChildToParentIndex -record $record -parent $newParent
+  }
+}
 function Build-Indices {
   $script:IndexByAsset.Clear(); $script:IndexBySerial.Clear(); $script:IndexByName.Clear()
   $script:ComputerByAsset.Clear(); $script:ComputerByName.Clear()
@@ -1259,12 +1320,8 @@ function Build-Indices {
       }
     }
     if($rec.serial_number){ Register-SerialIndex $rec.serial_number $rec }
-    if($rec.name){
-      foreach($k in (HostnameKeyVariants $rec.name)){
-        $script:IndexByName[$k] = $rec
-        $script:ComputerByName[$k] = $rec
-      }
-    }
+    Add-NameIndexEntries -record $rec -index $script:IndexByName
+    Add-NameIndexEntries -record $rec -index $script:ComputerByName
   }
   foreach($tbl in @('Monitors','Mics','Scanners','Carts')){
     $collection = (Get-Variable -Scope Script -Name $tbl -ErrorAction SilentlyContinue).Value
@@ -1276,9 +1333,7 @@ function Build-Indices {
         }
       }
       if($rec.serial_number){ Register-SerialIndex $rec.serial_number $rec }
-      if($rec.name){
-        foreach($k in (HostnameKeyVariants $rec.name)){ $script:IndexByName[$k] = $rec }
-      }
+      Add-NameIndexEntries -record $rec -index $script:IndexByName
     }
   }
   $script:ChildrenByParent.Clear()
@@ -4300,10 +4355,10 @@ function Remove-Selected-Associations($parentRec){
     $oldName = $ch.name
     $ch.u_parent_asset = $null
     if($ch.serial_number){ $ch.name = $ch.serial_number }
-    if($script:ChildrenByParent.ContainsKey($parentRec.asset_tag)){ [void]$script:ChildrenByParent[$parentRec.asset_tag].Remove($ch) }
+    Update-ChildrenIndex -record $ch -oldParent $oldParent -newParent $null
+    Update-NameIndices   -record $ch -oldName $oldName
     Log-AssocChange 'Unlink' (Get-DetectedType $ch) $ch.asset_tag $oldParent $null $oldName $ch.name
   }
-  Build-Indices
   Refresh-AssocViews $parentRec
   Update-CartCheckbox-State $parentRec
   Update-ManualRoundButton $parentRec
@@ -4337,7 +4392,7 @@ function Fix-DisplayName(){
   $oldName   = $disp.name
   $disp.name = $expected
   Log-AssocChange 'Rename' (Get-DetectedType $disp) $disp.asset_tag $oldParent $oldParent $oldName $disp.name
-  Build-Indices
+  Update-NameIndices -record $disp -oldName $oldName
   if($parent){ Refresh-AssocViews $parent }
   $txtHost.Text = $disp.name
   Validate-ParentAndName $disp $parent
