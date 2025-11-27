@@ -389,16 +389,46 @@ $script:SearchTextButtonStates = @{}
 $script:RoundNowDisabledTooltip = 'Clear the detected device type to use this feature.'
 $script:RoundingFlowName = 'Rounding Tool Updater'
 $script:RoundingFlowProcess = $null
-$script:RoundingFlowCandidates = @(
-  'C:\\Program Files (x86)\\Power Automate Desktop\\PAD.Console.Host.exe',
-  'C:\\Program Files\\Power Automate Desktop\\PAD.Console.Host.exe'
-)
+$script:RoundingFlowCandidates = @()
+try {
+  $pf86 = ${env:ProgramFiles(x86)}
+  if (-not [string]::IsNullOrWhiteSpace($pf86)) {
+    $script:RoundingFlowCandidates += (Join-Path $pf86 'Power Automate Desktop\PAD.Console.Host.exe')
+  }
+} catch {}
+try {
+  $pf = $env:ProgramFiles
+  if (-not [string]::IsNullOrWhiteSpace($pf)) {
+    $script:RoundingFlowCandidates += (Join-Path $pf 'Power Automate Desktop\PAD.Console.Host.exe')
+  }
+} catch {}
+try {
+  $local = $env:LOCALAPPDATA
+  if (-not [string]::IsNullOrWhiteSpace($local)) {
+    $script:RoundingFlowCandidates += (Join-Path $local 'Programs\Power Automate Desktop\PAD.Console.Host.exe')
+  }
+} catch {}
 $script:EditLocationOriginal = $null
 
 function Get-RoundingFlowLauncherPath {
-  foreach ($path in $script:RoundingFlowCandidates) {
+  $pathsToCheck = @()
+  try {
+    if ($script:RoundingFlowCandidates) { $pathsToCheck += $script:RoundingFlowCandidates }
+  } catch {}
+
+  try {
+    $command = Get-Command 'PAD.Console.Host.exe' -ErrorAction SilentlyContinue
+    if ($command -and -not [string]::IsNullOrWhiteSpace($command.Source)) {
+      $pathsToCheck = @($command.Source) + $pathsToCheck
+    }
+  } catch {}
+
+  foreach ($path in $pathsToCheck) {
     try {
       if (-not [string]::IsNullOrWhiteSpace($path) -and (Test-Path $path)) {
+        try {
+          if ($script:RoundingFlowCandidates -notcontains $path) { $script:RoundingFlowCandidates += $path }
+        } catch {}
         return $path
       }
     } catch {}
@@ -419,9 +449,13 @@ function Is-RoundingToolUpdaterRunning {
     foreach ($process in $processes) {
       $path = $null
       try { $path = $process.Path } catch {}
-      if (-not [string]::IsNullOrWhiteSpace($path) -and ($script:RoundingFlowCandidates -contains $path)) {
+      if (-not [string]::IsNullOrWhiteSpace($path)) {
+        try {
+          if ($script:RoundingFlowCandidates -notcontains $path) { $script:RoundingFlowCandidates += $path }
+        } catch {}
         return $true
       }
+      return $true
     }
   } catch {}
 
@@ -3385,9 +3419,24 @@ function Get-City-ForLocation([string]$loc){
 }
 
 function Get-RoundingFlowLauncherPath {
-  foreach ($path in $script:RoundingFlowCandidates) {
+  $pathsToCheck = @()
+  try {
+    if ($script:RoundingFlowCandidates) { $pathsToCheck += $script:RoundingFlowCandidates }
+  } catch {}
+
+  try {
+    $command = Get-Command 'PAD.Console.Host.exe' -ErrorAction SilentlyContinue
+    if ($command -and -not [string]::IsNullOrWhiteSpace($command.Source)) {
+      $pathsToCheck = @($command.Source) + $pathsToCheck
+    }
+  } catch {}
+
+  foreach ($path in $pathsToCheck) {
     try {
       if (-not [string]::IsNullOrWhiteSpace($path) -and (Test-Path $path)) {
+        try {
+          if ($script:RoundingFlowCandidates -notcontains $path) { $script:RoundingFlowCandidates += $path }
+        } catch {}
         return $path
       }
     } catch {}
@@ -3408,9 +3457,13 @@ function Is-RoundingToolUpdaterRunning {
     foreach ($process in $processes) {
       $path = $null
       try { $path = $process.Path } catch {}
-      if (-not [string]::IsNullOrWhiteSpace($path) -and ($script:RoundingFlowCandidates -contains $path)) {
+      if (-not [string]::IsNullOrWhiteSpace($path)) {
+        try {
+          if ($script:RoundingFlowCandidates -notcontains $path) { $script:RoundingFlowCandidates += $path }
+        } catch {}
         return $true
       }
+      return $true
     }
   } catch {}
 
@@ -3439,7 +3492,7 @@ function Start-RoundingToolUpdaterFlow {
     return $false
   }
 
-  $arguments = @('run','--flow',$script:RoundingFlowName)
+  $arguments = @('run','--flow',"`"$script:RoundingFlowName`"") -join ' '
   $workingDir = $null
   try {
     $workingDir = Split-Path -Parent $launcher
