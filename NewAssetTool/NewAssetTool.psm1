@@ -2607,7 +2607,7 @@ function Start-NewAssetTool {
   $nameRow.Dock = 'Fill'
 
   $btnCopyHost = New-Object System.Windows.Forms.Button
-  $btnCopyHost.Text = "📋"
+  $btnCopyHost.Text = "Copy"
   $btnCopyHost.Size = '28,24'
   $btnCopyHost.Margin = New-Object System.Windows.Forms.Padding(0,0,2,0)
   $btnCopyHost.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
@@ -5246,7 +5246,7 @@ function Start-NewAssetTool {
   if (-not $script:NEAR_STATUSES) {
     # Full set minus "Complete"
     $script:NEAR_STATUSES = @(
-      "—",
+      "-",
       "Inaccessible - Asset not found",
       "Inaccessible - In storage",
       "Inaccessible - In use by Customer",
@@ -5495,10 +5495,10 @@ function Start-NewAssetTool {
   $cmbSort = New-Object System.Windows.Forms.ComboBox
   $cmbSort.DropDownStyle = 'DropDownList'
   $cmbSort.Items.AddRange(@(
-    "Host Name (A→Z)",
-    "Host Name (Z→A)",
-    "Room (A→Z)",
-    "Room (Z→A)",
+    "Host Name (A->Z)",
+    "Host Name (Z->A)",
+    "Room (A->Z)",
+    "Room (Z->A)",
     "Last Rounded (oldest first)",
     "Last Rounded (newest first)"
   try { if ($cmbSort -and $cmbSort.Items -and $cmbSort.Items.Count -gt 4) { $cmbSort.SelectedIndex = 4 } else { $cmbSort.SelectedIndex = -1 } } catch {}
@@ -5895,9 +5895,9 @@ function Start-NewAssetTool {
       }
       if ($total -gt 0) {
         if ($visible -ne $total) {
-          $text += (" — Showing {0} of {1}" -f $visible, $total)
+          $text += (" - Showing {0} of {1}" -f $visible, $total)
         } else {
-          $text += (" — Showing {0}" -f $total)
+          $text += (" - Showing {0}" -f $total)
         }
       }
     }
@@ -5975,7 +5975,7 @@ function Start-NewAssetTool {
       $r.Cells['MaintenanceType'].Value = Get-MaintenanceTypeOrDefault $mtRaw ([string]$pc.name)
       $r.Cells['LastRounded'].Value = (Fmt-DateLong $lr)
       $r.Cells['DaysAgo'].Value   = $days
-      $r.Cells['Status'].Value    = "—"
+      $r.Cells['Status'].Value    = "-"
       $r.Cells['AT_KEY'].Value    = $atKey
       $r.Cells['TODAY'].Value     = if ($isToday) { "1" } else { "0" }
       $r.Cells['LRRAW'].Value     = if ($lr) { $lr.ToString("o") } else { "" }
@@ -6027,10 +6027,10 @@ function Start-NewAssetTool {
     }
     $sorted = $items
     switch ($cmbSort.SelectedItem) {
-      'Host Name (A→Z)' { $sorted = $items | Sort-Object Host }
-      'Host Name (Z→A)' { $sorted = $items | Sort-Object Host -Descending }
-      'Room (A→Z)'      { $sorted = $items | Sort-Object Room }
-      'Room (Z→A)'      { $sorted = $items | Sort-Object Room -Descending }
+      'Host Name (A->Z)' { $sorted = $items | Sort-Object Host }
+      'Host Name (Z->A)' { $sorted = $items | Sort-Object Host -Descending }
+      'Room (A->Z)'      { $sorted = $items | Sort-Object Room }
+      'Room (Z->A)'      { $sorted = $items | Sort-Object Room -Descending }
       'Last Rounded (oldest first)' {
         $sorted = $items | Sort-Object @{Expression={ if ($_.LR) { $_.LR } else { Get-Date "1900-01-01" } }}
       }
@@ -6094,7 +6094,7 @@ function Start-NewAssetTool {
     foreach ($row in $dgvNearby.Rows) {
       if ($row.IsNewRow) { continue }
       $status = [string]$row.Cells['Status'].Value
-      if (-not $status -or $status -eq '—') { continue }
+      if (-not $status -or $status -eq '-') { continue }
       $asset = [string]$row.Cells['Asset'].Value
       $atKey = if ($asset) { $asset.Trim().ToUpper() } else { "" }
       if ($atKey -and $todaySet.Contains($atKey)) { continue } # don't duplicate today's
