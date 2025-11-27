@@ -6249,6 +6249,7 @@ function Start-NewAssetTool {
   } catch {}
 
   $script:NewAssetToolMainForm = $form
+  $global:NewAssetToolMainForm = $form
 
   $shouldShowForm = $true
   try {
