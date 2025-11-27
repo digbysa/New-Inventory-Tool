@@ -386,7 +386,7 @@ function Set-ScanSearchControl {
 
 $script:DeviceTypeSummaryControl = $null
 $script:SearchTextButtonStates = @{}
-$script:RoundNowDisabledTooltip = 'A detected device type is required to use this feature.'
+$script:RoundNowDisabledTooltip = 'Clear the detected device type to use this feature.'
 $script:RoundingFlowName = 'Rounding Tool Updater'
 $script:RoundingFlowProcess = $null
 $script:RoundingFlowCandidates = @(
@@ -458,18 +458,19 @@ function Get-CurrentDeviceTypeText {
 
 function Update-SearchDependentButtonStates {
   $deviceTypeText = Get-CurrentDeviceTypeText
-  $hasDeviceType = -not [string]::IsNullOrWhiteSpace($deviceTypeText)
+  $isDeviceTypeEmpty = [string]::IsNullOrWhiteSpace($deviceTypeText)
+  $hasDeviceType = -not $isDeviceTypeEmpty
   $flowRunning = Is-RoundingToolUpdaterRunning
 
   if ($btnRoundNow) {
     try {
-      $shouldEnableRoundNow = $hasDeviceType -and -not $flowRunning
+      $shouldEnableRoundNow = $isDeviceTypeEmpty -and -not $flowRunning
       if ($btnRoundNow.Enabled -ne $shouldEnableRoundNow) {
         $btnRoundNow.Enabled = $shouldEnableRoundNow
       }
       if ($tip) {
         $tooltipText = ''
-        if (-not $hasDeviceType) {
+        if ($hasDeviceType) {
           $tooltipText = $script:RoundNowDisabledTooltip
         } elseif ($flowRunning) {
           $tooltipText = 'Rounding Tool Updater is currently running.'
@@ -4957,9 +4958,9 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
 })
 $btnRoundNow.Add_Click({
   $deviceTypeText = Get-CurrentDeviceTypeText
-  if ([string]::IsNullOrWhiteSpace($deviceTypeText)) {
+  if (-not [string]::IsNullOrWhiteSpace($deviceTypeText)) {
     [System.Windows.Forms.MessageBox]::Show(
-      "A detected device type is required to start the Rounding Tool Updater.",
+      "Clear the detected device type before starting the Rounding Tool Updater.",
       'Round Now',
       [System.Windows.Forms.MessageBoxButtons]::OK,
       [System.Windows.Forms.MessageBoxIcon]::Information
