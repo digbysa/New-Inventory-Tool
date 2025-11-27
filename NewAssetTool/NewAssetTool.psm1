@@ -5184,8 +5184,19 @@ function Start-NewAssetTool {
   # -------- Hardcode paths and auto-load on startup --------
   try{
     $__ownDir = Get-OwnScriptDir
-    $script:DataFolder   = Join-Path $__ownDir 'Data'
-    $script:OutputFolder = Join-Path $__ownDir 'Output'
+    $__baseDir = $__ownDir
+    $script:DataFolder   = Join-Path $__baseDir 'Data'
+    $script:OutputFolder = Join-Path $__baseDir 'Output'
+
+    if (-not (Test-Path $script:DataFolder)) {
+      $__parentDir = Split-Path -Parent $__ownDir
+      if ($__parentDir -and (Test-Path (Join-Path $__parentDir 'Data'))) {
+        $__baseDir = $__parentDir
+        $script:DataFolder   = Join-Path $__baseDir 'Data'
+        $script:OutputFolder = Join-Path $__baseDir 'Output'
+      }
+    }
+
     if (-not (Test-Path $script:OutputFolder)) { New-Item -ItemType Directory -Path $script:OutputFolder -Force | Out-Null }
     if (-not (Test-Path $script:DataFolder)) {
       throw "Data folder not found:`r
