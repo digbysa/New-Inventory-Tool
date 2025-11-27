@@ -387,6 +387,12 @@ function Set-ScanSearchControl {
 $script:DeviceTypeSummaryControl = $null
 $script:SearchTextButtonStates = @{}
 $script:RoundNowDisabledTooltip = 'A detected device type is required to use this feature.'
+$script:RoundingFlowName = 'Rounding Tool Updater'
+$script:RoundingFlowProcess = $null
+$script:RoundingFlowCandidates = @(
+  'C:\\Program Files (x86)\\Power Automate Desktop\\PAD.Console.Host.exe',
+  'C:\\Program Files\\Power Automate Desktop\\PAD.Console.Host.exe'
+)
 $script:EditLocationOriginal = $null
 
 function Get-CurrentSearchInputText {
@@ -420,15 +426,21 @@ function Get-CurrentDeviceTypeText {
 function Update-SearchDependentButtonStates {
   $deviceTypeText = Get-CurrentDeviceTypeText
   $hasDeviceType = -not [string]::IsNullOrWhiteSpace($deviceTypeText)
+  $flowRunning = Is-RoundingToolUpdaterRunning
 
   if ($btnRoundNow) {
     try {
-      $shouldEnableRoundNow = -not $hasDeviceType
+      $shouldEnableRoundNow = $hasDeviceType -and -not $flowRunning
       if ($btnRoundNow.Enabled -ne $shouldEnableRoundNow) {
         $btnRoundNow.Enabled = $shouldEnableRoundNow
       }
       if ($tip) {
-        $tooltipText = if ($shouldEnableRoundNow) { '' } else { $script:RoundNowDisabledTooltip }
+        $tooltipText = ''
+        if (-not $hasDeviceType) {
+          $tooltipText = $script:RoundNowDisabledTooltip
+        } elseif ($flowRunning) {
+          $tooltipText = 'Rounding Tool Updater is currently running.'
+        }
         $tip.SetToolTip($btnRoundNow, $tooltipText)
       }
     } catch {}
@@ -469,6 +481,13 @@ function Set-SearchTextButtonBaseState {
   }
   try { Update-RoundNowButtonState } catch {}
 }
+
+$script:RoundingFlowMonitor = New-Object System.Windows.Forms.Timer
+$script:RoundingFlowMonitor.Interval = 1000
+$script:RoundingFlowMonitor.Add_Tick({
+  try { Update-RoundNowButtonState } catch {}
+})
+$script:RoundingFlowMonitor.Start()
 # ===== Script directory resolver (robust, PS 5.1-safe) =====
 function Get-OwnScriptDir {
   try {
@@ -3330,6 +3349,83 @@ function Get-City-ForLocation([string]$loc){
   }
   return ''
 }
+
+function Get-RoundingFlowLauncherPath {
+  foreach ($path in $script:RoundingFlowCandidates) {
+    try {
+      if (-not [string]::IsNullOrWhiteSpace($path) -and (Test-Path $path)) {
+        return $path
+      }
+    } catch {}
+  }
+  return $null
+}
+
+function Is-RoundingToolUpdaterRunning {
+  try {
+    if ($script:RoundingFlowProcess) {
+      if (-not $script:RoundingFlowProcess.HasExited) { return $true }
+      $script:RoundingFlowProcess = $null
+    }
+  } catch {}
+
+  try {
+    $processes = Get-Process -Name 'PAD.Console.Host' -ErrorAction SilentlyContinue
+    foreach ($process in $processes) {
+      $path = $null
+      try { $path = $process.Path } catch {}
+      if (-not [string]::IsNullOrWhiteSpace($path) -and ($script:RoundingFlowCandidates -contains $path)) {
+        return $true
+      }
+    }
+  } catch {}
+
+  return $false
+}
+
+function Start-RoundingToolUpdaterFlow {
+  $launcher = Get-RoundingFlowLauncherPath
+  if (-not $launcher) {
+    [System.Windows.Forms.MessageBox]::Show(
+      "Power Automate Desktop console host was not found. Update the Rounding Tool launcher paths in the script.",
+      'Round Now',
+      [System.Windows.Forms.MessageBoxButtons]::OK,
+      [System.Windows.Forms.MessageBoxIcon]::Error
+    ) | Out-Null
+    return $false
+  }
+
+  if (Is-RoundingToolUpdaterRunning) {
+    [System.Windows.Forms.MessageBox]::Show(
+      "Rounding Tool Updater is already running.",
+      'Round Now',
+      [System.Windows.Forms.MessageBoxButtons]::OK,
+      [System.Windows.Forms.MessageBoxIcon]::Information
+    ) | Out-Null
+    return $false
+  }
+
+  $arguments = "run --flow `"$($script:RoundingFlowName)`""
+
+  try {
+    $proc = Start-Process -FilePath $launcher -ArgumentList $arguments -PassThru -WindowStyle Hidden
+    if ($proc) {
+      $script:RoundingFlowProcess = $proc
+      try { $proc.EnableRaisingEvents = $true } catch {}
+    }
+    try { Update-RoundNowButtonState } catch {}
+    return $true
+  } catch {
+    [System.Windows.Forms.MessageBox]::Show(
+      "Failed to launch Rounding Tool Updater: " + $_.Exception.Message,
+      'Round Now',
+      [System.Windows.Forms.MessageBoxButtons]::OK,
+      [System.Windows.Forms.MessageBoxIcon]::Error
+    ) | Out-Null
+    try { Update-RoundNowButtonState } catch {}
+    return $false
+  }
+}
 function Validate-Location($rec){
   # In edit mode, do not actively validate or repaint to avoid flicker; just reflect current text.
   if($script:editing){ return }
@@ -4825,6 +4921,23 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
     }
   } catch { Write-Host ("Main Save: Error - " + $_.Exception.Message) }
   try { $form.Cursor = [System.Windows.Forms.Cursors]::Default; $form.UseWaitCursor = $false } catch {}
+})
+$btnRoundNow.Add_Click({
+  $dialogResult = [System.Windows.Forms.MessageBox]::Show(
+    "Start the Rounding Tool Updater flow now?",
+    'Round Now',
+    [System.Windows.Forms.MessageBoxButtons]::YesNo,
+    [System.Windows.Forms.MessageBoxIcon]::Question
+  )
+
+  if ($dialogResult -ne [System.Windows.Forms.DialogResult]::Yes) {
+    return
+  }
+
+  $started = Start-RoundingToolUpdaterFlow
+  if ($started -and $statusLabel) {
+    try { $statusLabel.Text = 'Launching Rounding Tool Updater...'; $statusLabel.ForeColor = [System.Drawing.Color]::DarkGreen } catch {}
+  }
 })
 $btnManualRound.Add_Click({
   if($btnManualRound.Tag){ Start-Process -FilePath $btnManualRound.Tag }
