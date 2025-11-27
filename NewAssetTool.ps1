@@ -2094,6 +2094,29 @@ function Load-RoundingMapping([string]$folder){
     } catch {}
   }
 }
+function New-PeripheralAssetObject {
+  param(
+    [Parameter(Mandatory)]$Record,
+    [Parameter(Mandatory)][string]$Type
+  )
+
+  [pscustomobject]@{
+    u_device_rounding      = $Record.u_device_rounding
+    u_department_location  = $Record.u_department_location
+    Kind                   = 'Peripheral'
+    Type                   = $Type
+    u_parent_asset         = $Record.u_parent_asset
+    name                   = $Record.name
+    asset_tag              = $Record.asset_tag
+    serial_number          = $Record.serial_number
+    location               = $Record.location
+    u_building             = $Record.u_building
+    u_room                 = $Record.u_room
+    u_floor                = $Record.u_floor
+    po_number              = $Record.po_number
+    u_scheduled_retirement = $Record.u_scheduled_retirement
+  }
+}
 function Load-DataFolder([string]$folder){
   $script:DataFolder = $folder
   if(-not $script:OutputFolder){ $script:OutputFolder = $folder }
@@ -2104,11 +2127,10 @@ function Load-DataFolder([string]$folder){
   $mfile   = Join-Path $folder 'Monitors.csv'
   $micfile = Join-Path $folder 'Mics.csv'
   $sfile   = Join-Path $folder 'Scanners.csv'
-  $script:Computers = @(); $script:Monitors = @(); $script:Mics = @(); $script:Scanners = @()
-  
+  $script:Computers = @(); $script:Carts = @()
+
   $cartfile = Join-Path $folder 'Carts.csv'
-  $script:Carts = @()
-if(Test-Path $cfile){
+  if(Test-Path $cfile){
     $raw = Import-Csv $cfile
     foreach($r in $raw){
       $obj = [pscustomobject]@{
@@ -2127,53 +2149,27 @@ if(Test-Path $cfile){
       $script:Computers += $obj
     }
   }
-  if(Test-Path $mfile){
-    $raw = Import-Csv $mfile
-    foreach($r in $raw){
-      $obj = [pscustomobject]@{
-      u_device_rounding = $r.u_device_rounding
-      u_department_location = $r.u_department_location
-        Kind='Peripheral'; Type='Monitor'
-        u_parent_asset=$r.u_parent_asset
-        name=$r.name; asset_tag=$r.asset_tag; serial_number=$r.serial_number
-        location=$r.location; u_building=$r.u_building; u_room=$r.u_room; u_floor=$r.u_floor
-        po_number=$r.po_number; u_scheduled_retirement=$r.u_scheduled_retirement
+  $peripheralConfigs = @(
+    @{ Path=$mfile; Type='Monitor'; Target='Monitors';
+       PostProcess={ param($obj,$row)
+         $obj | Add-Member -NotePropertyName RITM -NotePropertyValue (Extract-RITM $obj.po_number) -Force
+         $obj | Add-Member -NotePropertyName Retire -NotePropertyValue (Parse-DateLoose $obj.u_scheduled_retirement) -Force
+       }
+     },
+    @{ Path=$micfile; Type='Mic'; Target='Mics'; PostProcess=$null },
+    @{ Path=$sfile; Type='Scanner'; Target='Scanners'; PostProcess=$null }
+  )
+
+  foreach($cfg in $peripheralConfigs){
+    $items = @()
+    if(Test-Path $cfg.Path){
+      $items = foreach($r in Import-Csv $cfg.Path){
+        $obj = New-PeripheralAssetObject -Record $r -Type $cfg.Type
+        if($cfg.PostProcess){ & $cfg.PostProcess $obj $r }
+        $obj
       }
-      $obj | Add-Member -NotePropertyName RITM -NotePropertyValue (Extract-RITM $obj.po_number) -Force
-      $obj | Add-Member -NotePropertyName Retire -NotePropertyValue (Parse-DateLoose $obj.u_scheduled_retirement) -Force
-      $script:Monitors += $obj
     }
-  }
-  if(Test-Path $micfile){
-    $raw = Import-Csv $micfile
-    foreach($r in $raw){
-      $obj = [pscustomobject]@{
-      u_device_rounding = $r.u_device_rounding
-      u_department_location = $r.u_department_location
-        Kind='Peripheral'; Type='Mic'
-        u_parent_asset=$r.u_parent_asset
-        name=$r.name; asset_tag=$r.asset_tag; serial_number=$r.serial_number
-        location=$r.location; u_building=$r.u_building; u_room=$r.u_room; u_floor=$r.u_floor
-        po_number=$r.po_number; u_scheduled_retirement=$r.u_scheduled_retirement
-      }
-      $obj | Add-Member -NotePropertyName RITM -NotePropertyValue (Extract-RITM $obj.po_number) -Force
-      $script:Mics += $obj
-    }
-  }
-  if(Test-Path $sfile){
-    $raw = Import-Csv $sfile
-    foreach($r in $raw){
-      $obj = [pscustomobject]@{
-      u_device_rounding = $r.u_device_rounding
-      u_department_location = $r.u_department_location
-        Kind='Peripheral'; Type='Scanner'
-        u_parent_asset=$r.u_parent_asset
-        name=$r.name; asset_tag=$r.asset_tag; serial_number=$r.serial_number
-        location=$r.location; u_building=$r.u_building; u_room=$r.u_room; u_floor=$r.u_floor
-        po_number=$r.po_number; u_scheduled_retirement=$r.u_scheduled_retirement
-      }
-      $script:Scanners += $obj
-    }
+    Set-Variable -Scope Script -Name $cfg.Target -Value $items
   }
   if(Test-Path $cartfile){
     $raw = Import-Csv $cartfile
