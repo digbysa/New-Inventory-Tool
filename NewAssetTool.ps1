@@ -4956,6 +4956,18 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
   try { $form.Cursor = [System.Windows.Forms.Cursors]::Default; $form.UseWaitCursor = $false } catch {}
 })
 $btnRoundNow.Add_Click({
+  $deviceTypeText = Get-CurrentDeviceTypeText
+  if ([string]::IsNullOrWhiteSpace($deviceTypeText)) {
+    [System.Windows.Forms.MessageBox]::Show(
+      "A detected device type is required to start the Rounding Tool Updater.",
+      'Round Now',
+      [System.Windows.Forms.MessageBoxButtons]::OK,
+      [System.Windows.Forms.MessageBoxIcon]::Information
+    ) | Out-Null
+    try { Update-RoundNowButtonState } catch {}
+    return
+  }
+
   $dialogResult = [System.Windows.Forms.MessageBox]::Show(
     "Start the Rounding Tool Updater flow now?",
     'Round Now',
