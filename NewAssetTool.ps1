@@ -3439,16 +3439,28 @@ function Start-RoundingToolUpdaterFlow {
     return $false
   }
 
-  $arguments = "run --flow `"$($script:RoundingFlowName)`""
+  $arguments = @('run','--flow',$script:RoundingFlowName)
+  $workingDir = $null
+  try {
+    $workingDir = Split-Path -Parent $launcher
+  } catch {}
 
   try {
-    $proc = Start-Process -FilePath $launcher -ArgumentList $arguments -PassThru -WindowStyle Hidden
+    $proc = Start-Process -FilePath $launcher -ArgumentList $arguments -PassThru -WindowStyle Hidden -WorkingDirectory $workingDir
     if ($proc) {
       $script:RoundingFlowProcess = $proc
       try { $proc.EnableRaisingEvents = $true } catch {}
     }
+    $isRunning = $false
+    try {
+      1..20 | ForEach-Object {
+        Start-Sleep -Milliseconds 100
+        if (Is-RoundingToolUpdaterRunning) { $isRunning = $true; break }
+      }
+    } catch {}
+
     try { Update-RoundNowButtonState } catch {}
-    return $true
+    return $isRunning
   } catch {
     [System.Windows.Forms.MessageBox]::Show(
       "Failed to launch Rounding Tool Updater: " + $_.Exception.Message,
@@ -4983,6 +4995,16 @@ $btnRoundNow.Add_Click({
   $started = Start-RoundingToolUpdaterFlow
   if ($started -and $statusLabel) {
     try { $statusLabel.Text = 'Launching Rounding Tool Updater...'; $statusLabel.ForeColor = [System.Drawing.Color]::DarkGreen } catch {}
+  } elseif (-not $started) {
+    [System.Windows.Forms.MessageBox]::Show(
+      "Rounding Tool Updater did not start. Confirm Power Automate Desktop is signed in and the flow exists.",
+      'Round Now',
+      [System.Windows.Forms.MessageBoxButtons]::OK,
+      [System.Windows.Forms.MessageBoxIcon]::Error
+    ) | Out-Null
+    if ($statusLabel) {
+      try { $statusLabel.Text = 'Rounding Tool Updater failed to start.'; $statusLabel.ForeColor = [System.Drawing.Color]::Firebrick } catch {}
+    }
   }
 })
 $btnManualRound.Add_Click({
