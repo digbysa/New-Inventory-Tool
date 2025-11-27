@@ -445,17 +445,20 @@ function Is-RoundingToolUpdaterRunning {
   } catch {}
 
   try {
-    $processes = Get-Process -Name 'PAD.Console.Host' -ErrorAction SilentlyContinue
+    $processes = Get-CimInstance -ClassName Win32_Process -Filter "Name='PAD.Console.Host.exe'" -ErrorAction SilentlyContinue
     foreach ($process in $processes) {
-      $path = $null
-      try { $path = $process.Path } catch {}
-      if (-not [string]::IsNullOrWhiteSpace($path)) {
+      $cmdLine = $null
+      try { $cmdLine = '' + $process.CommandLine } catch {}
+      if (-not [string]::IsNullOrWhiteSpace($cmdLine) -and $cmdLine -match [regex]::Escape($script:RoundingFlowName)) {
         try {
-          if ($script:RoundingFlowCandidates -notcontains $path) { $script:RoundingFlowCandidates += $path }
+          $path = $null
+          try { $path = '' + $process.ExecutablePath } catch {}
+          if (-not [string]::IsNullOrWhiteSpace($path) -and $script:RoundingFlowCandidates -notcontains $path) {
+            $script:RoundingFlowCandidates += $path
+          }
         } catch {}
         return $true
       }
-      return $true
     }
   } catch {}
 
@@ -3453,17 +3456,20 @@ function Is-RoundingToolUpdaterRunning {
   } catch {}
 
   try {
-    $processes = Get-Process -Name 'PAD.Console.Host' -ErrorAction SilentlyContinue
+    $processes = Get-CimInstance -ClassName Win32_Process -Filter "Name='PAD.Console.Host.exe'" -ErrorAction SilentlyContinue
     foreach ($process in $processes) {
-      $path = $null
-      try { $path = $process.Path } catch {}
-      if (-not [string]::IsNullOrWhiteSpace($path)) {
+      $cmdLine = $null
+      try { $cmdLine = '' + $process.CommandLine } catch {}
+      if (-not [string]::IsNullOrWhiteSpace($cmdLine) -and $cmdLine -match [regex]::Escape($script:RoundingFlowName)) {
         try {
-          if ($script:RoundingFlowCandidates -notcontains $path) { $script:RoundingFlowCandidates += $path }
+          $path = $null
+          try { $path = '' + $process.ExecutablePath } catch {}
+          if (-not [string]::IsNullOrWhiteSpace($path) -and $script:RoundingFlowCandidates -notcontains $path) {
+            $script:RoundingFlowCandidates += $path
+          }
         } catch {}
         return $true
       }
-      return $true
     }
   } catch {}
 
