@@ -33,6 +33,14 @@ Import-Module $manifestPath -Force
 $form = Start-NewAssetTool -ShowDialog:$false
 
 if (-not $form -or -not ($form -is [System.Windows.Forms.Form])) {
+  try {
+    if ($global:NewAssetToolMainForm -and $global:NewAssetToolMainForm -is [System.Windows.Forms.Form]) {
+      $form = $global:NewAssetToolMainForm
+    }
+  } catch {}
+}
+
+if (-not $form -or -not ($form -is [System.Windows.Forms.Form])) {
   throw "Start-NewAssetTool did not return a main form instance."
 }
 
