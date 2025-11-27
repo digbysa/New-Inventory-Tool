@@ -390,22 +390,32 @@ $script:RoundNowDisabledTooltip = 'Clear the detected device type to use this fe
 $script:RoundingFlowName = 'Rounding Tool Updater'
 $script:RoundingFlowProcess = $null
 $script:RoundingFlowCandidates = @()
+$script:PowerAutomateDesktopCandidates = @()
 try {
   $pf86 = ${env:ProgramFiles(x86)}
   if (-not [string]::IsNullOrWhiteSpace($pf86)) {
     $script:RoundingFlowCandidates += (Join-Path $pf86 'Power Automate Desktop\PAD.Console.Host.exe')
+    foreach ($exe in @('Power Automate Desktop.exe','PAD.Desktop.Client.exe','PAD.Desktop.exe')) {
+      $script:PowerAutomateDesktopCandidates += (Join-Path $pf86 ("Power Automate Desktop\$exe"))
+    }
   }
 } catch {}
 try {
   $pf = $env:ProgramFiles
   if (-not [string]::IsNullOrWhiteSpace($pf)) {
     $script:RoundingFlowCandidates += (Join-Path $pf 'Power Automate Desktop\PAD.Console.Host.exe')
+    foreach ($exe in @('Power Automate Desktop.exe','PAD.Desktop.Client.exe','PAD.Desktop.exe')) {
+      $script:PowerAutomateDesktopCandidates += (Join-Path $pf ("Power Automate Desktop\$exe"))
+    }
   }
 } catch {}
 try {
   $local = $env:LOCALAPPDATA
   if (-not [string]::IsNullOrWhiteSpace($local)) {
     $script:RoundingFlowCandidates += (Join-Path $local 'Programs\Power Automate Desktop\PAD.Console.Host.exe')
+    foreach ($exe in @('Power Automate Desktop.exe','PAD.Desktop.Client.exe','PAD.Desktop.exe')) {
+      $script:PowerAutomateDesktopCandidates += (Join-Path $local ("Programs\Power Automate Desktop\$exe"))
+    }
   }
 } catch {}
 $script:EditLocationOriginal = $null
@@ -433,6 +443,32 @@ function Get-RoundingFlowLauncherPath {
       }
     } catch {}
   }
+  return $null
+}
+
+function Get-PowerAutomateDesktopPath {
+  $pathsToCheck = @()
+  try {
+    if ($script:PowerAutomateDesktopCandidates) { $pathsToCheck += $script:PowerAutomateDesktopCandidates }
+  } catch {}
+
+  foreach ($name in @('Power Automate Desktop','PAD.Desktop.Client','PAD.Desktop')) {
+    try {
+      $command = Get-Command $name -ErrorAction SilentlyContinue
+      if ($command -and -not [string]::IsNullOrWhiteSpace($command.Source)) {
+        $pathsToCheck = @($command.Source) + $pathsToCheck
+      }
+    } catch {}
+  }
+
+  foreach ($path in $pathsToCheck) {
+    try {
+      if (-not [string]::IsNullOrWhiteSpace($path) -and (Test-Path $path)) {
+        return $path
+      }
+    } catch {}
+  }
+
   return $null
 }
 
@@ -497,21 +533,14 @@ function Update-SearchDependentButtonStates {
   $deviceTypeText = Get-CurrentDeviceTypeText
   $isDeviceTypeEmpty = [string]::IsNullOrWhiteSpace($deviceTypeText)
   $hasDeviceType = -not $isDeviceTypeEmpty
-  $flowRunning = Is-RoundingToolUpdaterRunning
 
   if ($btnRoundNow) {
     try {
-      $shouldEnableRoundNow = $isDeviceTypeEmpty -and -not $flowRunning
-      if ($btnRoundNow.Enabled -ne $shouldEnableRoundNow) {
-        $btnRoundNow.Enabled = $shouldEnableRoundNow
+      if ($btnRoundNow.Enabled -ne $isDeviceTypeEmpty) {
+        $btnRoundNow.Enabled = $isDeviceTypeEmpty
       }
       if ($tip) {
-        $tooltipText = ''
-        if ($hasDeviceType) {
-          $tooltipText = $script:RoundNowDisabledTooltip
-        } elseif ($flowRunning) {
-          $tooltipText = 'Rounding Tool Updater is currently running.'
-        }
+        $tooltipText = if ($hasDeviceType) { $script:RoundNowDisabledTooltip } else { '' }
         $tip.SetToolTip($btnRoundNow, $tooltipText)
       }
     } catch {}
@@ -5080,43 +5109,27 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
 })
 $btnRoundNow.Add_Click({
   try {
-    $deviceTypeText = Get-CurrentDeviceTypeText
-    if (-not [string]::IsNullOrWhiteSpace($deviceTypeText)) {
-      [System.Windows.Forms.MessageBox]::Show(
-        "Clear the detected device type before starting the Rounding Tool Updater.",
-        'Round Now',
-        [System.Windows.Forms.MessageBoxButtons]::OK,
-        [System.Windows.Forms.MessageBoxIcon]::Information
-      ) | Out-Null
-      try { Update-RoundNowButtonState } catch {}
-      return
-    }
-
     $dialogResult = [System.Windows.Forms.MessageBox]::Show(
-      "Start the Rounding Tool Updater flow now?",
+      "Would you like to open Power Automate Desktop?",
       'Round Now',
       [System.Windows.Forms.MessageBoxButtons]::YesNo,
       [System.Windows.Forms.MessageBoxIcon]::Question
     )
 
-    if ($dialogResult -ne [System.Windows.Forms.DialogResult]::Yes) {
-      return
-    }
+    if ($dialogResult -ne [System.Windows.Forms.DialogResult]::Yes) { return }
 
-    $started = Start-RoundingToolUpdaterFlow
-    if ($started -and $statusLabel) {
-      try { $statusLabel.Text = 'Launching Rounding Tool Updater...'; $statusLabel.ForeColor = [System.Drawing.Color]::DarkGreen } catch {}
-    } elseif (-not $started) {
+    $padPath = Get-PowerAutomateDesktopPath
+    if ([string]::IsNullOrWhiteSpace($padPath)) {
       [System.Windows.Forms.MessageBox]::Show(
-        "Rounding Tool Updater did not start. Confirm Power Automate Desktop is signed in and the flow exists.",
+        "Power Automate Desktop could not be found on this device.",
         'Round Now',
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Error
       ) | Out-Null
-      if ($statusLabel) {
-        try { $statusLabel.Text = 'Rounding Tool Updater failed to start.'; $statusLabel.ForeColor = [System.Drawing.Color]::Firebrick } catch {}
-      }
+      return
     }
+
+    Start-Process -FilePath $padPath | Out-Null
   } catch {
     [System.Windows.Forms.MessageBox]::Show(
       "Round Now failed: " + $_.Exception.Message,
@@ -5124,6 +5137,7 @@ $btnRoundNow.Add_Click({
       [System.Windows.Forms.MessageBoxButtons]::OK,
       [System.Windows.Forms.MessageBoxIcon]::Error
     ) | Out-Null
+  } finally {
     try { Update-RoundNowButtonState } catch {}
   }
 })
