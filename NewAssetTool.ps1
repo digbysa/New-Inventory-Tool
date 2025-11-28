@@ -3511,13 +3511,23 @@ function Convert-WmiIdToString([UInt16[]]$id){
   if($chars.Count -eq 0){ return $null }
   return (-join $chars).Trim()
 }
-function Get-RemoteDeviceSerials([string]$computerName){
-  $result = [pscustomobject]@{ ComputerSerial = $null; MonitorSerials = @(); Offline = $false }
-  if([string]::IsNullOrWhiteSpace($computerName)){ return $result }
+function Test-ComputerPingable([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $false }
   $online = $false
   try {
     $online = Test-Connection -ComputerName $computerName -Count 1 -Quiet -ErrorAction SilentlyContinue
   } catch {}
+  return [bool]$online
+}
+function Get-RemoteDeviceSerials([string]$computerName,[Nullable[bool]]$PingSucceeded=$null){
+  $result = [pscustomobject]@{ ComputerSerial = $null; MonitorSerials = @(); Offline = $false }
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $result }
+  $online = $false
+  if($PingSucceeded -ne $null){
+    $online = [bool]$PingSucceeded
+  } else {
+    $online = Test-ComputerPingable $computerName
+  }
   if(-not $online){ $result.Offline = $true; return $result }
   try {
     $bios = Get-CimInstance -ClassName Win32_BIOS -ComputerName $computerName -ErrorAction Stop
@@ -3603,9 +3613,14 @@ function Validate-AssociatedDevices([string]$computerName){
     [System.Windows.Forms.MessageBox]::Show("Enter a device name before validating.","Validate Devices") | Out-Null
     return
   }
-  $wmiData = Get-RemoteDeviceSerials $computerName
+  $pingable = Test-ComputerPingable $computerName
+  if(-not $pingable){
+    [System.Windows.Forms.MessageBox]::Show("Device is not pingable.","Validate Devices") | Out-Null
+    return
+  }
+  $wmiData = Get-RemoteDeviceSerials $computerName -PingSucceeded $pingable
   if($wmiData.Offline){
-    [System.Windows.Forms.MessageBox]::Show("Device appears offline or unreachable.","Validate Devices") | Out-Null
+    [System.Windows.Forms.MessageBox]::Show("Device is not pingable.","Validate Devices") | Out-Null
     return
   }
   Apply-AssociatedDeviceValidation $wmiData
