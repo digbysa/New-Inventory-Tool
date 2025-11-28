@@ -5473,7 +5473,19 @@ function Update-StatusLabelSafe {
 
 function Start-NearbyPingCheck {
   if ($script:NearbyPingInProgress) { return }
-  if (-not $dgvNearby -or $dgvNearby.Rows.Count -le 0) {
+  if (-not $dgvNearby) {
+    Update-StatusLabelSafe "No nearby devices to check online."
+    return
+  }
+
+  $rowsToCheck = @()
+  try {
+    $rowsToCheck = @(
+      $dgvNearby.Rows | Where-Object { $_ -and -not $_.IsNewRow -and $_.Visible }
+    )
+  } catch {}
+
+  if (-not $rowsToCheck -or $rowsToCheck.Count -le 0) {
     Update-StatusLabelSafe "No nearby devices to check online."
     return
   }
@@ -5490,15 +5502,12 @@ function Start-NearbyPingCheck {
   }
 
   try {
-    if ($dgvNearby.SelectedRows.Count -gt 0) {
-      foreach ($row in $dgvNearby.SelectedRows) {
-        $idx = $row.Index
-        & $collectTargets $row $idx
-      }
-    } else {
-      for ($i = 0; $i -lt $dgvNearby.Rows.Count; $i++) {
-        & $collectTargets $dgvNearby.Rows[$i] $i
-      }
+    $selected = @($rowsToCheck | Where-Object { try { $_.Selected } catch { $false } })
+    $sourceRows = if ($selected.Count -gt 0) { $selected } else { $rowsToCheck }
+
+    foreach ($row in $sourceRows) {
+      $idx = $row.Index
+      & $collectTargets $row $idx
     }
   } catch {}
 
