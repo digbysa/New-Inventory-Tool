@@ -5437,6 +5437,83 @@ try { $form.Add_Load({ Update-NearToolbarButtons }) } catch {}
 Update-NearToolbarButtons
 if (-not $menuStatus) { $menuStatus = New-Object System.Windows.Forms.ContextMenuStrip }
 
+$script:NearbyPingInProgress = $false
+function Set-NearbyPingState {
+  param(
+    [bool]$Running
+  )
+
+  $script:NearbyPingInProgress = $Running
+  try {
+    if ($btnCheckOnline) {
+      $btnCheckOnline.Enabled = -not $Running
+      $btnCheckOnline.Text = if ($Running) { 'Checking...' } else { 'Check online' }
+    }
+  } catch {}
+}
+
+function Start-NearbyPingCheck {
+  if ($script:NearbyPingInProgress) { return }
+  if (-not $dgvNearby -or -not $dgvNearby.Rows) { return }
+
+  $targets = @()
+  try {
+    for ($i = 0; $i -lt $dgvNearby.Rows.Count; $i++) {
+      $row = $dgvNearby.Rows[$i]
+      if ($row.IsNewRow) { continue }
+      $host = ''
+      try { $host = '' + $row.Cells['Host'].Value } catch {}
+      $targets += [pscustomobject]@{ Index = $i; Host = $host }
+    }
+  } catch {}
+
+  if (-not $targets) { return }
+
+  Set-NearbyPingState $true
+  [System.Threading.Tasks.Task]::Run([System.Action]{
+    $ping = $null
+    try { $ping = New-Object System.Net.NetworkInformation.Ping } catch {}
+    foreach ($target in $targets) {
+      $color = [System.Drawing.Color]::Red
+      if ($ping -and -not [string]::IsNullOrWhiteSpace($target.Host)) {
+        try {
+          $reply = $ping.Send($target.Host, 1000)
+          if ($reply -and $reply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
+            $color = [System.Drawing.Color]::Green
+          }
+        } catch {
+          $color = [System.Drawing.Color]::Red
+        }
+      }
+
+      try {
+        if ($dgvNearby) {
+          $null = $dgvNearby.BeginInvoke([System.Action[int, System.Drawing.Color]]{
+            param($idx, $clr)
+            try {
+              $row = $dgvNearby.Rows[$idx]
+              if ($row -and -not $row.IsNewRow) {
+                $cell = $row.Cells['Host']
+                if ($cell) { $cell.Style.ForeColor = $clr }
+              }
+            } catch {}
+          }, $target.Index, $color)
+        }
+      } catch {}
+    }
+
+    try {
+      if ($form) {
+        $null = $form.BeginInvoke([System.Action]{ Set-NearbyPingState $false })
+      } else {
+        Set-NearbyPingState $false
+      }
+    } catch {
+      Set-NearbyPingState $false
+    }
+  }) | Out-Null
+}
+
 function Set-NearbySelectedStatus {
   param(
     [string]$Value,
@@ -5875,28 +5952,7 @@ $dgvNearby.Add_CellDoubleClick({
 # React to toolbar changes
 $cmbSort.Add_SelectedIndexChanged({})
 $btnCheckOnline.Add_Click({
-  try {
-    if (-not $dgvNearby -or -not $dgvNearby.Rows) { return }
-    $ping = New-Object System.Net.NetworkInformation.Ping
-    foreach ($row in $dgvNearby.Rows) {
-      if ($row.IsNewRow) { continue }
-      $cell = $row.Cells['Host']
-      if (-not $cell) { continue }
-      $host = '' + $cell.Value
-      $color = [System.Drawing.Color]::Red
-      if (-not [string]::IsNullOrWhiteSpace($host)) {
-        try {
-          $reply = $ping.Send($host, 1000)
-          if ($reply -and $reply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
-            $color = [System.Drawing.Color]::Green
-          }
-        } catch {
-          $color = [System.Drawing.Color]::Red
-        }
-      }
-      try { $cell.Style.ForeColor = $color } catch {}
-    }
-  } catch {}
+  Start-NearbyPingCheck
 })
 $btnClearScopes.Add_Click({
   $script:ActiveNearbyScopes.Clear()
