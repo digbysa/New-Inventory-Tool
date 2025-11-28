@@ -5473,7 +5473,7 @@ function Update-StatusLabelSafe {
 
 function Start-NearbyPingCheck {
   if ($script:NearbyPingInProgress) { return }
-  if (-not $dgvNearby -or -not $dgvNearby.Rows) {
+  if (-not $dgvNearby -or $dgvNearby.Rows.Count -le 0) {
     Update-StatusLabelSafe "No nearby devices to check online."
     return
   }
@@ -5483,7 +5483,6 @@ function Start-NearbyPingCheck {
     param($row, $idx)
 
     if (-not $row -or $row.IsNewRow) { return }
-    if (-not $row.Visible) { return }
 
     $host = ''
     try { $host = '' + $row.Cells['Host'].Value } catch {}
