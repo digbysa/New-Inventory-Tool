@@ -5472,6 +5472,11 @@ function Update-StatusLabelSafe {
 }
 
 function Start-NearbyPingCheck {
+  param(
+    [System.Collections.IEnumerable]$RowsOverride,
+    [switch]$RequireSelection
+  )
+
   if ($script:NearbyPingInProgress) { return }
   if (-not $dgvNearby) {
     Update-StatusLabelSafe "No nearby devices to check online."
@@ -5479,17 +5484,29 @@ function Start-NearbyPingCheck {
   }
 
   $rowsToCheck = @()
-  for ($i = 0; $i -lt $dgvNearby.Rows.Count; $i++) {
-    try {
-      $row = $dgvNearby.Rows[$i]
-      if ($row -and -not $row.IsNewRow -and $row.Visible) {
-        $rowsToCheck += $row
-      }
-    } catch {}
+  if ($RowsOverride) {
+    foreach ($row in $RowsOverride) {
+      try {
+        if ($row -and -not $row.IsNewRow) { $rowsToCheck += $row }
+      } catch {}
+    }
+  } else {
+    for ($i = 0; $i -lt $dgvNearby.Rows.Count; $i++) {
+      try {
+        $row = $dgvNearby.Rows[$i]
+        if ($row -and -not $row.IsNewRow -and $row.Visible) {
+          $rowsToCheck += $row
+        }
+      } catch {}
+    }
   }
 
   if (-not $rowsToCheck -or $rowsToCheck.Count -le 0) {
-    Update-StatusLabelSafe "No nearby devices to check online."
+    if ($RequireSelection) {
+      Update-StatusLabelSafe "Select one or more devices to ping."
+    } else {
+      Update-StatusLabelSafe "No nearby devices to check online."
+    }
     return
   }
 
@@ -5504,14 +5521,16 @@ function Start-NearbyPingCheck {
     $targets += [pscustomobject]@{ Index = $idx; Host = $host }
   }
 
-  $selected = @()
-  foreach ($row in $rowsToCheck) {
-    try {
-      if ($row.Selected) { $selected += $row }
-    } catch {}
+  $sourceRows = $rowsToCheck
+  if (-not $RowsOverride) {
+    $selected = @()
+    foreach ($row in $rowsToCheck) {
+      try {
+        if ($row.Selected) { $selected += $row }
+      } catch {}
+    }
+    if ($selected.Count -gt 0) { $sourceRows = $selected }
   }
-
-  $sourceRows = if ($selected.Count -gt 0) { $selected } else { $rowsToCheck }
 
   foreach ($row in $sourceRows) {
     try {
@@ -5628,6 +5647,12 @@ function Show-NearbyStatusMenu {
       })
       [void]$menuStatus.Items.Add($item)
     }
+    [void]$menuStatus.Items.Add('-')
+    $pingItem = New-Object System.Windows.Forms.ToolStripMenuItem('Ping Device(s)')
+    $pingItem.Add_Click({
+      Start-NearbyPingCheck -RowsOverride $dgvNearby.SelectedRows -RequireSelection
+    })
+    [void]$menuStatus.Items.Add($pingItem)
     [void]$menuStatus.Items.Add('-')
     $custom = New-Object System.Windows.Forms.ToolStripMenuItem('Custom...')
     $custom.Add_Click({
