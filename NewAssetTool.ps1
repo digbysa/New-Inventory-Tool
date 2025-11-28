@@ -5471,6 +5471,30 @@ function Update-StatusLabelSafe {
   } catch {}
 }
 
+function Show-ToastMessage {
+  param(
+    [string]$Message,
+    [string]$Title = 'New Inventory Tool',
+    [System.Windows.Forms.ToolTipIcon]$Icon = [System.Windows.Forms.ToolTipIcon]::Info,
+    [int]$DurationMs = 3000
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Message)) { return }
+
+  try {
+    if (-not $script:ToastNotifyIcon) {
+      $script:ToastNotifyIcon = New-Object System.Windows.Forms.NotifyIcon
+      $script:ToastNotifyIcon.Icon = [System.Drawing.SystemIcons]::Information
+      $script:ToastNotifyIcon.Visible = $true
+    }
+
+    $script:ToastNotifyIcon.BalloonTipIcon = $Icon
+    $script:ToastNotifyIcon.BalloonTipTitle = $Title
+    $script:ToastNotifyIcon.BalloonTipText = $Message
+    $script:ToastNotifyIcon.ShowBalloonTip($DurationMs)
+  } catch {}
+}
+
 function Start-NearbyPingCheck {
   param(
     [System.Collections.IEnumerable]$RowsOverride,
@@ -5550,6 +5574,8 @@ function Start-NearbyPingCheck {
   [System.Threading.Tasks.Task]::Run([System.Action]{
     $ping = $null
     try { $ping = New-Object System.Net.NetworkInformation.Ping } catch {}
+    $successCount = 0
+    $failCount = 0
     $completed = 0
     foreach ($target in $targets) {
       $color = [System.Drawing.Color]::Red
@@ -5558,10 +5584,16 @@ function Start-NearbyPingCheck {
           $reply = $ping.Send($target.Host, 1000)
           if ($reply -and $reply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
             $color = [System.Drawing.Color]::Green
+            $successCount++
+          } else {
+            $failCount++
           }
         } catch {
           $color = [System.Drawing.Color]::Red
+          $failCount++
         }
+      } else {
+        $failCount++
       }
 
       try {
@@ -5593,6 +5625,29 @@ function Start-NearbyPingCheck {
     }
 
     Update-StatusLabelSafe "Ready - scan or enter a device."
+
+    $summaryIcon = [System.Windows.Forms.ToolTipIcon]::Info
+    if ($successCount -le 0 -and $failCount -gt 0) {
+      $summaryIcon = [System.Windows.Forms.ToolTipIcon]::Error
+    } elseif ($successCount -gt 0 -and $failCount -gt 0) {
+      $summaryIcon = [System.Windows.Forms.ToolTipIcon]::Warning
+    }
+
+    $summary = if ($successCount -gt 0 -and $failCount -le 0) {
+      "Ping successful for $successCount device(s)."
+    } elseif ($successCount -gt 0 -and $failCount -gt 0) {
+      "Ping succeeded for $successCount device(s) and failed for $failCount."
+    } else {
+      "Ping failed for all $total device(s)."
+    }
+
+    try {
+      if ($form) {
+        $null = $form.BeginInvoke([System.Action]{ Show-ToastMessage -Message $summary -Icon $summaryIcon })
+      } else {
+        Show-ToastMessage -Message $summary -Icon $summaryIcon
+      }
+    } catch {}
   }) | Out-Null
 }
 
