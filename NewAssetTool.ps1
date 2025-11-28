@@ -5452,6 +5452,25 @@ function Set-NearbyPingState {
   } catch {}
 }
 
+function Update-StatusLabelSafe {
+  param(
+    [string]$Text
+  )
+
+  try {
+    if ($form) {
+      $null = $form.BeginInvoke([System.Action[string]]{
+        param($msg)
+        try {
+          if ($statusLabel) { $statusLabel.Text = $msg }
+        } catch {}
+      }, $Text)
+    } elseif ($statusLabel) {
+      $statusLabel.Text = $Text
+    }
+  } catch {}
+}
+
 function Start-NearbyPingCheck {
   if ($script:NearbyPingInProgress) { return }
   if (-not $dgvNearby -or -not $dgvNearby.Rows) { return }
@@ -5461,6 +5480,7 @@ function Start-NearbyPingCheck {
     for ($i = 0; $i -lt $dgvNearby.Rows.Count; $i++) {
       $row = $dgvNearby.Rows[$i]
       if ($row.IsNewRow) { continue }
+      if (-not $row.Visible) { continue }
       $host = ''
       try { $host = '' + $row.Cells['Host'].Value } catch {}
       $targets += [pscustomobject]@{ Index = $i; Host = $host }
@@ -5470,9 +5490,12 @@ function Start-NearbyPingCheck {
   if (-not $targets) { return }
 
   Set-NearbyPingState $true
+  $total = $targets.Count
+  Update-StatusLabelSafe ("Scanning devices 0 of $total...")
   [System.Threading.Tasks.Task]::Run([System.Action]{
     $ping = $null
     try { $ping = New-Object System.Net.NetworkInformation.Ping } catch {}
+    $completed = 0
     foreach ($target in $targets) {
       $color = [System.Drawing.Color]::Red
       if ($ping -and -not [string]::IsNullOrWhiteSpace($target.Host)) {
@@ -5487,6 +5510,7 @@ function Start-NearbyPingCheck {
       }
 
       try {
+        $completed++
         if ($dgvNearby) {
           $null = $dgvNearby.BeginInvoke([System.Action[int, System.Drawing.Color]]{
             param($idx, $clr)
@@ -5499,6 +5523,7 @@ function Start-NearbyPingCheck {
             } catch {}
           }, $target.Index, $color)
         }
+        Update-StatusLabelSafe ("Scanning devices $completed of $total...")
       } catch {}
     }
 
@@ -5511,6 +5536,8 @@ function Start-NearbyPingCheck {
     } catch {
       Set-NearbyPingState $false
     }
+
+    Update-StatusLabelSafe "Ready - scan or enter a device."
   }) | Out-Null
 }
 
