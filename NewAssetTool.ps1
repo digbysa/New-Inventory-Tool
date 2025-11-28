@@ -3561,6 +3561,7 @@ function Apply-AssociatedDeviceValidation([pscustomobject]$wmiData){
   if(-not $wmiData){ return }
   $matchColor = [System.Drawing.Color]::ForestGreen
   $mismatchColor = [System.Drawing.Color]::IndianRed
+  $computerTypes = @('COMPUTER','DESKTOP','LAPTOP','TABLET','THIN CLIENT','TANGENT')
   $monitorSerials = @()
   try { if($wmiData.MonitorSerials){ $monitorSerials = $wmiData.MonitorSerials } } catch {}
   $computerSerial = ''
@@ -3576,10 +3577,12 @@ function Apply-AssociatedDeviceValidation([pscustomobject]$wmiData){
     $serialToCheck = $serialValue.Trim().ToUpper()
     $targets = @()
     $tooltip = ''
-    if($type -match '^(?i)Computer$'){
+    $normalizedType = ''
+    try { $normalizedType = $type.Trim().ToUpper() } catch {}
+    if($computerTypes -contains $normalizedType){
       if($computerSerial){ $targets = @($computerSerial.Trim().ToUpper()); $tooltip = "Detected computer serial: $computerSerial" }
       else { $tooltip = 'No computer serial retrieved from WMI.' }
-    } elseif($type -match '^(?i)Monitor$'){
+    } elseif($normalizedType -eq 'MONITOR'){
       $targets = @()
       foreach($m in $monitorSerials){ if($m){ $targets += $m.Trim().ToUpper() } }
       if($targets.Count -gt 0){ $tooltip = "Detected monitor serials: " + ($monitorSerials -join ', ') }
