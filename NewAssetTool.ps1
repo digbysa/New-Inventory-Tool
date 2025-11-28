@@ -5473,21 +5473,40 @@ function Update-StatusLabelSafe {
 
 function Start-NearbyPingCheck {
   if ($script:NearbyPingInProgress) { return }
-  if (-not $dgvNearby -or -not $dgvNearby.Rows) { return }
+  if (-not $dgvNearby -or -not $dgvNearby.Rows) {
+    Update-StatusLabelSafe "No nearby devices to check online."
+    return
+  }
 
   $targets = @()
+  $collectTargets = {
+    param($row, $idx)
+
+    if (-not $row -or $row.IsNewRow) { return }
+    if (-not $row.Visible) { return }
+
+    $host = ''
+    try { $host = '' + $row.Cells['Host'].Value } catch {}
+    $targets += [pscustomobject]@{ Index = $idx; Host = $host }
+  }
+
   try {
-    for ($i = 0; $i -lt $dgvNearby.Rows.Count; $i++) {
-      $row = $dgvNearby.Rows[$i]
-      if ($row.IsNewRow) { continue }
-      if (-not $row.Visible) { continue }
-      $host = ''
-      try { $host = '' + $row.Cells['Host'].Value } catch {}
-      $targets += [pscustomobject]@{ Index = $i; Host = $host }
+    if ($dgvNearby.SelectedRows.Count -gt 0) {
+      foreach ($row in $dgvNearby.SelectedRows) {
+        $idx = $row.Index
+        & $collectTargets $row $idx
+      }
+    } else {
+      for ($i = 0; $i -lt $dgvNearby.Rows.Count; $i++) {
+        & $collectTargets $dgvNearby.Rows[$i] $i
+      }
     }
   } catch {}
 
-  if (-not $targets) { return }
+  if (-not $targets) {
+    Update-StatusLabelSafe "No nearby devices to check online."
+    return
+  }
 
   Set-NearbyPingState $true
   $total = $targets.Count
