@@ -2685,10 +2685,17 @@ $btnAddPeripheral.ForeColor = [System.Drawing.SystemColors]::ControlText
 $btnRemove = New-Object ModernUI.RoundedButton
 $btnRemove.Text   = 'Remove Peripheral'
 $btnRemove.Size   = '160,32'
-$btnRemove.Margin = '0,0,0,0'
+$btnRemove.Margin = '0,0,8,0'
 $btnRemove.Anchor = 'Left'
 $btnRemove.BackColor = [System.Drawing.SystemColors]::Control
 $btnRemove.ForeColor = [System.Drawing.SystemColors]::ControlText
+$btnValidateDevices = New-Object ModernUI.RoundedButton
+$btnValidateDevices.Text   = 'Validate Devices'
+$btnValidateDevices.Size   = '150,32'
+$btnValidateDevices.Margin = '0,0,0,0'
+$btnValidateDevices.Anchor = 'Left'
+$btnValidateDevices.BackColor = [System.Drawing.SystemColors]::Control
+$btnValidateDevices.ForeColor = [System.Drawing.SystemColors]::ControlText
 $assocButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
 $assocButtonsPanel.Dock = 'Left'
 $assocButtonsPanel.AutoSize = $true
@@ -2699,10 +2706,12 @@ $assocButtonsPanel.Margin = '0,0,0,0'
 $assocButtonsPanel.Padding = '0,4,0,0'
 $assocButtonsPanel.Controls.Add($btnAddPeripheral)
 $assocButtonsPanel.Controls.Add($btnRemove)
+$assocButtonsPanel.Controls.Add($btnValidateDevices)
 $assocToolbarPanel.Controls.Add($assocButtonsPanel)
 
 Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled $false
 Set-SearchTextButtonBaseState -Button $btnRemove -BaseEnabled $true
+Set-SearchTextButtonBaseState -Button $btnValidateDevices -BaseEnabled $true
 $assocGridPanel = New-Object System.Windows.Forms.Panel
 $assocGridPanel.Dock = 'Fill'
 $assocGridPanel.Margin = '0,0,0,0'
@@ -3088,10 +3097,10 @@ function Apply-ResponsiveHeights {
     }
     $stripHeight = $assocToolbarPanel.PreferredSize.Height
     if($stripHeight -le 0){
-      $stripHeight = [Math]::Max($assocButtonsPanel.PreferredSize.Height, [Math]::Max($btnAddPeripheral.PreferredSize.Height, $btnRemove.PreferredSize.Height))
+      $stripHeight = [Math]::Max($assocButtonsPanel.PreferredSize.Height, [Math]::Max([Math]::Max($btnAddPeripheral.PreferredSize.Height, $btnRemove.PreferredSize.Height), $btnValidateDevices.PreferredSize.Height))
     }
     if($stripHeight -le 0){
-      $stripHeight = [Math]::Max($assocToolbarPanel.Height, [Math]::Max($assocButtonsPanel.Height, [Math]::Max($btnAddPeripheral.Height, $btnRemove.Height)))
+      $stripHeight = [Math]::Max($assocToolbarPanel.Height, [Math]::Max($assocButtonsPanel.Height, [Math]::Max([Math]::Max($btnAddPeripheral.Height, $btnRemove.Height), $btnValidateDevices.Height)))
     }
     if($stripHeight -le 0){ $stripHeight = 36 }
     $assocPadding = $grpAssoc.Padding.Vertical + $grpAssoc.Margin.Vertical + $tlpAssoc.Margin.Vertical + $tlpAssoc.Padding.Vertical + $assocToolbarPanel.Margin.Vertical + $assocToolbarPanel.Padding.Vertical + $assocGridPanel.Margin.Vertical + $assocGridPanel.Padding.Vertical
@@ -3491,6 +3500,112 @@ function Refresh-AssocGrid($parentRec){
     }
   }
   Size-AssocForRows([Math]::Max($dgv.Rows.Count,1)) | Out-Null
+}
+function Convert-WmiIdToString([UInt16[]]$id){
+  if(-not $id){ return $null }
+  $chars = @()
+  foreach($code in $id){
+    if($code -le 0){ break }
+    if($code -gt 0 -and $code -lt 256){ $chars += [char]$code }
+  }
+  if($chars.Count -eq 0){ return $null }
+  return (-join $chars).Trim()
+}
+function Get-RemoteDeviceSerials([string]$computerName){
+  $result = [pscustomobject]@{ ComputerSerial = $null; MonitorSerials = @(); Offline = $false }
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $result }
+  $online = $false
+  try {
+    $online = Test-Connection -ComputerName $computerName -Count 1 -Quiet -ErrorAction SilentlyContinue
+  } catch {}
+  if(-not $online){ $result.Offline = $true; return $result }
+  try {
+    $bios = Get-CimInstance -ClassName Win32_BIOS -ComputerName $computerName -ErrorAction Stop
+    if($bios -and $bios.SerialNumber){ $result.ComputerSerial = ($bios.SerialNumber).Trim() }
+  } catch {}
+  if(-not $result.ComputerSerial){
+    try {
+      $csprod = Get-CimInstance -ClassName Win32_ComputerSystemProduct -ComputerName $computerName -ErrorAction Stop
+      if($csprod -and $csprod.IdentifyingNumber){ $result.ComputerSerial = ($csprod.IdentifyingNumber).Trim() }
+    } catch {}
+  }
+  try {
+    $monitorData = Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorID -ComputerName $computerName -ErrorAction Stop
+    foreach($m in $monitorData){
+      $serial = Convert-WmiIdToString $m.SerialNumberID
+      if(-not [string]::IsNullOrWhiteSpace($serial)){ $result.MonitorSerials += $serial.Trim() }
+    }
+  } catch {}
+  return $result
+}
+function Reset-AssociatedSerialStyling {
+  $defaultColor = [System.Drawing.Color]::FromArgb(32,32,32)
+  try {
+    if($dgv.DefaultCellStyle -and $dgv.DefaultCellStyle.ForeColor){
+      $defaultColor = $dgv.DefaultCellStyle.ForeColor
+    }
+  } catch {}
+  foreach($row in $dgv.Rows){
+    if($row -and -not $row.IsNewRow){
+      try {
+        $cell = $row.Cells['Serial']
+        if($cell){
+          $cell.Style.ForeColor = $defaultColor
+          $cell.ToolTipText = ''
+        }
+      } catch {}
+    }
+  }
+}
+function Apply-AssociatedDeviceValidation([pscustomobject]$wmiData){
+  if(-not $wmiData){ return }
+  $matchColor = [System.Drawing.Color]::ForestGreen
+  $mismatchColor = [System.Drawing.Color]::IndianRed
+  $monitorSerials = @()
+  try { if($wmiData.MonitorSerials){ $monitorSerials = $wmiData.MonitorSerials } } catch {}
+  $computerSerial = ''
+  try { if($wmiData.ComputerSerial){ $computerSerial = $wmiData.ComputerSerial.Trim() } } catch {}
+  Reset-AssociatedSerialStyling
+  foreach($row in $dgv.Rows){
+    if(-not $row -or $row.IsNewRow){ continue }
+    $type = ''
+    $serialValue = ''
+    try { $type = [string]$row.Cells['Type'].Value } catch {}
+    try { $serialValue = [string]$row.Cells['Serial'].Value } catch {}
+    if([string]::IsNullOrWhiteSpace($serialValue)){ continue }
+    $serialToCheck = $serialValue.Trim().ToUpper()
+    $targets = @()
+    $tooltip = ''
+    if($type -match '^(?i)Computer$'){
+      if($computerSerial){ $targets = @($computerSerial.Trim().ToUpper()); $tooltip = "Detected computer serial: $computerSerial" }
+      else { $tooltip = 'No computer serial retrieved from WMI.' }
+    } elseif($type -match '^(?i)Monitor$'){
+      $targets = @()
+      foreach($m in $monitorSerials){ if($m){ $targets += $m.Trim().ToUpper() } }
+      if($targets.Count -gt 0){ $tooltip = "Detected monitor serials: " + ($monitorSerials -join ', ') }
+      else { $tooltip = 'No monitor serials retrieved from WMI/EDID.' }
+    }
+    if($targets.Count -eq 0){ $row.Cells['Serial'].Style.ForeColor = $mismatchColor; $row.Cells['Serial'].ToolTipText = $tooltip; continue }
+    $isMatch = $false
+    foreach($target in $targets){
+      if([string]::IsNullOrWhiteSpace($target)){ continue }
+      if($serialToCheck -eq $target){ $isMatch = $true; break }
+    }
+    $row.Cells['Serial'].Style.ForeColor = if($isMatch){ $matchColor } else { $mismatchColor }
+    $row.Cells['Serial'].ToolTipText = $tooltip
+  }
+}
+function Validate-AssociatedDevices([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){
+    [System.Windows.Forms.MessageBox]::Show("Enter a device name before validating.","Validate Devices") | Out-Null
+    return
+  }
+  $wmiData = Get-RemoteDeviceSerials $computerName
+  if($wmiData.Offline){
+    [System.Windows.Forms.MessageBox]::Show("Device appears offline or unreachable.","Validate Devices") | Out-Null
+    return
+  }
+  Apply-AssociatedDeviceValidation $wmiData
 }
 function Make-Card($title,$kvPairs,[System.Drawing.Color]$ritmColor,[bool]$showRITM,[bool]$showRetire,$tagPayload){
   $p = New-Object System.Windows.Forms.Panel
@@ -4170,6 +4285,7 @@ function Populate-UI($displayRec,$parentRec){
   Update-CartCheckbox-State $parentRec
   Update-ManualRoundButton   $parentRec
   if($btnAddPeripheral){ Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled ([bool]$parentRec) }
+  if($btnValidateDevices){ Set-SearchTextButtonBaseState -Button $btnValidateDevices -BaseEnabled ([bool]$displayRec) }
   Validate-ParentAndName $displayRec $parentRec
   Update-FixNameButton $displayRec $parentRec
 }
@@ -4540,6 +4656,14 @@ $btnRemove.Add_Click({
   if(Should-SkipExcludedDevice $pc){ return }
   Remove-Selected-Associations $pc
 })
+$btnValidateDevices.Add_Click({
+  $targetName = ''
+  try { $targetName = $txtHost.Text } catch {}
+  if([string]::IsNullOrWhiteSpace($targetName) -and $script:CurrentParent){
+    try { $targetName = $script:CurrentParent.name } catch {}
+  }
+  Validate-AssociatedDevices $targetName
+})
 $cmbCity.Add_TextChanged({
   if($script:IsPopulatingLocationCombos){ return }
   $selStart = $null; $selLength = $null
@@ -4633,6 +4757,7 @@ function Clear-UI(){
   foreach($cb in @($chkCable,$chkCableNeeded,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked=$false }
   $btnFixName.Enabled = $false
   if($btnAddPeripheral){ Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled $false }
+  if($btnValidateDevices){ Set-SearchTextButtonBaseState -Button $btnValidateDevices -BaseEnabled $false }
   $statusLabel.Text = "Ready - scan or enter a device."
   Size-AssocForRows(1) | Out-Null
 }
