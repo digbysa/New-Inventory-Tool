@@ -5306,6 +5306,11 @@ $btnClearScopes.Text = "Clear List"
 $btnClearScopes.AutoSize = $true
 $btnClearScopes.Anchor = 'Top,Right'
 $btnClearScopes.Margin = '0,0,0,0'
+$btnCheckOnline = New-Object ModernUI.RoundedButton
+$btnCheckOnline.Text = "Check online"
+$btnCheckOnline.AutoSize = $true
+$btnCheckOnline.Anchor = 'Top,Right'
+$btnCheckOnline.Margin = '0,0,0,0'
 $btnZoomOut = New-Object ModernUI.RoundedButton
 $btnZoomOut.Text = '-'
 $btnZoomOut.AutoSize = $true
@@ -5332,7 +5337,7 @@ try {
     $tip.SetToolTip($btnZoomIn, 'Zoom in (+10%)')
   }
 } catch {}
-$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$chkRecentlyRounded,$btnClearScopes,$btnZoomOut,$btnZoomIn))
+$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$chkRecentlyRounded,$btnCheckOnline,$btnClearScopes,$btnZoomOut,$btnZoomIn))
 Update-NearbyCheckboxLabels 0 0 0
 $btnNearbyShowAll.Add_Click({
   try {
@@ -5389,7 +5394,7 @@ $nearToolbar.Controls.Add($btnSetStatus)
 function Update-NearToolbarButtons {
   if (-not $nearToolbar) { return }
   $buttons = @()
-  foreach ($button in @($btnZoomIn, $btnZoomOut, $btnClearScopes, $btnSetStatus)) {
+  foreach ($button in @($btnZoomIn, $btnZoomOut, $btnClearScopes, $btnCheckOnline, $btnSetStatus)) {
     if ($button -and $button.Visible) { $buttons += $button }
   }
   if (-not $buttons) { return }
@@ -5869,6 +5874,30 @@ $dgvNearby.Add_CellDoubleClick({
 })
 # React to toolbar changes
 $cmbSort.Add_SelectedIndexChanged({})
+$btnCheckOnline.Add_Click({
+  try {
+    if (-not $dgvNearby -or -not $dgvNearby.Rows) { return }
+    $ping = New-Object System.Net.NetworkInformation.Ping
+    foreach ($row in $dgvNearby.Rows) {
+      if ($row.IsNewRow) { continue }
+      $cell = $row.Cells['Host']
+      if (-not $cell) { continue }
+      $host = '' + $cell.Value
+      $color = [System.Drawing.Color]::Red
+      if (-not [string]::IsNullOrWhiteSpace($host)) {
+        try {
+          $reply = $ping.Send($host, 1000)
+          if ($reply -and $reply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
+            $color = [System.Drawing.Color]::Green
+          }
+        } catch {
+          $color = [System.Drawing.Color]::Red
+        }
+      }
+      try { $cell.Style.ForeColor = $color } catch {}
+    }
+  } catch {}
+})
 $btnClearScopes.Add_Click({
   $script:ActiveNearbyScopes.Clear()
   $dgvNearby.Rows.Clear()
