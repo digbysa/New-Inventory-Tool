@@ -5115,8 +5115,7 @@ function Start-NewAssetTool {
       }
     }
     foreach($cb in @($chkCable,$chkCableNeeded,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked = $false }
-    [System.Windows.Forms.MessageBox]::Show(("Saved rounding event to
-  " + $file),"Save Event") | Out-Null
+    [System.Windows.Forms.MessageBox]::Show("Saved rounding event to $file","Save Event") | Out-Null
     $cmbChkStatus.SelectedIndex = 0
     $txtScan.Clear()
     Clear-UI
@@ -5193,9 +5192,7 @@ function Start-NewAssetTool {
 
     if (-not (Test-Path $script:OutputFolder)) { New-Item -ItemType Directory -Path $script:OutputFolder -Force | Out-Null }
     if (-not (Test-Path $script:DataFolder)) {
-      throw "Data folder not found:`r
-  $script:DataFolder`r
-  Create a 'Data' folder next to the script and add your CSVs."
+      throw "Data folder not found:`n  $script:DataFolder`n  Create a 'Data' folder next to the script and add your CSVs."
     }
     Load-DataFolder $script:DataFolder
     Update-Counters
@@ -5221,13 +5218,7 @@ function Start-NewAssetTool {
     $diag += ("  MyInvocation.MyCommand.Path: " + ($(if($MyInvocation -and $MyInvocation.MyCommand -and $MyInvocation.MyCommand.Path){$MyInvocation.MyCommand.Path}else{'(null)'})))
     $diag += ("  env:__ScriptDir: " + ($(if($env:__ScriptDir){$env:__ScriptDir}else{'(null)'})))
     $diag += ("  Get-Location: " + (Get-Location).Path)
-    $msg = "Failed to load data:
-  " + $err.Message + "
-  " + ($diag -join "
-  ") + "
-  Type: " + $err.GetType().FullName + "
-  Stack:
-  " + $_.ScriptStackTrace
+    $msg = "Failed to load data:`n  $($err.Message)`n  $(($diag -join "`n  "))`n  Type: $($err.GetType().FullName)`n  Stack:`n  $($_.ScriptStackTrace)"
     [System.Windows.Forms.MessageBox]::Show($msg,"Load Error",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
   }
   $form.Add_KeyDown({ if($_.Control -and $_.KeyCode -eq 'S'){ Save-AllCSVs; $_.Handled=$true } })
