@@ -5503,38 +5503,43 @@ function Show-ToastMessage {
 }
 
 function Invoke-NearbyPingSelected {
-  $hosts = New-Object System.Collections.Generic.List[string]
+  $defaultColor = [System.Drawing.Color]::Black
+  $updatedCount = 0
+
   try {
     foreach ($row in $dgvNearby.SelectedRows) {
+      if (-not $row) { continue }
+
+      $hostVal = ''
+      try { $hostVal = [string]$row.Cells['Host'].Value } catch {}
+      if ([string]::IsNullOrWhiteSpace($hostVal)) { continue }
+
+      $hostName = $hostVal.Trim()
+      $cell = $null
+      try { $cell = $row.Cells['Host'] } catch {}
+
+      $success = $false
       try {
-        $hostVal = [string]$row.Cells['Host'].Value
-        if (-not [string]::IsNullOrWhiteSpace($hostVal)) {
-          $hostVal = $hostVal.Trim()
-          if (-not $hosts.Contains($hostVal)) { [void]$hosts.Add($hostVal) }
+        $success = [bool](Test-Connection -ComputerName $hostName -Count 1 -Quiet -ErrorAction Stop)
+      } catch {
+        $success = $false
+      }
+
+      if ($cell) {
+        try {
+          $cell.Style.ForeColor = if ($success) { [System.Drawing.Color]::ForestGreen } else { [System.Drawing.Color]::Crimson }
+        } catch {
+          try { $cell.Style.ForeColor = $defaultColor } catch {}
         }
-      } catch {}
+      }
+
+      $updatedCount++
     }
   } catch {}
 
-  if (-not $hosts -or $hosts.Count -le 0) {
-    Show-ToastMessage -Title 'Ping results' -Message 'No host names selected.'
-    return
+  if ($updatedCount -le 0) {
+    [System.Windows.Forms.MessageBox]::Show("No host names selected.","Ping Host(s)",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
   }
-
-  $results = New-Object System.Collections.Generic.List[string]
-  foreach ($hostName in $hosts) {
-    $success = $false
-    try {
-      $success = [bool](Test-Connection -ComputerName $hostName -Count 1 -Quiet -ErrorAction Stop)
-    } catch {
-      $success = $false
-    }
-    $status = if ($success) { 'Success' } else { 'Failed' }
-    [void]$results.Add("$($hostName): $status")
-  }
-
-  $message = if ($results.Count -gt 0) { [string]::Join([Environment]::NewLine, $results) } else { 'No ping results.' }
-  Show-ToastMessage -Title 'Ping results' -Message $message
 }
 
 function Set-NearbySelectedStatus {
