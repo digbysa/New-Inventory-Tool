@@ -5559,11 +5559,23 @@ function Invoke-NearbyPingRows {
       $cell = $null
       try { $cell = $row.Cells['Host'] } catch {}
 
+      $ipCell = $null
+      try { $ipCell = $row.Cells['IP'] } catch {}
+
       $success = $false
+      $ipAddress = ''
       try {
-        $success = [bool](Test-Connection -ComputerName $hostName -Count 1 -Quiet -ErrorAction Stop)
+        $reply = Test-Connection -ComputerName $hostName -Count 1 -ErrorAction Stop | Select-Object -First 1
+        if ($reply) {
+          $success = ($reply.Status -eq 'Success')
+          if ($success) {
+            if ($reply.IPV4Address) { $ipAddress = '' + $reply.IPV4Address }
+            elseif ($reply.Address) { $ipAddress = '' + $reply.Address }
+          }
+        }
       } catch {
         $success = $false
+        $ipAddress = ''
       }
 
       if ($cell) {
@@ -5572,6 +5584,10 @@ function Invoke-NearbyPingRows {
         } catch {
           try { $cell.Style.ForeColor = $defaultColor } catch {}
         }
+      }
+
+      if ($ipCell) {
+        try { $ipCell.Value = $ipAddress } catch {}
       }
 
       $updatedCount++
@@ -5736,6 +5752,7 @@ function New-NearCol([string]$name,[string]$header,[int]$width,[bool]$ro=$true){
 }
 # Visible columns
 $dgvNearby.Columns.Add((New-NearCol 'Host' 'Host Name' 140))         | Out-Null
+$dgvNearby.Columns.Add((New-NearCol 'IP' 'IP Address' 140))          | Out-Null
 $dgvNearby.Columns.Add((New-NearCol 'Asset' 'Asset Tag' 110))        | Out-Null
 $dgvNearby.Columns.Add((New-NearCol 'Location' 'Location' 120))      | Out-Null
 $dgvNearby.Columns.Add((New-NearCol 'Building' 'Building' 110))      | Out-Null
@@ -5945,6 +5962,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $rowIdx = $dgvNearby.Rows.Add()
     $r = $dgvNearby.Rows[$rowIdx]
     $r.Cells['Host'].Value      = $pc.name
+    $r.Cells['IP'].Value        = ''
     $r.Cells['Asset'].Value     = $pc.asset_tag
     $r.Cells['Location'].Value  = $pc.location
     $r.Cells['Building'].Value  = $pc.u_building
