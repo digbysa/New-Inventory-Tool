@@ -5507,7 +5507,7 @@ function Invoke-NearbyPingSelected {
   try {
     foreach ($row in $dgvNearby.SelectedRows) {
       try {
-        $hostVal = "{0}" -f $row.Cells['Host'].Value
+        $hostVal = [string]$row.Cells['Host'].Value
         if (-not [string]::IsNullOrWhiteSpace($hostVal)) {
           $hostVal = $hostVal.Trim()
           if (-not $hosts.Contains($hostVal)) { [void]$hosts.Add($hostVal) }
@@ -5521,20 +5521,20 @@ function Invoke-NearbyPingSelected {
     return
   }
 
-  $results = New-Object System.Collections.Generic.List[string]
-  foreach ($hostName in $hosts) {
-    $success = $false
-    try {
-      $success = [bool](Test-Connection -ComputerName $hostName -Count 1 -Quiet -ErrorAction Stop)
-    } catch {
+    $results = New-Object System.Collections.Generic.List[string]
+    foreach ($hostName in $hosts) {
       $success = $false
+      try {
+        $success = [bool](Test-Connection -ComputerName $hostName -Count 1 -Quiet -ErrorAction Stop)
+      } catch {
+        $success = $false
+      }
+      $status = if ($success) { 'Success' } else { 'Failed' }
+      [void]$results.Add("$($hostName): $status")
     }
-    $status = if ($success) { 'Success' } else { 'Failed' }
-    [void]$results.Add('{0}: {1}' -f $hostName, $status)
-  }
 
-  $message = if ($results.Count -gt 0) { [string]::Join([Environment]::NewLine, $results) } else { 'No ping results.' }
-  Show-ToastMessage -Title 'Ping results' -Message $message
+    $message = if ($results.Count -gt 0) { [string]::Join([Environment]::NewLine, $results) } else { 'No ping results.' }
+    Show-ToastMessage -Title 'Ping results' -Message $message
 }
 
 function Set-NearbySelectedStatus {
