@@ -5475,15 +5475,15 @@ function Invoke-NearbyPingSelected {
   }
 
   $results = New-Object System.Collections.Generic.List[string]
-  foreach ($host in $hosts) {
+  foreach ($hostName in $hosts) {
     $success = $false
     try {
-      $success = [bool](Test-Connection -ComputerName $host -Count 1 -Quiet -ErrorAction Stop)
+      $success = [bool](Test-Connection -ComputerName $hostName -Count 1 -Quiet -ErrorAction Stop)
     } catch {
       $success = $false
     }
     $status = if ($success) { 'Success' } else { 'Failed' }
-    [void]$results.Add('{0}: {1}' -f $host, $status)
+    [void]$results.Add('{0}: {1}' -f $hostName, $status)
   }
 
   $message = if ($results.Count -gt 0) { [string]::Join([Environment]::NewLine, $results) } else { 'No ping results.' }
