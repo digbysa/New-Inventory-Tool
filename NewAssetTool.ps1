@@ -5431,6 +5431,64 @@ try { $nearToolbar.Add_SizeChanged({ Update-NearToolbarButtons }) } catch {}
 try { $form.Add_Load({ Update-NearToolbarButtons }) } catch {}
 Update-NearToolbarButtons
 if (-not $menuStatus) { $menuStatus = New-Object System.Windows.Forms.ContextMenuStrip }
+if (-not $script:ToastNotifier) {
+  try {
+    $script:ToastNotifier = New-Object System.Windows.Forms.NotifyIcon
+    $script:ToastNotifier.Icon = [System.Drawing.SystemIcons]::Information
+    $script:ToastNotifier.Visible = $true
+  } catch {}
+}
+
+function Show-ToastMessage {
+  param(
+    [string]$Title,
+    [string]$Message,
+    [int]$DurationMs = 4000
+  )
+
+  if (-not $script:ToastNotifier) { return }
+  try {
+    $script:ToastNotifier.BalloonTipTitle = if ($Title) { $Title } else { 'Notification' }
+    $script:ToastNotifier.BalloonTipText = if ($Message) { $Message } else { '' }
+    $script:ToastNotifier.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
+    $script:ToastNotifier.ShowBalloonTip([Math]::Max(1000,[int]$DurationMs))
+  } catch {}
+}
+
+function Invoke-NearbyPingSelected {
+  $hosts = New-Object System.Collections.Generic.List[string]
+  try {
+    foreach ($row in $dgvNearby.SelectedRows) {
+      try {
+        $hostVal = "{0}" -f $row.Cells['Host'].Value
+        if (-not [string]::IsNullOrWhiteSpace($hostVal)) {
+          $hostVal = $hostVal.Trim()
+          if (-not $hosts.Contains($hostVal)) { [void]$hosts.Add($hostVal) }
+        }
+      } catch {}
+    }
+  } catch {}
+
+  if (-not $hosts -or $hosts.Count -le 0) {
+    Show-ToastMessage -Title 'Ping results' -Message 'No host names selected.'
+    return
+  }
+
+  $results = New-Object System.Collections.Generic.List[string]
+  foreach ($host in $hosts) {
+    $success = $false
+    try {
+      $success = [bool](Test-Connection -ComputerName $host -Count 1 -Quiet -ErrorAction Stop)
+    } catch {
+      $success = $false
+    }
+    $status = if ($success) { 'Success' } else { 'Failed' }
+    [void]$results.Add('{0}: {1}' -f $host, $status)
+  }
+
+  $message = if ($results.Count -gt 0) { [string]::Join([Environment]::NewLine, $results) } else { 'No ping results.' }
+  Show-ToastMessage -Title 'Ping results' -Message $message
+}
 
 function Set-NearbySelectedStatus {
   param(
@@ -5470,6 +5528,10 @@ function Show-NearbyStatusMenu {
   )
   try {
     $menuStatus.Items.Clear()
+    $ping = New-Object System.Windows.Forms.ToolStripMenuItem('Ping selected host(s)')
+    $ping.Add_Click({ Invoke-NearbyPingSelected })
+    [void]$menuStatus.Items.Add($ping)
+    [void]$menuStatus.Items.Add('-')
     $options = Get-StatusOptionsFromGrid
     foreach ($opt in $options) {
       $item = New-Object System.Windows.Forms.ToolStripMenuItem($opt)
