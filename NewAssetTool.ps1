@@ -5432,11 +5432,17 @@ $extraWidth = 12
 $desiredWidth = [Math]::Max($multiStatusPreferred.Width + $extraWidth, $clearPreferred.Width)
 $btnSetStatus.MinimumSize = New-Object System.Drawing.Size($multiStatusPreferred.Width, $clearPreferred.Height)
 $btnSetStatus.Size = New-Object System.Drawing.Size($desiredWidth, $clearPreferred.Height)
+$btnPingAll = New-Object ModernUI.RoundedButton
+$btnPingAll.Text = 'Ping All'
+$btnPingAll.AutoSize = $true
+$btnPingAll.Anchor = 'Top,Right'
+$btnPingAll.Margin = '0,0,0,0'
 $nearToolbar.Controls.Add($btnSetStatus)
+$nearToolbar.Controls.Add($btnPingAll)
 function Update-NearToolbarButtons {
   if (-not $nearToolbar) { return }
   $buttons = @()
-  foreach ($button in @($btnZoomIn, $btnZoomOut, $btnClearScopes, $btnSetStatus)) {
+  foreach ($button in @($btnZoomIn, $btnZoomOut, $btnClearScopes, $btnSetStatus, $btnPingAll)) {
     if ($button -and $button.Visible) { $buttons += $button }
   }
   if (-not $buttons) { return }
@@ -5502,19 +5508,54 @@ function Show-ToastMessage {
   } catch {}
 }
 
-function Invoke-NearbyPingSelected {
+function Invoke-NearbyPingRows {
+  param(
+    [System.Collections.IEnumerable]$Rows,
+    [string]$EmptyMessage
+  )
+
   $defaultColor = [System.Drawing.Color]::Black
+  $targets = New-Object System.Collections.Generic.List[object]
+
+  foreach ($row in $Rows) {
+    if (-not $row) { continue }
+
+    $hostVal = ''
+    try { $hostVal = [string]$row.Cells['Host'].Value } catch {}
+    if ([string]::IsNullOrWhiteSpace($hostVal)) { continue }
+
+    $targets.Add([pscustomobject]@{
+      Row  = $row
+      Host = $hostVal.Trim()
+    }) | Out-Null
+  }
+
+  $total = $targets.Count
+  if ($total -le 0) {
+    if ($EmptyMessage) {
+      [System.Windows.Forms.MessageBox]::Show($EmptyMessage,"Ping Host(s)",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+    }
+    return
+  }
+
   $updatedCount = 0
 
   try {
-    foreach ($row in $dgvNearby.SelectedRows) {
-      if (-not $row) { continue }
+    if ($statusLabel) {
+      $statusLabel.Text = ('0 of {0} devices pinging...' -f $total)
+      $parent = $statusLabel.GetCurrentParent()
+      if ($parent) { $parent.Refresh() }
+      elseif ($status) { $status.Refresh() }
+    }
+  } catch {}
 
-      $hostVal = ''
-      try { $hostVal = [string]$row.Cells['Host'].Value } catch {}
-      if ([string]::IsNullOrWhiteSpace($hostVal)) { continue }
+  try {
+    $current = 0
+    foreach ($target in $targets) {
+      $current++
+      $row = $target.Row
+      $hostName = $target.Host
 
-      $hostName = $hostVal.Trim()
       $cell = $null
       try { $cell = $row.Cells['Host'] } catch {}
 
@@ -5534,12 +5575,44 @@ function Invoke-NearbyPingSelected {
       }
 
       $updatedCount++
+
+      try {
+        if ($statusLabel) {
+          $statusLabel.Text = ('{0} of {1} devices pinging...' -f $current, $total)
+          $parent = $statusLabel.GetCurrentParent()
+          if ($parent) { $parent.Refresh() }
+          elseif ($status) { $status.Refresh() }
+        }
+      } catch {}
+
+      try { [System.Windows.Forms.Application]::DoEvents() } catch {}
     }
   } catch {}
 
-  if ($updatedCount -le 0) {
-    [System.Windows.Forms.MessageBox]::Show("No host names selected.","Ping Host(s)",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+  try {
+    if ($statusLabel) {
+      $statusLabel.Text = 'Ping complete.'
+      $parent = $statusLabel.GetCurrentParent()
+      if ($parent) { $parent.Refresh() }
+      elseif ($status) { $status.Refresh() }
+    }
+  } catch {}
+
+  if ($updatedCount -le 0 -and $EmptyMessage) {
+    [System.Windows.Forms.MessageBox]::Show($EmptyMessage,"Ping Host(s)",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
   }
+}
+
+function Invoke-NearbyPingSelected {
+  Invoke-NearbyPingRows -Rows $dgvNearby.SelectedRows -EmptyMessage "No host names selected."
+}
+
+function Invoke-NearbyPingAll {
+  $rows = New-Object System.Collections.Generic.List[object]
+  foreach ($row in $dgvNearby.Rows) {
+    if ($row -and -not $row.IsNewRow -and $row.Visible) { $rows.Add($row) | Out-Null }
+  }
+  Invoke-NearbyPingRows -Rows $rows -EmptyMessage "No host names available to ping."
 }
 
 function Set-NearbySelectedStatus {
@@ -5627,6 +5700,7 @@ $btnSetStatus.Add_Click({
   $pt = New-Object System.Drawing.Point(0,$btnSetStatus.Height)
   Show-NearbyStatusMenu $btnSetStatus $pt -ShowConfirmation
 })
+$btnPingAll.Add_Click({ Invoke-NearbyPingAll })
 $dgvNearby = New-Object System.Windows.Forms.DataGridView
 $dgvNearby.Dock='Fill'
 $dgvNearby.AllowUserToAddRows=$false
