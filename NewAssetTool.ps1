@@ -5452,6 +5452,27 @@ function Set-NearbyPingState {
   } catch {}
 }
 
+function Get-NearbyRowHostName {
+  param(
+    [System.Windows.Forms.DataGridViewRow]$Row
+  )
+
+  if (-not $Row) { return '' }
+
+  try {
+    $cell = $Row.Cells['Host']
+    if ($cell) {
+      $formatted = '' + $cell.FormattedValue
+      if (-not [string]::IsNullOrWhiteSpace($formatted)) { return $formatted.Trim() }
+
+      $raw = '' + $cell.Value
+      if (-not [string]::IsNullOrWhiteSpace($raw)) { return $raw.Trim() }
+    }
+  } catch {}
+
+  return ''
+}
+
 function Update-StatusLabelSafe {
   param(
     [string]$Text
@@ -5539,8 +5560,7 @@ function Start-NearbyPingCheck {
 
     if (-not $row -or $row.IsNewRow) { return }
 
-    $host = ''
-    try { $host = '' + $row.Cells['Host'].Value } catch {}
+    $host = Get-NearbyRowHostName $row
     $targets += [pscustomobject]@{ Index = $idx; Host = $host }
   }
 
