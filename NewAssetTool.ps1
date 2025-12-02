@@ -5521,20 +5521,23 @@ function Invoke-NearbyPingSelected {
     return
   }
 
-  $results = New-Object System.Collections.Generic.List[string]
-  foreach ($hostName in $hosts) {
-    $success = $false
-    try {
-      $success = [bool](Test-Connection -ComputerName $hostName -Count 1 -Quiet -ErrorAction Stop)
-    } catch {
+    $results = New-Object System.Collections.Generic.List[string]
+    foreach ($hostName in $hosts) {
       $success = $false
+      try {
+        $success = [bool](Test-Connection -ComputerName $hostName -Count 1 -Quiet -ErrorAction Stop)
+      } catch {
+        $success = $false
+      }
+      $status = if ($success) { 'Success' } else { 'Failed' }
+      [void]$results.Add("$($hostName): $status")
     }
     $status = if ($success) { 'Success' } else { 'Failed' }
     [void]$results.Add("$hostName: $status")
   }
 
-  $message = if ($results.Count -gt 0) { [string]::Join([Environment]::NewLine, $results) } else { 'No ping results.' }
-  Show-ToastMessage -Title 'Ping results' -Message $message
+    $message = if ($results.Count -gt 0) { [string]::Join([Environment]::NewLine, $results) } else { 'No ping results.' }
+    Show-ToastMessage -Title 'Ping results' -Message $message
 }
 
 function Set-NearbySelectedStatus {
