@@ -5532,6 +5532,9 @@ function Invoke-NearbyPingSelected {
       $status = if ($success) { 'Success' } else { 'Failed' }
       [void]$results.Add("$($hostName): $status")
     }
+    $status = if ($success) { 'Success' } else { 'Failed' }
+    [void]$results.Add("$hostName: $status")
+  }
 
     $message = if ($results.Count -gt 0) { [string]::Join([Environment]::NewLine, $results) } else { 'No ping results.' }
     Show-ToastMessage -Title 'Ping results' -Message $message
