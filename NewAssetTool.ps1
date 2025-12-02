@@ -4,6 +4,53 @@ try { [System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.H
 [System.Windows.Forms.Application]::EnableVisualStyles()
 try { [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false) } catch {}
 
+# Capture and report unexpected formatting errors so the application can continue running
+function Register-NewAssetToolExceptionHandlers {
+  try {
+    $logPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'NewAssetTool-error.log'
+
+    $logError = {
+      param([Exception]$ex)
+
+      if (-not $ex) { return }
+
+      try {
+        $timestamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+        $message = "[$timestamp] $($ex.GetType().FullName): $($ex.Message)" + [Environment]::NewLine + $ex.StackTrace + [Environment]::NewLine
+        Add-Content -Path $logPath -Value $message -Encoding UTF8
+      } catch {}
+
+      try {
+        [System.Windows.Forms.MessageBox]::Show(
+          "An unexpected error occurred and was logged to:`n$logPath`n`n" + $ex.Message,
+          'New Inventory Tool',
+          [System.Windows.Forms.MessageBoxButtons]::OK,
+          [System.Windows.Forms.MessageBoxIcon]::Error
+        ) | Out-Null
+      } catch {}
+    }
+
+    [System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException)
+    [System.Windows.Forms.Application]::Add_ThreadException({
+      param($sender,$eventArgs)
+      if ($eventArgs.Exception -is [System.FormatException] -or $eventArgs.Exception -is [System.Management.Automation.RuntimeException]) {
+        & $logError $eventArgs.Exception
+        return
+      }
+      try { $eventArgs.Exception } catch {}
+    })
+    [AppDomain]::CurrentDomain.add_UnhandledException({
+      param($sender,$eventArgs)
+      $ex = $eventArgs.ExceptionObject -as [Exception]
+      if ($ex -is [System.FormatException] -or $ex -is [System.Management.Automation.RuntimeException]) {
+        & $logError $ex
+      }
+    })
+  } catch {}
+}
+
+Register-NewAssetToolExceptionHandlers
+
 if (-not ('NewAssetTool.NativeMethods.Dpi' -as [Type])) {
   try {
     Add-Type -Namespace NewAssetTool.NativeMethods -Name Dpi -MemberDefinition @"
