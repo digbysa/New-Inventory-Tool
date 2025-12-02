@@ -5528,13 +5528,20 @@ function Start-NearbyPingCheck {
   }
 
   $rowsToCheck = @()
+  $overrideRows = @()
   if ($RowsOverride) {
     foreach ($row in $RowsOverride) {
       try {
-        if ($row -and -not $row.IsNewRow) { $rowsToCheck += $row }
+        if ($row -and -not $row.IsNewRow) { $overrideRows += $row }
       } catch {}
     }
-  } else {
+  }
+
+  $useOverride = ($overrideRows.Count -gt 0)
+
+  if ($useOverride) {
+    $rowsToCheck = $overrideRows
+  } elseif (-not $RequireSelection) {
     for ($i = 0; $i -lt $dgvNearby.Rows.Count; $i++) {
       try {
         $row = $dgvNearby.Rows[$i]
