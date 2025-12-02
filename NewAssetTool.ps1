@@ -5501,7 +5501,6 @@ function Start-NearbyPingCheck {
     [switch]$RequireSelection
   )
 
-  if ($script:NearbyPingInProgress) { return }
   if (-not $dgvNearby) {
     Update-StatusLabelSafe "No nearby devices to check online."
     return
@@ -5567,6 +5566,15 @@ function Start-NearbyPingCheck {
     Update-StatusLabelSafe "No nearby devices to check online."
     return
   }
+
+  $hostList = @()
+  foreach ($target in $targets) {
+    $displayHost = if ([string]::IsNullOrWhiteSpace($target.Host)) { '(missing host)' } else { $target.Host }
+    $hostList += $displayHost
+  }
+  try {
+    [System.Windows.Forms.MessageBox]::Show(("Pinging the following host(s):`n`n" + ($hostList -join "`n")), 'Nearby Ping Targets') | Out-Null
+  } catch {}
 
   Set-NearbyPingState $true
   $total = $targets.Count
