@@ -5507,7 +5507,7 @@ function Invoke-NearbyPingSelected {
   try {
     foreach ($row in $dgvNearby.SelectedRows) {
       try {
-        $hostVal = "{0}" -f $row.Cells['Host'].Value
+        $hostVal = [string]$row.Cells['Host'].Value
         if (-not [string]::IsNullOrWhiteSpace($hostVal)) {
           $hostVal = $hostVal.Trim()
           if (-not $hosts.Contains($hostVal)) { [void]$hosts.Add($hostVal) }
@@ -5530,7 +5530,7 @@ function Invoke-NearbyPingSelected {
       $success = $false
     }
     $status = if ($success) { 'Success' } else { 'Failed' }
-    [void]$results.Add('{0}: {1}' -f $hostName, $status)
+    [void]$results.Add("$hostName: $status")
   }
 
   $message = if ($results.Count -gt 0) { [string]::Join([Environment]::NewLine, $results) } else { 'No ping results.' }
