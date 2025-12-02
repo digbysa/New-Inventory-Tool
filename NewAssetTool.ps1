@@ -5564,18 +5564,19 @@ function Invoke-NearbyPingRows {
 
       $success = $false
       $ipAddress = ''
+      $ping = $null
       try {
-        $reply = Test-Connection -ComputerName $hostName -Count 1 -ErrorAction Stop | Select-Object -First 1
+        $ping = New-Object System.Net.NetworkInformation.Ping
+        $reply = $ping.Send($hostName, 2000)
         if ($reply) {
-          $success = if ($null -ne $reply.PingSucceeded) { [bool]$reply.PingSucceeded } else { $reply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success -or $reply.Status -eq 'Success' }
-          if ($success) {
-            if ($reply.IPV4Address) { $ipAddress = '' + $reply.IPV4Address }
-            elseif ($reply.Address) { $ipAddress = '' + $reply.Address }
-          }
+          $success = $reply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success
+          if ($success -and $reply.Address) { $ipAddress = '' + $reply.Address }
         }
       } catch {
         $success = $false
         $ipAddress = ''
+      } finally {
+        try { if ($ping) { $ping.Dispose() } } catch {}
       }
 
       if ($cell) {
