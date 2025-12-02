@@ -5567,7 +5567,7 @@ function Invoke-NearbyPingRows {
       try {
         $reply = Test-Connection -ComputerName $hostName -Count 1 -ErrorAction Stop | Select-Object -First 1
         if ($reply) {
-          $success = ($reply.Status -eq 'Success')
+          $success = if ($null -ne $reply.PingSucceeded) { [bool]$reply.PingSucceeded } else { $reply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success -or $reply.Status -eq 'Success' }
           if ($success) {
             if ($reply.IPV4Address) { $ipAddress = '' + $reply.IPV4Address }
             elseif ($reply.Address) { $ipAddress = '' + $reply.Address }
