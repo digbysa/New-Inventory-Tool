@@ -1066,6 +1066,7 @@ $script:CurrentDisplay = $null
 $script:CurrentParent  = $null
 $script:editing = $false
 $script:NewAssetToolMainForm = $null
+$script:SiteSubnetEntries = @()
 # Canonical column order for rounding event exports (includes Comments column)
 $script:RoundingEventColumns = @(
   'Timestamp','AssetTag','Name','Serial','City','Location','Building','Floor','Room',
@@ -1194,6 +1195,84 @@ function Sort-Floors {
     $pairs += [pscustomobject]@{ Orig=$s; G=$group; R=$rank; S=$n }
   }
   return ($pairs | Sort-Object G,R,S | Select-Object -ExpandProperty Orig)
+}
+function ConvertTo-IPv4Bytes([string]$ip){
+  if([string]::IsNullOrWhiteSpace($ip)){ return $null }
+  try {
+    $addr = [System.Net.IPAddress]::Parse($ip.Trim())
+    $bytes = $addr.GetAddressBytes()
+    if($bytes.Length -ne 4){ return $null }
+    return $bytes
+  } catch {
+    return $null
+  }
+}
+function New-SiteSubnetEntry([string]$cidr,[string]$label){
+  if([string]::IsNullOrWhiteSpace($cidr) -or [string]::IsNullOrWhiteSpace($label)){ return $null }
+  $parts = $cidr.Split('/')
+  if($parts.Count -ne 2){ return $null }
+  $netBytes = ConvertTo-IPv4Bytes $parts[0]
+  if(-not $netBytes){ return $null }
+  try { $prefix = [int]$parts[1] } catch { return $null }
+  if($prefix -lt 0 -or $prefix -gt 32){ return $null }
+
+  $maskBytes = New-Object 'System.Byte[]' 4
+  for($i=0; $i -lt 4; $i++){
+    $bits = [Math]::Min([Math]::Max($prefix - 8*$i,0),8)
+    if($bits -ge 8){
+      $maskBytes[$i] = 255
+    } elseif($bits -le 0){
+      $maskBytes[$i] = 0
+    } else {
+      $maskBytes[$i] = [byte]((0xFF -shl (8 - $bits)) -band 0xFF)
+    }
+  }
+
+  $networkBytes = New-Object 'System.Byte[]' 4
+  for($i=0; $i -lt 4; $i++){
+    $networkBytes[$i] = [byte]($netBytes[$i] -band $maskBytes[$i])
+  }
+
+  return [pscustomobject]@{
+    Label   = $label.Trim()
+    Cidr    = $cidr.Trim()
+    Network = $networkBytes
+    Mask    = $maskBytes
+  }
+}
+function Test-SiteSubnetMatch([byte[]]$ipBytes,$entry){
+  if(-not $ipBytes -or -not $entry){ return $false }
+  for($i=0; $i -lt 4; $i++){
+    if(($ipBytes[$i] -band $entry.Mask[$i]) -ne $entry.Network[$i]){ return $false }
+  }
+  return $true
+}
+function Get-SiteSubnetLabelForIp([string]$ipAddress){
+  $ipBytes = ConvertTo-IPv4Bytes $ipAddress
+  if(-not $ipBytes -or -not $script:SiteSubnetEntries){ return $null }
+  foreach($entry in $script:SiteSubnetEntries){
+    if(Test-SiteSubnetMatch $ipBytes $entry){ return $entry.Label }
+  }
+  return $null
+}
+function Load-SiteSubnets([string]$folder){
+  $script:SiteSubnetEntries = @()
+  if([string]::IsNullOrWhiteSpace($folder)){ return }
+  $path = Join-Path $folder 'SiteSubnets.csv'
+  if(-not (Test-Path $path)){ return }
+
+  $entries = New-Object System.Collections.Generic.List[object]
+  foreach($line in (Get-Content -Path $path)){
+    if([string]::IsNullOrWhiteSpace($line)){ continue }
+    $parts = $line.Split(',')
+    if($parts.Count -lt 2){ continue }
+    $cidr = $parts[0].Trim()
+    $label = $parts[1].Trim()
+    if([string]::IsNullOrWhiteSpace($cidr) -or [string]::IsNullOrWhiteSpace($label)){ continue }
+    $entry = New-SiteSubnetEntry $cidr $label
+    if($entry){ $entries.Add($entry) | Out-Null }
+  }
+  try { $script:SiteSubnetEntries = $entries.ToArray() } catch { $script:SiteSubnetEntries = @() }
 }
 function Register-SerialIndex([string]$serial,$record){
   if([string]::IsNullOrWhiteSpace($serial) -or -not $record){ return }
@@ -1999,6 +2078,7 @@ function Load-RoundingMapping([string]$folder){
 function Load-DataFolder([string]$folder){
   $script:DataFolder = $folder
   if(-not $script:OutputFolder){ $script:OutputFolder = $folder }
+  Load-SiteSubnets $folder
   Load-LocationMaster $folder
   Load-RoundingMapping $folder
   try { Load-DepartmentMaster } catch {}
@@ -5507,6 +5587,18 @@ function Show-ToastMessage {
     $script:ToastNotifier.ShowBalloonTip([Math]::Max(1000,[int]$DurationMs))
   } catch {}
 }
+function Update-NearbyIpTooltip {
+  param(
+    [System.Windows.Forms.DataGridViewCell]$Cell,
+    [string]$IpAddress
+  )
+
+  if(-not $Cell){ return }
+  try {
+    $label = Get-SiteSubnetLabelForIp $IpAddress
+    $Cell.ToolTipText = if($label){ $label } else { '' }
+  } catch {}
+}
 
 function Invoke-NearbyPingRows {
   param(
@@ -5589,6 +5681,7 @@ function Invoke-NearbyPingRows {
 
       if ($ipCell) {
         try { $ipCell.Value = $ipAddress } catch {}
+        Update-NearbyIpTooltip -Cell $ipCell -IpAddress $ipAddress
       }
 
       $updatedCount++
@@ -5964,6 +6057,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $r = $dgvNearby.Rows[$rowIdx]
     $r.Cells['Host'].Value      = $pc.name
     $r.Cells['IP'].Value        = ''
+    Update-NearbyIpTooltip -Cell $r.Cells['IP'] -IpAddress ''
     $r.Cells['Asset'].Value     = $pc.asset_tag
     $r.Cells['Location'].Value  = $pc.location
     $r.Cells['Building'].Value  = $pc.u_building
