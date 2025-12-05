@@ -2890,10 +2890,17 @@ function New-TextCol([string]$name,[string]$header,[int]$width,[bool]$ro=$true){
   $col.Name=$name; $col.HeaderText=$header; $col.Width=[math]::Max($width,60); $col.MinimumWidth=60; $col.ReadOnly=$ro
   return $col
 }
+function New-LinkCol([string]$name,[string]$header,[int]$width,[bool]$ro=$true){
+  $col = New-Object System.Windows.Forms.DataGridViewLinkColumn
+  $col.Name=$name; $col.HeaderText=$header; $col.Width=[math]::Max($width,60); $col.MinimumWidth=60; $col.ReadOnly=$ro
+  $col.TrackVisitedState = $false
+  $col.LinkBehavior = [System.Windows.Forms.LinkBehavior]::SystemDefault
+  return $col
+}
 $dgv.Columns.Add((New-TextCol 'Role' 'Role' 70))       | Out-Null
 $dgv.Columns.Add((New-TextCol 'Type' 'Type' 90))       | Out-Null
 $dgv.Columns.Add((New-TextCol 'Name' 'Name' 140))      | Out-Null
-$dgv.Columns.Add((New-TextCol 'AssetTag' 'Asset Tag' 120)) | Out-Null
+$dgv.Columns.Add((New-LinkCol 'AssetTag' 'Asset Tag' 120)) | Out-Null
 $dgv.Columns.Add((New-TextCol 'Serial' 'Serial' 120))  | Out-Null
 $dgv.Columns.Add((New-TextCol 'RITM' 'RITM' 100))      | Out-Null
 $dgv.Columns.Add((New-TextCol 'Retire' 'Retire' 120)) | Out-Null
@@ -2907,6 +2914,20 @@ try{
   $dgv.Columns['Retire'].FillWeight = 110
 } catch {}
 Register-NewAssetToolScaledDataGrid -DataGrid $dgv -CellBaseSize $script:ThemeFontBaseSize -HeaderBaseSize $script:ThemeFontBaseSize
+$dgv.Add_CellContentClick({
+  param($sender,$eventArgs)
+  try {
+    if($eventArgs.RowIndex -lt 0 -or $eventArgs.ColumnIndex -lt 0){ return }
+    $column = $sender.Columns[$eventArgs.ColumnIndex]
+    if(-not $column -or $column.Name -ne 'AssetTag'){ return }
+    $row = $sender.Rows[$eventArgs.RowIndex]
+    $cell = $row.Cells['AssetTag']
+    $link = $null
+    try { $link = $cell.Tag } catch {}
+    if([string]::IsNullOrWhiteSpace($link)){ return }
+    Start-Process $link
+  } catch {}
+})
 
 $assocGridPanel.Controls.Add($dgv)
 $cards = New-Object System.Windows.Forms.FlowLayoutPanel
@@ -3559,7 +3580,7 @@ function Refresh-AssocGrid($parentRec){
   $dgv.Rows[$prow].Cells['Role'].Value='Parent'
   $dgv.Rows[$prow].Cells['Type'].Value=(Get-DetectedType $parentRec)
   $dgv.Rows[$prow].Cells['Name'].Value=$parentRec.name
-  $dgv.Rows[$prow].Cells['AssetTag'].Value=$parentRec.asset_tag
+  Set-AssociatedAssetTagCell $dgv.Rows[$prow].Cells['AssetTag'] (Get-DetectedType $parentRec) $parentRec.asset_tag
   $dgv.Rows[$prow].Cells['Serial'].Value=$parentRec.serial_number
   $dgv.Rows[$prow].Cells['RITM'].Value=$parentRec.RITM
   $dgv.Rows[$prow].Cells['Retire'].Value= (Fmt-DateLong $parentRec.Retire)
@@ -3580,7 +3601,7 @@ function Refresh-AssocGrid($parentRec){
     $rowIdx = $dgv.Rows.Add()
     $r = $dgv.Rows[$rowIdx]
     $r.Cells['Role'].Value=$roleLabel
-    $r.Cells['Type'].Value=$ch.Type
+    $r.Cells['Type'].Value=(Get-DetectedType $ch)
     if($ch.name){ $r.Cells['Name'].Value = $ch.name } else { $r.Cells['Name'].Value = '' }
     try {
       $nameParent = $immediateParent
@@ -3611,7 +3632,7 @@ function Refresh-AssocGrid($parentRec){
         $r.Cells['Name'].ToolTipText = ''
       }
     } catch {}
-    $r.Cells['AssetTag'].Value=$ch.asset_tag
+    Set-AssociatedAssetTagCell $r.Cells['AssetTag'] (Get-DetectedType $ch) $ch.asset_tag
     $r.Cells['Serial'].Value=$ch.serial_number
     if(($ch.Type -eq 'Mic') -or ($ch.Type -eq 'Scanner')){
       $r.Cells['RITM'].Value=''; $r.Cells['Retire'].Value=''
@@ -4039,6 +4060,18 @@ function Get-CmdbLink([string]$deviceType,[string]$assetTag){
   $expandedInnerPath = [string]::Format($innerPath,$assetValue)
   $encodedInnerPath  = [System.Uri]::EscapeDataString($expandedInnerPath)
   return "https://healthbc.service-now.com/nav_to.do?uri=$encodedInnerPath"
+}
+
+function Set-AssociatedAssetTagCell([System.Windows.Forms.DataGridViewCell]$cell,[string]$deviceType,[string]$assetTag){
+  if(-not $cell){ return }
+  $cell.Value = $assetTag
+  $cell.Tag = $null
+  try { $cell.ToolTipText = '' } catch {}
+  if([string]::IsNullOrWhiteSpace($assetTag)){ return }
+  $cmdbLink = Get-CmdbLink $deviceType $assetTag
+  if([string]::IsNullOrWhiteSpace($cmdbLink)){ return }
+  $cell.Tag = $cmdbLink
+  try { $cell.ToolTipText = $cmdbLink } catch {}
 }
 
 function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[string]$oldParent,[string]$newParent,[string]$oldName,[string]$newName){
