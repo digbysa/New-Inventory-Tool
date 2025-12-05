@@ -2895,6 +2895,12 @@ function New-LinkCol([string]$name,[string]$header,[int]$width,[bool]$ro=$true){
   $col.Name=$name; $col.HeaderText=$header; $col.Width=[math]::Max($width,60); $col.MinimumWidth=60; $col.ReadOnly=$ro
   $col.TrackVisitedState = $false
   $col.LinkBehavior = [System.Windows.Forms.LinkBehavior]::SystemDefault
+  try {
+    $linkStyle = New-Object System.Windows.Forms.DataGridViewCellStyle
+    $linkStyle.Font = New-ScaledFont -Family 'Segoe UI' -BaseSize $script:ThemeFontBaseSize
+    $col.DefaultCellStyle = $linkStyle
+    $col.LinkDefaultCellStyle = $linkStyle
+  } catch {}
   return $col
 }
 $dgv.Columns.Add((New-TextCol 'Role' 'Role' 70))       | Out-Null
