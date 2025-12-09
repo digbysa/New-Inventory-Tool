@@ -1066,6 +1066,7 @@ $script:CurrentDisplay = $null
 $script:CurrentParent  = $null
 $script:editing = $false
 $script:NewAssetToolMainForm = $null
+$script:SiteSubnetEntries = @()
 # Canonical column order for rounding event exports (includes Comments column)
 $script:RoundingEventColumns = @(
   'Timestamp','AssetTag','Name','Serial','City','Location','Building','Floor','Room',
@@ -1132,10 +1133,10 @@ function Normalize-Scan([string]$raw){
   if($s -match '^HSS[- ]?(\d+)$'){return @{Value=("HSS-{0}" -f $matches[1]);Kind='AssetTag'}}
   if($s -match '^C[- ]?0*(\d+)$'){return @{Value=("C{0}" -f $matches[1]);Kind='AssetTag'}}
   if($s -match '^(CRT[- ]?.+)$'){ return @{Value=($s -replace '^CRT[- ]?','CRT-');Kind='AssetTag'}}
-  if($s -match '^(PC\d+)$'){     return @{Value=$matches[1];Kind='Hostname'}}
-  if($s -match '^(LD-?\d+)$'){   return @{Value=($s -replace '^LD','LD-');Kind='Hostname'}}   # fixed
-  if($s -match '^(TD-?\d+)$'){   return @{Value=($s -replace '^TD','TD-');Kind='Hostname'}}   # fixed
-  if($s -match '^(AO[-]?\w+)$'){ return @{Value=($s -replace '^AO','AO-');Kind='Hostname'}}
+  if($s -match '^(PC\d+(?:-.+)?)$'){ return @{Value=$matches[1];Kind='Hostname'}}
+  if($s -match '^(LD\d+(?:-.+)?)$'){ return @{Value=$matches[1];Kind='Hostname'}}
+  if($s -match '^(TD\d+(?:-.+)?)$'){ return @{Value=$matches[1];Kind='Hostname'}}
+  if($s -match '^(AO\d+(?:-.+)?)$'){ return @{Value=$matches[1];Kind='Hostname'}}
   if($s -match '^[A-Z0-9\-]{5,}$'){return @{Value=$s;Kind='Serial'}}
   return @{Value=$s;Kind='Unknown'}
 }
@@ -1194,6 +1195,84 @@ function Sort-Floors {
     $pairs += [pscustomobject]@{ Orig=$s; G=$group; R=$rank; S=$n }
   }
   return ($pairs | Sort-Object G,R,S | Select-Object -ExpandProperty Orig)
+}
+function ConvertTo-IPv4Bytes([string]$ip){
+  if([string]::IsNullOrWhiteSpace($ip)){ return $null }
+  try {
+    $addr = [System.Net.IPAddress]::Parse($ip.Trim())
+    $bytes = $addr.GetAddressBytes()
+    if($bytes.Length -ne 4){ return $null }
+    return $bytes
+  } catch {
+    return $null
+  }
+}
+function New-SiteSubnetEntry([string]$cidr,[string]$label){
+  if([string]::IsNullOrWhiteSpace($cidr) -or [string]::IsNullOrWhiteSpace($label)){ return $null }
+  $parts = $cidr.Split('/')
+  if($parts.Count -ne 2){ return $null }
+  $netBytes = ConvertTo-IPv4Bytes $parts[0]
+  if(-not $netBytes){ return $null }
+  try { $prefix = [int]$parts[1] } catch { return $null }
+  if($prefix -lt 0 -or $prefix -gt 32){ return $null }
+
+  $maskBytes = New-Object 'System.Byte[]' 4
+  for($i=0; $i -lt 4; $i++){
+    $bits = [Math]::Min([Math]::Max($prefix - 8*$i,0),8)
+    if($bits -ge 8){
+      $maskBytes[$i] = 255
+    } elseif($bits -le 0){
+      $maskBytes[$i] = 0
+    } else {
+      $maskBytes[$i] = [byte]((0xFF -shl (8 - $bits)) -band 0xFF)
+    }
+  }
+
+  $networkBytes = New-Object 'System.Byte[]' 4
+  for($i=0; $i -lt 4; $i++){
+    $networkBytes[$i] = [byte]($netBytes[$i] -band $maskBytes[$i])
+  }
+
+  return [pscustomobject]@{
+    Label   = $label.Trim()
+    Cidr    = $cidr.Trim()
+    Network = $networkBytes
+    Mask    = $maskBytes
+  }
+}
+function Test-SiteSubnetMatch([byte[]]$ipBytes,$entry){
+  if(-not $ipBytes -or -not $entry){ return $false }
+  for($i=0; $i -lt 4; $i++){
+    if(($ipBytes[$i] -band $entry.Mask[$i]) -ne $entry.Network[$i]){ return $false }
+  }
+  return $true
+}
+function Get-SiteSubnetLabelForIp([string]$ipAddress){
+  $ipBytes = ConvertTo-IPv4Bytes $ipAddress
+  if(-not $ipBytes -or -not $script:SiteSubnetEntries){ return $null }
+  foreach($entry in $script:SiteSubnetEntries){
+    if(Test-SiteSubnetMatch $ipBytes $entry){ return $entry.Label }
+  }
+  return $null
+}
+function Load-SiteSubnets([string]$folder){
+  $script:SiteSubnetEntries = @()
+  if([string]::IsNullOrWhiteSpace($folder)){ return }
+  $path = Join-Path $folder 'SiteSubnets.csv'
+  if(-not (Test-Path $path)){ return }
+
+  $entries = New-Object System.Collections.Generic.List[object]
+  foreach($line in (Get-Content -Path $path)){
+    if([string]::IsNullOrWhiteSpace($line)){ continue }
+    $parts = $line.Split(',')
+    if($parts.Count -lt 2){ continue }
+    $cidr = $parts[0].Trim()
+    $label = $parts[1].Trim()
+    if([string]::IsNullOrWhiteSpace($cidr) -or [string]::IsNullOrWhiteSpace($label)){ continue }
+    $entry = New-SiteSubnetEntry $cidr $label
+    if($entry){ $entries.Add($entry) | Out-Null }
+  }
+  try { $script:SiteSubnetEntries = $entries.ToArray() } catch { $script:SiteSubnetEntries = @() }
 }
 function Register-SerialIndex([string]$serial,$record){
   if([string]::IsNullOrWhiteSpace($serial) -or -not $record){ return }
@@ -1471,6 +1550,7 @@ function Get-DetectedType($rec){
     if($rec.name -match '^(?i)WT'){ return 'Thin Client' }
     if($rec.name -match '^(?i)PC'){ return 'Desktop' }
     if($rec.name -match '^(?i)LD'){ return 'Laptop' }
+    if($rec.name -match '^(?i)TD'){ return 'Tablet' }
     if($rec.name -match '^(?i)AO'){ return 'Tangent' }
     return 'Computer'
   }
@@ -1999,6 +2079,7 @@ function Load-RoundingMapping([string]$folder){
 function Load-DataFolder([string]$folder){
   $script:DataFolder = $folder
   if(-not $script:OutputFolder){ $script:OutputFolder = $folder }
+  Load-SiteSubnets $folder
   Load-LocationMaster $folder
   Load-RoundingMapping $folder
   try { Load-DepartmentMaster } catch {}
@@ -2810,10 +2891,23 @@ function New-TextCol([string]$name,[string]$header,[int]$width,[bool]$ro=$true){
   $col.Name=$name; $col.HeaderText=$header; $col.Width=[math]::Max($width,60); $col.MinimumWidth=60; $col.ReadOnly=$ro
   return $col
 }
+function New-LinkCol([string]$name,[string]$header,[int]$width,[bool]$ro=$true){
+  $col = New-Object System.Windows.Forms.DataGridViewLinkColumn
+  $col.Name=$name; $col.HeaderText=$header; $col.Width=[math]::Max($width,60); $col.MinimumWidth=60; $col.ReadOnly=$ro
+  $col.TrackVisitedState = $false
+  $col.LinkBehavior = [System.Windows.Forms.LinkBehavior]::SystemDefault
+  try {
+    $linkStyle = New-Object System.Windows.Forms.DataGridViewCellStyle
+    $linkStyle.Font = New-ScaledFont -Family 'Segoe UI' -BaseSize $script:ThemeFontBaseSize
+    $col.DefaultCellStyle = $linkStyle
+    $col.LinkDefaultCellStyle = $linkStyle
+  } catch {}
+  return $col
+}
 $dgv.Columns.Add((New-TextCol 'Role' 'Role' 70))       | Out-Null
 $dgv.Columns.Add((New-TextCol 'Type' 'Type' 90))       | Out-Null
 $dgv.Columns.Add((New-TextCol 'Name' 'Name' 140))      | Out-Null
-$dgv.Columns.Add((New-TextCol 'AssetTag' 'Asset Tag' 120)) | Out-Null
+$dgv.Columns.Add((New-LinkCol 'AssetTag' 'Asset Tag' 120)) | Out-Null
 $dgv.Columns.Add((New-TextCol 'Serial' 'Serial' 120))  | Out-Null
 $dgv.Columns.Add((New-TextCol 'RITM' 'RITM' 100))      | Out-Null
 $dgv.Columns.Add((New-TextCol 'Retire' 'Retire' 120)) | Out-Null
@@ -2827,6 +2921,20 @@ try{
   $dgv.Columns['Retire'].FillWeight = 110
 } catch {}
 Register-NewAssetToolScaledDataGrid -DataGrid $dgv -CellBaseSize $script:ThemeFontBaseSize -HeaderBaseSize $script:ThemeFontBaseSize
+$dgv.Add_CellContentClick({
+  param($sender,$eventArgs)
+  try {
+    if($eventArgs.RowIndex -lt 0 -or $eventArgs.ColumnIndex -lt 0){ return }
+    $column = $sender.Columns[$eventArgs.ColumnIndex]
+    if(-not $column -or $column.Name -ne 'AssetTag'){ return }
+    $row = $sender.Rows[$eventArgs.RowIndex]
+    $cell = $row.Cells['AssetTag']
+    $link = $null
+    try { $link = $cell.Tag } catch {}
+    if([string]::IsNullOrWhiteSpace($link)){ return }
+    Start-Process $link
+  } catch {}
+})
 
 $assocGridPanel.Controls.Add($dgv)
 $cards = New-Object System.Windows.Forms.FlowLayoutPanel
@@ -3479,7 +3587,7 @@ function Refresh-AssocGrid($parentRec){
   $dgv.Rows[$prow].Cells['Role'].Value='Parent'
   $dgv.Rows[$prow].Cells['Type'].Value=(Get-DetectedType $parentRec)
   $dgv.Rows[$prow].Cells['Name'].Value=$parentRec.name
-  $dgv.Rows[$prow].Cells['AssetTag'].Value=$parentRec.asset_tag
+  Set-AssociatedAssetTagCell $dgv.Rows[$prow].Cells['AssetTag'] (Get-DetectedType $parentRec) $parentRec.asset_tag
   $dgv.Rows[$prow].Cells['Serial'].Value=$parentRec.serial_number
   $dgv.Rows[$prow].Cells['RITM'].Value=$parentRec.RITM
   $dgv.Rows[$prow].Cells['Retire'].Value= (Fmt-DateLong $parentRec.Retire)
@@ -3500,7 +3608,7 @@ function Refresh-AssocGrid($parentRec){
     $rowIdx = $dgv.Rows.Add()
     $r = $dgv.Rows[$rowIdx]
     $r.Cells['Role'].Value=$roleLabel
-    $r.Cells['Type'].Value=$ch.Type
+    $r.Cells['Type'].Value=(Get-DetectedType $ch)
     if($ch.name){ $r.Cells['Name'].Value = $ch.name } else { $r.Cells['Name'].Value = '' }
     try {
       $nameParent = $immediateParent
@@ -3531,7 +3639,7 @@ function Refresh-AssocGrid($parentRec){
         $r.Cells['Name'].ToolTipText = ''
       }
     } catch {}
-    $r.Cells['AssetTag'].Value=$ch.asset_tag
+    Set-AssociatedAssetTagCell $r.Cells['AssetTag'] (Get-DetectedType $ch) $ch.asset_tag
     $r.Cells['Serial'].Value=$ch.serial_number
     if(($ch.Type -eq 'Mic') -or ($ch.Type -eq 'Scanner')){
       $r.Cells['RITM'].Value=''; $r.Cells['Retire'].Value=''
@@ -3959,6 +4067,18 @@ function Get-CmdbLink([string]$deviceType,[string]$assetTag){
   $expandedInnerPath = [string]::Format($innerPath,$assetValue)
   $encodedInnerPath  = [System.Uri]::EscapeDataString($expandedInnerPath)
   return "https://healthbc.service-now.com/nav_to.do?uri=$encodedInnerPath"
+}
+
+function Set-AssociatedAssetTagCell([System.Windows.Forms.DataGridViewCell]$cell,[string]$deviceType,[string]$assetTag){
+  if(-not $cell){ return }
+  $cell.Value = $assetTag
+  $cell.Tag = $null
+  try { $cell.ToolTipText = '' } catch {}
+  if([string]::IsNullOrWhiteSpace($assetTag)){ return }
+  $cmdbLink = Get-CmdbLink $deviceType $assetTag
+  if([string]::IsNullOrWhiteSpace($cmdbLink)){ return }
+  $cell.Tag = $cmdbLink
+  try { $cell.ToolTipText = $cmdbLink } catch {}
 }
 
 function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[string]$oldParent,[string]$newParent,[string]$oldName,[string]$newName){
@@ -5507,6 +5627,18 @@ function Show-ToastMessage {
     $script:ToastNotifier.ShowBalloonTip([Math]::Max(1000,[int]$DurationMs))
   } catch {}
 }
+function Update-NearbyIpTooltip {
+  param(
+    [System.Windows.Forms.DataGridViewCell]$Cell,
+    [string]$IpAddress
+  )
+
+  if(-not $Cell){ return }
+  try {
+    $label = Get-SiteSubnetLabelForIp $IpAddress
+    $Cell.ToolTipText = if($label){ $label } else { '' }
+  } catch {}
+}
 
 function Invoke-NearbyPingRows {
   param(
@@ -5589,6 +5721,7 @@ function Invoke-NearbyPingRows {
 
       if ($ipCell) {
         try { $ipCell.Value = $ipAddress } catch {}
+        Update-NearbyIpTooltip -Cell $ipCell -IpAddress $ipAddress
       }
 
       $updatedCount++
@@ -5964,6 +6097,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $r = $dgvNearby.Rows[$rowIdx]
     $r.Cells['Host'].Value      = $pc.name
     $r.Cells['IP'].Value        = ''
+    Update-NearbyIpTooltip -Cell $r.Cells['IP'] -IpAddress ''
     $r.Cells['Asset'].Value     = $pc.asset_tag
     $r.Cells['Location'].Value  = $pc.location
     $r.Cells['Building'].Value  = $pc.u_building
