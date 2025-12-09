@@ -2911,6 +2911,23 @@ $dgv.Columns.Add((New-LinkCol 'AssetTag' 'Asset Tag' 120)) | Out-Null
 $dgv.Columns.Add((New-TextCol 'Serial' 'Serial' 120))  | Out-Null
 $dgv.Columns.Add((New-TextCol 'RITM' 'RITM' 100))      | Out-Null
 $dgv.Columns.Add((New-TextCol 'Retire' 'Retire' 120)) | Out-Null
+try {
+  $assetTagCol = $dgv.Columns['AssetTag']
+  if ($assetTagCol) {
+    $linkFont = $dgv.DefaultCellStyle.Font
+    if (-not $linkFont) {
+      $linkFont = New-ScaledFont -Family 'Segoe UI' -BaseSize $script:ThemeFontBaseSize
+    }
+
+    $assetTagStyle = $assetTagCol.DefaultCellStyle.Clone()
+    $assetTagStyle.Font = $linkFont
+    $assetTagCol.DefaultCellStyle = $assetTagStyle
+
+    $assetTagLinkStyle = $assetTagCol.LinkDefaultCellStyle.Clone()
+    $assetTagLinkStyle.Font = $linkFont
+    $assetTagCol.LinkDefaultCellStyle = $assetTagLinkStyle
+  }
+} catch {}
 try{
   $dgv.Columns['Role'].FillWeight   = 60
   $dgv.Columns['Type'].FillWeight   = 90
