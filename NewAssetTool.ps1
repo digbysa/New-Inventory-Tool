@@ -330,6 +330,9 @@ function Update-NewAssetToolScaledDataGrid {
         if ($column -and $column.DefaultCellStyle) { $column.DefaultCellStyle.Font = $cellFont }
       } catch {}
       try {
+        if ($column -and $column.LinkDefaultCellStyle) { $column.LinkDefaultCellStyle.Font = $cellFont }
+      } catch {}
+      try {
         if ($column -and $column.HeaderCell -and $column.HeaderCell.Style) { $column.HeaderCell.Style.Font = $headerFont }
       } catch {}
     }
