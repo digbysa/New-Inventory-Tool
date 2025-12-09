@@ -1133,10 +1133,10 @@ function Normalize-Scan([string]$raw){
   if($s -match '^HSS[- ]?(\d+)$'){return @{Value=("HSS-{0}" -f $matches[1]);Kind='AssetTag'}}
   if($s -match '^C[- ]?0*(\d+)$'){return @{Value=("C{0}" -f $matches[1]);Kind='AssetTag'}}
   if($s -match '^(CRT[- ]?.+)$'){ return @{Value=($s -replace '^CRT[- ]?','CRT-');Kind='AssetTag'}}
-  if($s -match '^(PC\d+)$'){     return @{Value=$matches[1];Kind='Hostname'}}
-  if($s -match '^(LD-?\d+)$'){   return @{Value=($s -replace '^LD','LD-');Kind='Hostname'}}   # fixed
-  if($s -match '^(TD-?\d+)$'){   return @{Value=($s -replace '^TD','TD-');Kind='Hostname'}}   # fixed
-  if($s -match '^(AO[-]?\w+)$'){ return @{Value=($s -replace '^AO','AO-');Kind='Hostname'}}
+  if($s -match '^(PC\d+(?:-.+)?)$'){ return @{Value=$matches[1];Kind='Hostname'}}
+  if($s -match '^(LD\d+(?:-.+)?)$'){ return @{Value=$matches[1];Kind='Hostname'}}
+  if($s -match '^(TD\d+(?:-.+)?)$'){ return @{Value=$matches[1];Kind='Hostname'}}
+  if($s -match '^(AO\d+(?:-.+)?)$'){ return @{Value=$matches[1];Kind='Hostname'}}
   if($s -match '^[A-Z0-9\-]{5,}$'){return @{Value=$s;Kind='Serial'}}
   return @{Value=$s;Kind='Unknown'}
 }
@@ -1550,6 +1550,7 @@ function Get-DetectedType($rec){
     if($rec.name -match '^(?i)WT'){ return 'Thin Client' }
     if($rec.name -match '^(?i)PC'){ return 'Desktop' }
     if($rec.name -match '^(?i)LD'){ return 'Laptop' }
+    if($rec.name -match '^(?i)TD'){ return 'Tablet' }
     if($rec.name -match '^(?i)AO'){ return 'Tangent' }
     return 'Computer'
   }
