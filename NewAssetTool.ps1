@@ -5229,6 +5229,34 @@ if (-not $script:NEAR_STATUSES) {
 if (-not (Get-Variable -Scope Script -Name RoundingEvents -ErrorAction SilentlyContinue)) {
   $script:RoundingEvents = @()
 }
+if (-not (Get-Variable -Scope Script -Name NearbyIpCache -ErrorAction SilentlyContinue)) {
+  $script:NearbyIpCache = New-Object 'System.Collections.Generic.Dictionary[string,string]'
+}
+function Get-NearbyPingCacheKey {
+  param([string]$HostName)
+
+  if ([string]::IsNullOrWhiteSpace($HostName)) { return $null }
+  return $HostName.Trim().ToUpper()
+}
+function Get-NearbyCachedIp {
+  param([string]$HostName)
+
+  $key = Get-NearbyPingCacheKey $HostName
+  if (-not $key) { return '' }
+  if ($script:NearbyIpCache.ContainsKey($key)) { return '' + $script:NearbyIpCache[$key] }
+  return ''
+}
+function Set-NearbyCachedIp {
+  param(
+    [string]$HostName,
+    [string]$IpAddress
+  )
+
+  $key = Get-NearbyPingCacheKey $HostName
+  if (-not $key) { return }
+  if ($script:NearbyIpCache.ContainsKey($key)) { $script:NearbyIpCache[$key] = $IpAddress }
+  else { $script:NearbyIpCache.Add($key, $IpAddress) }
+}
 function Ensure-RoundingCommentsColumn([string]$file){
   try {
     if([string]::IsNullOrWhiteSpace($file)){ return }
@@ -5727,6 +5755,8 @@ function Invoke-NearbyPingRows {
         Update-NearbyIpTooltip -Cell $ipCell -IpAddress $ipAddress
       }
 
+      Set-NearbyCachedIp -HostName $hostName -IpAddress $ipAddress
+
       $updatedCount++
 
       try {
@@ -6098,9 +6128,11 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     if (-not $chkRecentlyRounded.Checked -and $isRecent) { continue }
     $rowIdx = $dgvNearby.Rows.Add()
     $r = $dgvNearby.Rows[$rowIdx]
-    $r.Cells['Host'].Value      = $pc.name
-    $r.Cells['IP'].Value        = ''
-    Update-NearbyIpTooltip -Cell $r.Cells['IP'] -IpAddress ''
+    $hostName = $pc.name
+    $cachedIp = Get-NearbyCachedIp $hostName
+    $r.Cells['Host'].Value      = $hostName
+    $r.Cells['IP'].Value        = $cachedIp
+    Update-NearbyIpTooltip -Cell $r.Cells['IP'] -IpAddress $cachedIp
     $r.Cells['Asset'].Value     = $pc.asset_tag
     $r.Cells['Location'].Value  = $pc.location
     $r.Cells['Building'].Value  = $pc.u_building
