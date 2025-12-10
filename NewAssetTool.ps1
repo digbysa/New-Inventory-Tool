@@ -5417,7 +5417,9 @@ function Show-NearbyFilterMenu {
 
   $current = @()
   if ($script:NearbyFilters.ContainsKey($Column.Name)) { $current = @($script:NearbyFilters[$Column.Name]) }
+
   $menu = New-Object System.Windows.Forms.ContextMenuStrip
+
   $panel = New-Object System.Windows.Forms.TableLayoutPanel
   $panel.AutoSize = $true
   $panel.RowCount = 2
@@ -5425,52 +5427,59 @@ function Show-NearbyFilterMenu {
   $panel.Padding = '6,6,6,4'
   $panel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $panel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+
   $clb = New-Object System.Windows.Forms.CheckedListBox
   $clb.CheckOnClick = $true
   $clb.BorderStyle = 'FixedSingle'
+
   $labels = @()
   foreach ($opt in $options) {
     $display = if ([string]::IsNullOrWhiteSpace($opt)) { '(blank)' } else { $opt }
     $labels += $display
   }
   [void]$clb.Items.AddRange($labels)
+
   for ($i = 0; $i -lt $options.Count; $i++) {
     $shouldCheck = ($current.Count -eq 0 -or $current -contains $options[$i])
     $clb.SetItemChecked($i, $shouldCheck)
   }
+
   $maxHeight = 240
-  $clb.Height = [Math]::Min(
-    $maxHeight,
-    [Math]::Max(60, $clb.ItemHeight * ($clb.Items.Count + 1))
-  )
+  $clb.Height = [Math]::Min($maxHeight, [Math]::Max(60, $clb.ItemHeight * ($clb.Items.Count + 1)))
 
   $longestLabel = ($labels | ForEach-Object { $_.Length } | Measure-Object -Maximum).Maximum
-  $clb.Width = [Math]::Min(
-    260,
-    [Math]::Max(140, $longestLabel * 7)
-  )
+  $clb.Width = [Math]::Min(260, [Math]::Max(140, $longestLabel * 7))
+
   $panel.Controls.Add($clb, 0, 0)
+
   $btnRow = New-Object System.Windows.Forms.FlowLayoutPanel
   $btnRow.FlowDirection = 'RightToLeft'
   $btnRow.AutoSize = $true
   $btnRow.Margin = '0,8,0,0'
+
   $btnApply = New-Object System.Windows.Forms.Button
   $btnApply.Text = 'Apply'
   $btnApply.AutoSize = $true
+
   $btnClear = New-Object System.Windows.Forms.Button
   $btnClear.Text = 'Select None'
   $btnClear.AutoSize = $true
+
   $btnAll = New-Object System.Windows.Forms.Button
   $btnAll.Text = 'Select All'
   $btnAll.AutoSize = $true
+
   $btnCancel = New-Object System.Windows.Forms.Button
   $btnCancel.Text = 'Cancel'
   $btnCancel.AutoSize = $true
-  $btnRow.Controls.AddRange(@($btnApply,$btnCancel,$btnClear,$btnAll))
+
+  $btnRow.Controls.AddRange(@($btnApply, $btnCancel, $btnClear, $btnAll))
   $panel.Controls.Add($btnRow, 0, 1)
+
   $host = New-Object System.Windows.Forms.ToolStripControlHost($panel)
   $host.AutoSize = $true
   [void]$menu.Items.Add($host)
+
   $btnAll.Add_Click({
     for ($i = 0; $i -lt $clb.Items.Count; $i++) { $clb.SetItemChecked($i, $true) }
   })
@@ -5492,7 +5501,11 @@ function Show-NearbyFilterMenu {
     if ($dgvNearby) { try { $dgvNearby.Invalidate() } catch {} }
     $menu.Close()
   })
-  $menu.Show($dgvNearby, New-Object System.Drawing.Point($AnchorRectangle.Left, $AnchorRectangle.Bottom))
+
+  $menu.Show(
+    $dgvNearby,
+    (New-Object System.Drawing.Point($AnchorRectangle.Left, $AnchorRectangle.Bottom))
+  )
 }
 function ScopeKey([string]$city,[string]$loc,[string]$b,[string]$f){
   $nl = if ($loc) { (Normalize-Field $loc) } else { "" }
