@@ -6062,6 +6062,11 @@ $dgvNearby.ReadOnly=$false
 $dgvNearby.SelectionMode=[System.Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
 $dgvNearby.MultiSelect=$true
 $dgvNearby.RowHeadersVisible=$false
+$dgvNearby.EnableHeadersVisualStyles=$false
+$dgvNearby.ColumnHeadersDefaultCellStyle.BackColor=[System.Drawing.Color]::White
+$dgvNearby.ColumnHeadersDefaultCellStyle.ForeColor=[System.Drawing.Color]::Black
+$dgvNearby.ColumnHeadersDefaultCellStyle.SelectionBackColor=[System.Drawing.Color]::FromArgb(227, 235, 242)
+$dgvNearby.ColumnHeadersDefaultCellStyle.Padding='0,0,18,0'
 $dgvNearby.BackgroundColor=[System.Drawing.Color]::White
 $dgvNearby.BorderStyle='FixedSingle'
 $dgvNearby.add_CellMouseClick({
