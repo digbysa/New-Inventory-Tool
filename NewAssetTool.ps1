@@ -2275,6 +2275,8 @@ function Set-NewAssetToolUiScale {
 
   Restore-NearbyMultiSelect
 
+  try { Apply-NearbyFilterHeaderPadding -Grid $dgvNearby } catch {}
+
   & $applyWinFormsManualScale $Source -Force
   Invoke-NewAssetToolWpfScale $Source
 
@@ -5372,6 +5374,27 @@ function Get-NearbyDistinctValues([string]$columnName){
   }
   return ($set | Sort-Object)
 }
+function Apply-NearbyFilterHeaderPadding {
+  param([System.Windows.Forms.DataGridView]$Grid)
+
+  if (-not $Grid) { return }
+
+  try {
+    $padding = New-Object System.Windows.Forms.Padding(0,0,18,0)
+  } catch {
+    return
+  }
+
+  try { $Grid.ColumnHeadersDefaultCellStyle.Padding = $padding } catch {}
+
+  foreach ($col in $Grid.Columns) {
+    try {
+      if ($col -and $col.HeaderCell -and $col.HeaderCell.Style) {
+        $col.HeaderCell.Style.Padding = $padding
+      }
+    } catch {}
+  }
+}
 function Get-NearbyFilterIconRect([System.Drawing.Rectangle]$bounds){
   $size = 14
   $left = $bounds.Right - $size - 6
@@ -6066,7 +6089,6 @@ $dgvNearby.EnableHeadersVisualStyles=$false
 $dgvNearby.ColumnHeadersDefaultCellStyle.BackColor=[System.Drawing.Color]::White
 $dgvNearby.ColumnHeadersDefaultCellStyle.ForeColor=[System.Drawing.Color]::Black
 $dgvNearby.ColumnHeadersDefaultCellStyle.SelectionBackColor=[System.Drawing.Color]::FromArgb(227, 235, 242)
-$dgvNearby.ColumnHeadersDefaultCellStyle.Padding='0,0,18,0'
 $dgvNearby.BackgroundColor=[System.Drawing.Color]::White
 $dgvNearby.BorderStyle='FixedSingle'
 $dgvNearby.add_CellMouseClick({
@@ -6115,9 +6137,7 @@ $colStatus.MinimumWidth = 160
 $colStatus.DataSource = $script:NEAR_STATUSES
 $colStatus.ReadOnly = $false
 $dgvNearby.Columns.Add($colStatus) | Out-Null
-foreach ($col in $dgvNearby.Columns) {
-  try { $col.HeaderCell.Style.Padding = New-Object System.Windows.Forms.Padding(0,0,18,0) } catch {}
-}
+Apply-NearbyFilterHeaderPadding -Grid $dgvNearby
 Register-NewAssetToolScaledDataGrid -DataGrid $dgvNearby -CellBaseSize $script:ThemeFontBaseSize -HeaderBaseSize $script:ThemeFontBaseSize
 
 $dgvNearby.add_CellPainting({
