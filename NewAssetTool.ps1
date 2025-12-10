@@ -5208,6 +5208,9 @@ if (-not (Get-Variable -Scope Script -Name NearbyLastSortColumn -ErrorAction Sil
 if (-not (Get-Variable -Scope Script -Name NearbyLastSortDirection -ErrorAction SilentlyContinue)) {
   $script:NearbyLastSortDirection = 'Asc'
 }
+if (-not (Get-Variable -Scope Script -Name NearbyFilters -ErrorAction SilentlyContinue)) {
+  $script:NearbyFilters = @{}
+}
 if (-not $script:NEAR_STATUSES) {
   # Full set minus "Complete"
   $script:NEAR_STATUSES = @(
@@ -5332,14 +5335,156 @@ function Load-RoundingEvents {
   } catch { $script:RoundingEvents = @() }
 }
 Load-RoundingEvents
-# Filtering removed from Nearby grid; keep stub to refresh visibility/count labels.
 function Apply-NearbyFilters {
   if (-not $dgvNearby) { Update-ScopeLabel; return }
   foreach ($row in $dgvNearby.Rows) {
     if ($row.IsNewRow) { continue }
     $row.Visible = $true
+    foreach ($kvp in $script:NearbyFilters.GetEnumerator()) {
+      $colName = $kvp.Key
+      $allowed = $kvp.Value
+      if (-not $allowed -or $allowed.Count -eq 0) { continue }
+      try {
+        $cellValue = ''
+        if ($row.Cells[$colName]) { $cellValue = '' + $row.Cells[$colName].Value }
+        if (-not ($allowed -contains $cellValue)) { $row.Visible = $false; break }
+      } catch {}
+    }
   }
   Update-ScopeLabel
+}
+function Clear-NearbyFilters {
+  if (-not $script:NearbyFilters) { return }
+  $script:NearbyFilters.Clear()
+  Apply-NearbyFilters
+  if ($dgvNearby) { try { $dgvNearby.Invalidate() } catch {} }
+}
+function Get-NearbyDistinctValues([string]$columnName){
+  $set = New-Object 'System.Collections.Generic.HashSet[string]'
+  if (-not $dgvNearby) { return @() }
+  foreach ($row in $dgvNearby.Rows) {
+    if ($row.IsNewRow) { continue }
+    try {
+      $val = ''
+      if ($row.Cells[$columnName]) { $val = '' + $row.Cells[$columnName].Value }
+      [void]$set.Add($val)
+    } catch {}
+  }
+  return ($set | Sort-Object)
+}
+function Get-NearbyFilterIconRect([System.Drawing.Rectangle]$bounds){
+  $size = 14
+  $left = $bounds.Right - $size - 6
+  $top  = $bounds.Top + [Math]::Max(2, [Math]::Floor(($bounds.Height - $size) / 2))
+  return New-Object System.Drawing.Rectangle($left, $top, $size, $size)
+}
+function Draw-NearbyFilterGlyph {
+  param(
+    [System.Drawing.Graphics]$Graphics,
+    [System.Drawing.Rectangle]$Bounds,
+    [System.Drawing.Color]$Color
+  )
+
+  try {
+    $brush = New-Object System.Drawing.SolidBrush($Color)
+    $topY = $Bounds.Top
+    $midX = $Bounds.Left + [Math]::Floor($Bounds.Width / 2)
+    $pointsTop = @(
+      (New-Object System.Drawing.Point($Bounds.Left, $topY)),
+      (New-Object System.Drawing.Point($Bounds.Right, $topY)),
+      (New-Object System.Drawing.Point($midX, $Bounds.Top + [Math]::Floor($Bounds.Height * 0.45)))
+    )
+    $pointsBottom = @(
+      (New-Object System.Drawing.Point($midX - 4, $Bounds.Top + [Math]::Floor($Bounds.Height * 0.45))),
+      (New-Object System.Drawing.Point($midX + 4, $Bounds.Top + [Math]::Floor($Bounds.Height * 0.45))),
+      (New-Object System.Drawing.Point($midX, $Bounds.Bottom))
+    )
+    $Graphics.FillPolygon($brush, $pointsTop)
+    $Graphics.FillPolygon($brush, $pointsBottom)
+  } catch {} finally {
+    try { $brush.Dispose() } catch {}
+  }
+}
+function Show-NearbyFilterMenu {
+  param(
+    [System.Windows.Forms.DataGridViewColumn]$Column,
+    [System.Drawing.Rectangle]$AnchorRectangle
+  )
+
+  if (-not $Column) { return }
+  $options = @(Get-NearbyDistinctValues $Column.Name)
+  if (-not $options) { return }
+
+  $current = @()
+  if ($script:NearbyFilters.ContainsKey($Column.Name)) { $current = @($script:NearbyFilters[$Column.Name]) }
+  $menu = New-Object System.Windows.Forms.ContextMenuStrip
+  $panel = New-Object System.Windows.Forms.TableLayoutPanel
+  $panel.AutoSize = $true
+  $panel.RowCount = 2
+  $panel.ColumnCount = 1
+  $panel.Padding = '6,6,6,4'
+  $panel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $panel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $clb = New-Object System.Windows.Forms.CheckedListBox
+  $clb.CheckOnClick = $true
+  $clb.BorderStyle = 'FixedSingle'
+  $labels = @()
+  foreach ($opt in $options) {
+    $display = if ([string]::IsNullOrWhiteSpace($opt)) { '(blank)' } else { $opt }
+    $labels += $display
+  }
+  [void]$clb.Items.AddRange($labels)
+  for ($i = 0; $i -lt $options.Count; $i++) {
+    $shouldCheck = ($current.Count -eq 0 -or $current -contains $options[$i])
+    $clb.SetItemChecked($i, $shouldCheck)
+  }
+  $maxHeight = 240
+  $clb.Height = [Math]::Min($maxHeight, [Math]::Max(60, $clb.ItemHeight * ($clb.Items.Count + 1)))
+  $clb.Width = [Math]::Min(260, [Math]::Max(140, ($labels | ForEach-Object { $_.Length } | Measure-Object -Maximum).Maximum * 7))
+  $panel.Controls.Add($clb, 0, 0)
+  $btnRow = New-Object System.Windows.Forms.FlowLayoutPanel
+  $btnRow.FlowDirection = 'RightToLeft'
+  $btnRow.AutoSize = $true
+  $btnRow.Margin = '0,8,0,0'
+  $btnApply = New-Object System.Windows.Forms.Button
+  $btnApply.Text = 'Apply'
+  $btnApply.AutoSize = $true
+  $btnClear = New-Object System.Windows.Forms.Button
+  $btnClear.Text = 'Select None'
+  $btnClear.AutoSize = $true
+  $btnAll = New-Object System.Windows.Forms.Button
+  $btnAll.Text = 'Select All'
+  $btnAll.AutoSize = $true
+  $btnCancel = New-Object System.Windows.Forms.Button
+  $btnCancel.Text = 'Cancel'
+  $btnCancel.AutoSize = $true
+  $btnRow.Controls.AddRange(@($btnApply,$btnCancel,$btnClear,$btnAll))
+  $panel.Controls.Add($btnRow, 0, 1)
+  $host = New-Object System.Windows.Forms.ToolStripControlHost($panel)
+  $host.AutoSize = $true
+  [void]$menu.Items.Add($host)
+  $btnAll.Add_Click({
+    for ($i = 0; $i -lt $clb.Items.Count; $i++) { $clb.SetItemChecked($i, $true) }
+  })
+  $btnClear.Add_Click({
+    for ($i = 0; $i -lt $clb.Items.Count; $i++) { $clb.SetItemChecked($i, $false) }
+  })
+  $btnCancel.Add_Click({ $menu.Close() })
+  $btnApply.Add_Click({
+    $selected = @()
+    for ($i = 0; $i -lt $options.Count; $i++) {
+      if ($clb.GetItemChecked($i)) { $selected += $options[$i] }
+    }
+    if ($selected.Count -eq 0 -or $selected.Count -eq $options.Count) {
+      if ($script:NearbyFilters.ContainsKey($Column.Name)) { $script:NearbyFilters.Remove($Column.Name) }
+    } else {
+      $script:NearbyFilters[$Column.Name] = $selected
+    }
+    Apply-NearbyFilters
+    if ($dgvNearby) { try { $dgvNearby.Invalidate() } catch {} }
+    $menu.Close()
+  })
+  $menu.Show($dgvNearby, New-Object System.Drawing.Point($AnchorRectangle.Left, $AnchorRectangle.Bottom))
 }
 function ScopeKey([string]$city,[string]$loc,[string]$b,[string]$f){
   $nl = if ($loc) { (Normalize-Field $loc) } else { "" }
@@ -5462,20 +5607,24 @@ $btnNearbyShowAll = New-Object ModernUI.RoundedButton
 $btnNearbyShowAll.Text = 'Show All'
 $btnNearbyShowAll.AutoSize = $true
 $btnNearbyShowAll.Location = '8,32'
+$btnNearbyClearFilters = New-Object ModernUI.RoundedButton
+$btnNearbyClearFilters.Text = 'Clear Filters'
+$btnNearbyClearFilters.AutoSize = $true
+$btnNearbyClearFilters.Location = '110,32'
 $chkTodayRounded = New-Object System.Windows.Forms.CheckBox
 $chkTodayRounded.Text = "Today's Rounded"
 $chkTodayRounded.AutoSize = $true
-$chkTodayRounded.Location = '120,32'
+$chkTodayRounded.Location = '240,32'
 $chkTodayRounded.Checked = $false
 $chkShowExcluded = New-Object System.Windows.Forms.CheckBox
 $chkShowExcluded.Text = "Excluded"
 $chkShowExcluded.AutoSize = $true
-$chkShowExcluded.Location = '280,32'
+$chkShowExcluded.Location = '400,32'
 $chkShowExcluded.Checked = $false
 $chkRecentlyRounded = New-Object System.Windows.Forms.CheckBox
 $chkRecentlyRounded.Text = "Recently Rounded"
 $chkRecentlyRounded.AutoSize = $true
-$chkRecentlyRounded.Location = '400,32'
+$chkRecentlyRounded.Location = '560,32'
 $chkRecentlyRounded.Checked = $true
 $chkShowExcluded.Add_CheckedChanged({ Rebuild-Nearby })
 $chkTodayRounded.Add_CheckedChanged({ Rebuild-Nearby })
@@ -5484,7 +5633,7 @@ $chkRecentlyRounded.Add_CheckedChanged({ Rebuild-Nearby })
 $lblSort = New-Object System.Windows.Forms.Label
 $lblSort.AutoSize = $true
 $lblSort.Text = "Sort:"
-$lblSort.Location = '430,10'
+$lblSort.Location = '720,10'
 $cmbSort = New-Object System.Windows.Forms.ComboBox
 $cmbSort.DropDownStyle = 'DropDownList'
 $cmbSort.Items.AddRange(@(
@@ -5497,7 +5646,7 @@ $cmbSort.Items.AddRange(@(
 try { if ($cmbSort -and $cmbSort.Items -and $cmbSort.Items.Count -gt 4) { $cmbSort.SelectedIndex = 4 } else { $cmbSort.SelectedIndex = -1 } } catch {}
 $cmbSort.Visible = $false; $cmbSort.Enabled = $false
 ))
-$cmbSort.Location = '470,6'
+$cmbSort.Location = '760,6'
 $cmbSort.Width = 210
 $btnClearScopes = New-Object ModernUI.RoundedButton
 $btnClearScopes.Text = "Clear List"
@@ -5530,8 +5679,9 @@ try {
     $tip.SetToolTip($btnZoomIn, 'Zoom in (+10%)')
   }
 } catch {}
-$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$chkRecentlyRounded,$btnClearScopes,$btnZoomOut,$btnZoomIn))
+$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$btnNearbyClearFilters,$chkTodayRounded,$chkShowExcluded,$chkRecentlyRounded,$btnClearScopes,$btnZoomOut,$btnZoomIn))
 Update-NearbyCheckboxLabels 0 0 0
+$btnNearbyClearFilters.Add_Click({ Clear-NearbyFilters })
 $btnNearbyShowAll.Add_Click({
   try {
     if (-not $script:NearbyShowAllChanges) {
@@ -5939,7 +6089,23 @@ $colStatus.MinimumWidth = 160
 $colStatus.DataSource = $script:NEAR_STATUSES
 $colStatus.ReadOnly = $false
 $dgvNearby.Columns.Add($colStatus) | Out-Null
+foreach ($col in $dgvNearby.Columns) {
+  try { $col.HeaderCell.Style.Padding = New-Object System.Windows.Forms.Padding(0,0,18,0) } catch {}
+}
 Register-NewAssetToolScaledDataGrid -DataGrid $dgvNearby -CellBaseSize $script:ThemeFontBaseSize -HeaderBaseSize $script:ThemeFontBaseSize
+
+$dgvNearby.add_CellPainting({
+  param($sender,$e)
+  if ($e.RowIndex -eq -1 -and $e.ColumnIndex -ge 0) {
+    $col = $sender.Columns[$e.ColumnIndex]
+    $e.Paint($e.ClipBounds, [System.Windows.Forms.DataGridViewPaintParts]::All)
+    $iconRect = Get-NearbyFilterIconRect $e.CellBounds
+    $color = [System.Drawing.Color]::Gray
+    if ($script:NearbyFilters.ContainsKey($col.Name)) { $color = [System.Drawing.Color]::SteelBlue }
+    Draw-NearbyFilterGlyph -Graphics $e.Graphics -Bounds $iconRect -Color $color
+    $e.Handled = $true
+  }
+})
 
 # Hidden helper columns
 # --- Enable header-click sorting on the unbound grid ---
@@ -5980,6 +6146,14 @@ try {
     param($sender, $e)
     $col = $sender.Columns[$e.ColumnIndex]
     if (-not $col) { return }
+    try {
+      $headerRect = $sender.GetCellDisplayRectangle($e.ColumnIndex, -1, $true)
+      $iconRect = Get-NearbyFilterIconRect $headerRect
+      if ($iconRect.Contains($e.Location)) {
+        Show-NearbyFilterMenu $col $iconRect
+        return
+      }
+    } catch {}
     $name = $col.Name
     $dir = if ($script:NearbySortDir[$name] -eq 'Asc') { 'Desc' } else { 'Asc' }
     $script:NearbySortDir[$name] = $dir
