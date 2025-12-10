@@ -5571,45 +5571,19 @@ $btnNearbyShowAll.Add_Click({
     }
   } catch {}
 })
-# --- Multi-Status (apply one status to selected rows) ---
-$btnSetStatus = New-Object ModernUI.RoundedButton
-$btnSetStatus.Text = 'Multi-Status'
-$btnSetStatus.AutoSize = $true
-$multiStatusPreferred = $btnSetStatus.PreferredSize
-$clearPreferred = $btnClearScopes.PreferredSize
-$btnSetStatus.AutoSize = $false
-$btnSetStatus.AutoEllipsis = $false
-$extraWidth = 12
-$desiredWidth = [Math]::Max($multiStatusPreferred.Width + $extraWidth, $clearPreferred.Width)
-$btnSetStatus.MinimumSize = New-Object System.Drawing.Size($multiStatusPreferred.Width, $clearPreferred.Height)
-$btnSetStatus.Size = New-Object System.Drawing.Size($desiredWidth, $clearPreferred.Height)
 $btnPingAll = New-Object ModernUI.RoundedButton
 $btnPingAll.Text = 'Ping All'
 $btnPingAll.AutoSize = $true
 $btnPingAll.Anchor = 'Top,Right'
 $btnPingAll.Margin = '0,0,0,0'
-$nearToolbar.Controls.Add($btnSetStatus)
 $nearToolbar.Controls.Add($btnPingAll)
 function Update-NearToolbarButtons {
   if (-not $nearToolbar) { return }
   $buttons = @()
-  foreach ($button in @($btnZoomIn, $btnZoomOut, $btnClearScopes, $btnSetStatus, $btnPingAll)) {
+  foreach ($button in @($btnZoomIn, $btnZoomOut, $btnClearScopes, $btnPingAll)) {
     if ($button -and $button.Visible) { $buttons += $button }
   }
   if (-not $buttons) { return }
-
-  try {
-    if ($btnSetStatus -and $btnClearScopes) {
-      $preferredStatus = $btnSetStatus.GetPreferredSize([System.Drawing.Size]::Empty)
-      $preferredClear = $btnClearScopes.GetPreferredSize([System.Drawing.Size]::Empty)
-      $statusWidth = [Math]::Max($preferredStatus.Width + 12, $preferredClear.Width)
-      $statusHeight = [Math]::Max($preferredClear.Height, $preferredStatus.Height)
-      if ($statusWidth -gt 0 -and $statusHeight -gt 0) {
-        $btnSetStatus.MinimumSize = New-Object System.Drawing.Size($preferredStatus.Width, $preferredClear.Height)
-        $btnSetStatus.Size = New-Object System.Drawing.Size($statusWidth, $statusHeight)
-      }
-    }
-  } catch {}
 
   $spacing = 8
   $rightPadding = 12
@@ -5871,18 +5845,14 @@ function Show-NearbyStatusMenu {
     }
     if ($Anchor) {
       $menuStatus.Show($Anchor, $Location)
-    } else {
-      $menuStatus.Show($btnSetStatus, (New-Object System.Drawing.Point(0,$btnSetStatus.Height)))
+    } elseif ($nearToolbar) {
+      $menuStatus.Show($nearToolbar, $Location)
     }
   } catch {
     [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)","Multi-Status",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
   }
 }
 
-$btnSetStatus.Add_Click({
-  $pt = New-Object System.Drawing.Point(0,$btnSetStatus.Height)
-  Show-NearbyStatusMenu $btnSetStatus $pt -ShowConfirmation
-})
 $btnPingAll.Add_Click({ Invoke-NearbyPingAll })
 $dgvNearby = New-Object System.Windows.Forms.DataGridView
 $dgvNearby.Dock='Fill'
