@@ -5439,8 +5439,16 @@ function Show-NearbyFilterMenu {
     $clb.SetItemChecked($i, $shouldCheck)
   }
   $maxHeight = 240
-  $clb.Height = [Math]::Min($maxHeight, [Math]::Max(60, $clb.ItemHeight * ($clb.Items.Count + 1)))
-  $clb.Width = [Math]::Min(260, [Math]::Max(140, ($labels | ForEach-Object { $_.Length } | Measure-Object -Maximum).Maximum * 7))
+  $clb.Height = [Math]::Min(
+    $maxHeight,
+    [Math]::Max(60, $clb.ItemHeight * ($clb.Items.Count + 1))
+  )
+
+  $longestLabel = ($labels | ForEach-Object { $_.Length } | Measure-Object -Maximum).Maximum
+  $clb.Width = [Math]::Min(
+    260,
+    [Math]::Max(140, $longestLabel * 7)
+  )
   $panel.Controls.Add($clb, 0, 0)
   $btnRow = New-Object System.Windows.Forms.FlowLayoutPanel
   $btnRow.FlowDirection = 'RightToLeft'
