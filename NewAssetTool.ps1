@@ -6005,6 +6005,11 @@ $tabTop.TabPages.AddRange(@($tabPageMain,$tabPageNear))
 # Put the TabControl on the form (above status strip)
 $form.Controls.Add($tabTop)
 $form.Controls.SetChildIndex($tabTop, 0)  # ensure it's above the status strip
+try {
+  $tabTop.Add_SelectedIndexChanged({
+    if ($tabTop.SelectedTab -eq $tabPageNear) { Update-NearToolbarButtons }
+  })
+} catch {}
 # ---- Nearby logic ----
 function Update-ScopeLabel {
   $scopeCount = if ($script:ActiveNearbyScopes) { $script:ActiveNearbyScopes.Count } else { 0 }
