@@ -5814,7 +5814,7 @@ function Show-NearbyStatusMenu {
     $ping.Add_Click({ Invoke-NearbyPingSelected })
     [void]$menuStatus.Items.Add($ping)
     [void]$menuStatus.Items.Add('-')
-    $options = Get-StatusOptionsFromGrid
+    $options = Get-StatusOptionsFromGrid | Where-Object { $_ -ne 'Pending Repair' }
     foreach ($opt in $options) {
       $item = New-Object System.Windows.Forms.ToolStripMenuItem($opt)
       $item.Add_Click({
@@ -5827,19 +5827,6 @@ function Show-NearbyStatusMenu {
       })
       [void]$menuStatus.Items.Add($item)
     }
-    [void]$menuStatus.Items.Add('-')
-    $custom = New-Object System.Windows.Forms.ToolStripMenuItem('Custom...')
-    $custom.Add_Click({
-      Add-Type -AssemblyName Microsoft.VisualBasic
-      $val = [Microsoft.VisualBasic.Interaction]::InputBox('Enter custom status for selected rows:','Multi-Status','')
-      if ([string]::IsNullOrWhiteSpace($val)) { return }
-      if ($ShowConfirmation) {
-        Set-NearbySelectedStatus -Value $val -ShowConfirmation
-      } else {
-        Set-NearbySelectedStatus -Value $val
-      }
-    })
-    [void]$menuStatus.Items.Add($custom)
     if (-not $Location) {
       $Location = New-Object System.Drawing.Point(0,0)
     }
