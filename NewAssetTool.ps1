@@ -16,6 +16,32 @@ try {
   }
 } catch {}
 
+function Ensure-NewAssetToolFullLanguageMode {
+  try {
+    if (-not ($ExecutionContext -and $ExecutionContext.SessionState)) { return $true }
+
+    $mode = $ExecutionContext.SessionState.LanguageMode
+    if ($mode -ne [System.Management.Automation.PSLanguageMode]::FullLanguage) {
+      try { $ExecutionContext.SessionState.LanguageMode = [System.Management.Automation.PSLanguageMode]::FullLanguage } catch {}
+      $mode = $ExecutionContext.SessionState.LanguageMode
+    }
+
+    if ($mode -ne [System.Management.Automation.PSLanguageMode]::FullLanguage) {
+      try {
+        [System.Windows.Forms.MessageBox]::Show(
+          "Active Details Info requires PowerShell's FullLanguage mode. Endpoint protection appears to be blocking script logic. Please allow script execution for this tool and try again.",
+          'New Inventory Tool'
+        ) | Out-Null
+      } catch {}
+      return $false
+    }
+
+    return $true
+  } catch {
+    return $true
+  }
+}
+
 # Capture and report unexpected formatting errors so the application can continue running
 function Register-NewAssetToolExceptionHandlers {
   try {
@@ -5249,6 +5275,8 @@ $btnAddPeripheral.Add_Click({
   Show-AddPeripheralDialog $pc
 })
 $btnActiveDetails.Add_Click({
+  if (-not (Ensure-NewAssetToolFullLanguageMode)) { return }
+
   $targetName = ''
   try { $targetName = $txtHost.Text } catch {}
   if([string]::IsNullOrWhiteSpace($targetName) -and $script:CurrentParent){
