@@ -2827,6 +2827,13 @@ $btnValidateDevices.Margin = '0,0,0,0'
 $btnValidateDevices.Anchor = 'Left'
 $btnValidateDevices.BackColor = [System.Drawing.SystemColors]::Control
 $btnValidateDevices.ForeColor = [System.Drawing.SystemColors]::ControlText
+$btnActiveDetails = New-Object ModernUI.RoundedButton
+$btnActiveDetails.Text   = 'Active Details Info'
+$btnActiveDetails.Size   = '170,32'
+$btnActiveDetails.Margin = '8,0,0,0'
+$btnActiveDetails.Anchor = 'Left'
+$btnActiveDetails.BackColor = [System.Drawing.SystemColors]::Control
+$btnActiveDetails.ForeColor = [System.Drawing.SystemColors]::ControlText
 $assocButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
 $assocButtonsPanel.Dock = 'Left'
 $assocButtonsPanel.AutoSize = $true
@@ -2838,11 +2845,13 @@ $assocButtonsPanel.Padding = '0,4,0,0'
 $assocButtonsPanel.Controls.Add($btnAddPeripheral)
 $assocButtonsPanel.Controls.Add($btnRemove)
 $assocButtonsPanel.Controls.Add($btnValidateDevices)
+$assocButtonsPanel.Controls.Add($btnActiveDetails)
 $assocToolbarPanel.Controls.Add($assocButtonsPanel)
 
 Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled $false
 Set-SearchTextButtonBaseState -Button $btnRemove -BaseEnabled $true
 Set-SearchTextButtonBaseState -Button $btnValidateDevices -BaseEnabled $true
+Set-SearchTextButtonBaseState -Button $btnActiveDetails -BaseEnabled $true
 $assocGridPanel = New-Object System.Windows.Forms.Panel
 $assocGridPanel.Dock = 'Fill'
 $assocGridPanel.Margin = '0,0,0,0'
@@ -3255,10 +3264,10 @@ function Apply-ResponsiveHeights {
     }
     $stripHeight = $assocToolbarPanel.PreferredSize.Height
     if($stripHeight -le 0){
-      $stripHeight = [Math]::Max($assocButtonsPanel.PreferredSize.Height, [Math]::Max([Math]::Max($btnAddPeripheral.PreferredSize.Height, $btnRemove.PreferredSize.Height), $btnValidateDevices.PreferredSize.Height))
+      $stripHeight = [Math]::Max($assocButtonsPanel.PreferredSize.Height, [Math]::Max([Math]::Max([Math]::Max($btnAddPeripheral.PreferredSize.Height, $btnRemove.PreferredSize.Height), $btnValidateDevices.PreferredSize.Height), $btnActiveDetails.PreferredSize.Height))
     }
     if($stripHeight -le 0){
-      $stripHeight = [Math]::Max($assocToolbarPanel.Height, [Math]::Max($assocButtonsPanel.Height, [Math]::Max([Math]::Max($btnAddPeripheral.Height, $btnRemove.Height), $btnValidateDevices.Height)))
+      $stripHeight = [Math]::Max($assocToolbarPanel.Height, [Math]::Max($assocButtonsPanel.Height, [Math]::Max([Math]::Max([Math]::Max($btnAddPeripheral.Height, $btnRemove.Height), $btnValidateDevices.Height), $btnActiveDetails.Height)))
     }
     if($stripHeight -le 0){ $stripHeight = 36 }
     $assocPadding = $grpAssoc.Padding.Vertical + $grpAssoc.Margin.Vertical + $tlpAssoc.Margin.Vertical + $tlpAssoc.Padding.Vertical + $assocToolbarPanel.Margin.Vertical + $assocToolbarPanel.Padding.Vertical + $assocGridPanel.Margin.Vertical + $assocGridPanel.Padding.Vertical
@@ -3766,6 +3775,126 @@ function Apply-AssociatedDeviceValidation([pscustomobject]$wmiData){
     $row.Cells['Serial'].ToolTipText = $tooltip
   }
 }
+function Get-RegistryStringValueViaCim {
+  param(
+    [System.Management.CimSession]$CimSession,
+    [string]$Path,
+    [string]$ValueName
+  )
+
+  if (-not $CimSession -or [string]::IsNullOrWhiteSpace($Path) -or [string]::IsNullOrWhiteSpace($ValueName)) { return $null }
+
+  $HKLM = 0x80000002
+  try {
+    $result = Invoke-CimMethod -CimSession $CimSession -Namespace 'root\\default' -ClassName StdRegProv -MethodName GetStringValue -Arguments @{ hDefKey = $HKLM; sSubKeyName = $Path; sValueName = $ValueName } -ErrorAction Stop
+    if ($result -and $result.sValue) { return [string]$result.sValue }
+  } catch {}
+
+  return $null
+}
+function Test-PendingRebootViaCim {
+  param(
+    [System.Management.CimSession]$CimSession
+  )
+
+  if (-not $CimSession) { return $false }
+
+  $HKLM = 0x80000002
+  $pending = $false
+  try {
+    $cbs = Invoke-CimMethod -CimSession $CimSession -Namespace 'root\\default' -ClassName StdRegProv -MethodName EnumKey -Arguments @{ hDefKey = $HKLM; sSubKeyName = 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing' } -ErrorAction Stop
+    if ($cbs -and $cbs.sNames -and ($cbs.sNames -contains 'RebootPending')) { return $true }
+  } catch {}
+
+  try {
+    $wu = Invoke-CimMethod -CimSession $CimSession -Namespace 'root\\default' -ClassName StdRegProv -MethodName EnumKey -Arguments @{ hDefKey = $HKLM; sSubKeyName = 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\Auto Update' } -ErrorAction Stop
+    if ($wu -and $wu.sNames -and ($wu.sNames -contains 'RebootRequired')) { return $true }
+  } catch {}
+
+  try {
+    $pendingRename = Invoke-CimMethod -CimSession $CimSession -Namespace 'root\\default' -ClassName StdRegProv -MethodName GetMultiStringValue -Arguments @{ hDefKey = $HKLM; sSubKeyName = 'SYSTEM\\CurrentControlSet\\Control\\Session Manager'; sValueName = 'PendingFileRenameOperations' } -ErrorAction Stop
+    if ($pendingRename -and $pendingRename.sValue -and $pendingRename.sValue.Count -gt 0) { return $true }
+  } catch {}
+
+  return $pending
+}
+function Get-ActiveDeviceDetails([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
+
+  $pingInfo = $null
+  $ipAddress = $null
+  try {
+    $pingInfo = Test-Connection -ComputerName $computerName -Count 1 -ErrorAction Stop | Select-Object -First 1
+    if($pingInfo){
+      if($pingInfo.IPV4Address){ $ipAddress = $pingInfo.IPV4Address.IPAddressToString }
+      elseif($pingInfo.Address){ $ipAddress = [string]$pingInfo.Address }
+    }
+  } catch {}
+
+  $session = $null
+  $os = $null
+  $disks = @()
+  $pendingReboot = $false
+  $displayVersion = $null
+  try {
+    $session = New-CimSession -ComputerName $computerName -ErrorAction Stop
+    try { $os = Get-CimInstance -CimSession $session -ClassName Win32_OperatingSystem -ErrorAction Stop } catch {}
+    try { $disks = Get-CimInstance -CimSession $session -ClassName Win32_LogicalDisk -Filter "DriveType=3" -ErrorAction Stop } catch {}
+    try { $pendingReboot = Test-PendingRebootViaCim -CimSession $session } catch {}
+    try {
+      $displayVersion = Get-RegistryStringValueViaCim -CimSession $session -Path 'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' -ValueName 'DisplayVersion'
+      if([string]::IsNullOrWhiteSpace($displayVersion)){
+        $displayVersion = Get-RegistryStringValueViaCim -CimSession $session -Path 'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' -ValueName 'ReleaseId'
+      }
+    } catch {}
+  } catch {
+    if($session){ try { $session | Remove-CimSession } catch {} }
+    return [pscustomobject]@{ PingInfo=$pingInfo; IpAddress=$ipAddress; Online=$false; Error=$_.Exception.Message }
+  }
+  finally {
+    if($session){
+      try { $session | Remove-CimSession } catch {}
+    }
+  }
+
+  $lastBoot = $null
+  $osVersion = $null
+  $daysAgo = $null
+  if($os){
+    try { $lastBoot = [System.Management.ManagementDateTimeConverter]::ToDateTime($os.LastBootUpTime) } catch {}
+    try {
+      $caption = if($os.Caption){ $os.Caption.Trim() } else { '' }
+      $versionLabel = ''
+      if($displayVersion){ $versionLabel = $displayVersion.Trim() }
+      elseif($os.Version){ $versionLabel = $os.Version.Trim() }
+      $osVersion = if([string]::IsNullOrWhiteSpace($versionLabel)){ $caption } else { "$caption - $versionLabel" }
+    } catch {}
+  }
+  if($lastBoot){
+    try { $daysAgo = [Math]::Round(([DateTime]::Now - $lastBoot).TotalDays,1) } catch {}
+  }
+
+  $diskSummaries = @()
+  foreach($disk in $disks){
+    try {
+      $name = if($disk.DeviceID){ $disk.DeviceID } else { '(unknown)' }
+      $sizeGB = if($disk.Size){ [Math]::Round($disk.Size/1GB,1) } else { $null }
+      $freeGB = if($disk.FreeSpace){ [Math]::Round($disk.FreeSpace/1GB,1) } else { $null }
+      $diskSummaries += ("{0}: {1} GB total / {2} GB free" -f $name, $(if($sizeGB -ne $null){ $sizeGB } else { '?' }), $(if($freeGB -ne $null){ $freeGB } else { '?' }))
+    } catch {}
+  }
+
+  return [pscustomobject]@{
+    PingInfo     = $pingInfo
+    IpAddress    = $ipAddress
+    LastBoot     = $lastBoot
+    DaysAgo      = $daysAgo
+    PendingReboot= [bool]$pendingReboot
+    OsVersion    = $osVersion
+    Disks        = $diskSummaries
+    Online       = $true
+  }
+}
 function Validate-AssociatedDevices([string]$computerName){
   if([string]::IsNullOrWhiteSpace($computerName)){
     [System.Windows.Forms.MessageBox]::Show("Enter a device name before validating.","Validate Devices") | Out-Null
@@ -3782,6 +3911,137 @@ function Validate-AssociatedDevices([string]$computerName){
     return
   }
   Apply-AssociatedDeviceValidation $wmiData
+}
+function Show-ActiveDetailsDialog([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){
+    [System.Windows.Forms.MessageBox]::Show("Enter a device name before viewing details.","Active Details Info") | Out-Null
+    return
+  }
+
+  $details = Get-ActiveDeviceDetails $computerName
+  if(-not $details){
+    [System.Windows.Forms.MessageBox]::Show("Unable to retrieve device details.","Active Details Info") | Out-Null
+    return
+  }
+
+  $pingable = $false
+  try {
+    if($details.PingInfo){ $pingable = $true }
+    elseif($details.IpAddress){ $pingable = $true }
+  } catch {}
+  if(-not $pingable){
+    [System.Windows.Forms.MessageBox]::Show("Device is not pingable.","Active Details Info") | Out-Null
+    return
+  }
+  if(-not $details.Online){
+    [System.Windows.Forms.MessageBox]::Show("Unable to gather WMI/CIM data for the device.","Active Details Info") | Out-Null
+    return
+  }
+
+  $dialog = New-Object System.Windows.Forms.Form
+  $dialog.Text = 'Active Details'
+  $dialog.StartPosition = 'CenterParent'
+  $dialog.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+  $dialog.MaximizeBox = $false
+  $dialog.MinimizeBox = $false
+  $dialog.ShowIcon = $false
+  $dialog.AutoSize = $true
+  $dialog.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $dialog.Padding = New-Object System.Windows.Forms.Padding(12)
+
+  $layout = New-Object System.Windows.Forms.TableLayoutPanel
+  $layout.Dock = 'Fill'
+  $layout.AutoSize = $true
+  $layout.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $layout.ColumnCount = 1
+  $layout.RowCount = 2
+  $layout.RowStyles.Clear()
+  $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+
+  $infoTable = New-Object System.Windows.Forms.TableLayoutPanel
+  $infoTable.AutoSize = $true
+  $infoTable.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $infoTable.ColumnCount = 2
+  $infoTable.RowCount = 6
+  $infoTable.Dock = 'Top'
+  $infoTable.ColumnStyles.Clear()
+  $infoTable.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $infoTable.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $infoTable.RowStyles.Clear()
+  for($i=0;$i -lt 6;$i++){ [void]$infoTable.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
+
+  $makeLabel = {
+    param($text)
+    $lbl = New-Object System.Windows.Forms.Label
+    $lbl.Text = $text
+    $lbl.AutoSize = $true
+    $lbl.Font = $script:ThemeFontSemibold
+    $lbl.Margin = '0,4,8,4'
+    return $lbl
+  }
+
+  $makeValueLabel = {
+    param($text)
+    $lbl = New-Object System.Windows.Forms.Label
+    $lbl.Text = $text
+    $lbl.AutoSize = $true
+    $lbl.Margin = '0,4,0,4'
+    return $lbl
+  }
+
+  $hostnameValue = & $makeValueLabel $computerName
+  $ipDisplay = '(unknown)'
+  if($details.IpAddress){
+    $subnetLabel = Get-SiteSubnetLabelForIp $details.IpAddress
+    $suffix = if($subnetLabel){ " ($subnetLabel)" } else { '' }
+    $ipDisplay = $details.IpAddress + $suffix
+  }
+  $ipValue = & $makeValueLabel $ipDisplay
+
+  $lastBootDisplay = 'Unavailable'
+  $lastBootLabel = & $makeValueLabel $lastBootDisplay
+  if($details.LastBoot){
+    $daysText = if($details.DaysAgo -ne $null){ " ({0} days ago)" -f $details.DaysAgo } else { '' }
+    $lastBootLabel.Text = ($details.LastBoot.ToString('g') + $daysText)
+    if($details.DaysAgo -ne $null -and $details.DaysAgo -gt 3){
+      $lastBootLabel.ForeColor = [System.Drawing.Color]::IndianRed
+    }
+  }
+
+  $rebootValue = & $makeValueLabel (if($details.PendingReboot){ 'Yes' } else { 'No' })
+  if($details.PendingReboot){ $rebootValue.ForeColor = [System.Drawing.Color]::IndianRed }
+
+  $osValue = & $makeValueLabel (if($details.OsVersion){ $details.OsVersion } else { 'Unavailable' })
+
+  $disksText = if($details.Disks -and $details.Disks.Count -gt 0){ $details.Disks -join "`n" } else { 'No disks detected' }
+  $diskValue = & $makeValueLabel $disksText
+  try { $diskValue.MaximumSize = New-Object System.Drawing.Size(420,0) } catch {}
+
+  $infoTable.Controls.Add((& $makeLabel 'Hostname'),0,0)
+  $infoTable.Controls.Add($hostnameValue,1,0)
+  $infoTable.Controls.Add((& $makeLabel 'IP Address'),0,1)
+  $infoTable.Controls.Add($ipValue,1,1)
+  $infoTable.Controls.Add((& $makeLabel 'Last Boot/Reboot'),0,2)
+  $infoTable.Controls.Add($lastBootLabel,1,2)
+  $infoTable.Controls.Add((& $makeLabel 'Reboot Pending'),0,3)
+  $infoTable.Controls.Add($rebootValue,1,3)
+  $infoTable.Controls.Add((& $makeLabel 'OS Version'),0,4)
+  $infoTable.Controls.Add($osValue,1,4)
+  $infoTable.Controls.Add((& $makeLabel 'Disk Sizes/Free Space'),0,5)
+  $infoTable.Controls.Add($diskValue,1,5)
+
+  $btnClose = New-Object ModernUI.RoundedButton
+  $btnClose.Text = 'Close'
+  $btnClose.AutoSize = $true
+  $btnClose.Margin = '0,10,0,0'
+  $btnClose.Add_Click({ $dialog.Close() })
+
+  $layout.Controls.Add($infoTable,0,0)
+  $layout.Controls.Add($btnClose,0,1)
+
+  $dialog.Controls.Add($layout)
+  $dialog.ShowDialog() | Out-Null
 }
 function Make-Card($title,$kvPairs,[System.Drawing.Color]$ritmColor,[bool]$showRITM,[bool]$showRetire,$tagPayload){
   $p = New-Object System.Windows.Forms.Panel
@@ -4474,6 +4734,7 @@ function Populate-UI($displayRec,$parentRec){
   Update-ManualRoundButton   $parentRec
   if($btnAddPeripheral){ Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled ([bool]$parentRec) }
   if($btnValidateDevices){ Set-SearchTextButtonBaseState -Button $btnValidateDevices -BaseEnabled ([bool]$displayRec) }
+  if($btnActiveDetails){ Set-SearchTextButtonBaseState -Button $btnActiveDetails -BaseEnabled ([bool]$displayRec) }
   Validate-ParentAndName $displayRec $parentRec
   Update-FixNameButton $displayRec $parentRec
 }
@@ -4946,6 +5207,7 @@ function Clear-UI(){
   $btnFixName.Enabled = $false
   if($btnAddPeripheral){ Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled $false }
   if($btnValidateDevices){ Set-SearchTextButtonBaseState -Button $btnValidateDevices -BaseEnabled $false }
+  if($btnActiveDetails){ Set-SearchTextButtonBaseState -Button $btnActiveDetails -BaseEnabled $false }
   $statusLabel.Text = "Ready - scan or enter a device."
   Size-AssocForRows(1) | Out-Null
 }
@@ -4973,6 +5235,14 @@ $btnAddPeripheral.Add_Click({
     }
   } catch {}
   Show-AddPeripheralDialog $pc
+})
+$btnActiveDetails.Add_Click({
+  $targetName = ''
+  try { $targetName = $txtHost.Text } catch {}
+  if([string]::IsNullOrWhiteSpace($targetName) -and $script:CurrentParent){
+    try { $targetName = $script:CurrentParent.name } catch {}
+  }
+  Show-ActiveDetailsDialog $targetName
 })
 # Double-click a grid row to open that record
 $dgv.Add_CellDoubleClick({
