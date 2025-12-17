@@ -1,27 +1,32 @@
-SET CsvPath TO $'''C:\\Users\\da1701_sa\\Desktop\\New-Inventory-Tool\\Output\\RoundingEvents.csv'''
+Folder.GetSpecialFolder SpecialFolder: Folder.SpecialFolder.DesktopDirectory SpecialFolderPath=> DesktopPath
+SET CsvPath TO $'''%DesktopPath%\\New-Inventory-Tool\\Output\\RoundingEvents.csv'''
 SET LogPath TO $'''C:\\Users\\Public\\Documents\\RoundingUpdateLog.csv'''
 SET TimeoutMs TO 20000
 File.GetPathPart File: LogPath RootPath=> RootPath Directory=> LogFolder FileName=> FileName FileNameWithoutExtension=> FileNameNoExtension Extension=> FileExtension
 File.ReadFromCSVFile.ReadCSV CSVFile: CsvPath Encoding: File.CSVEncoding.SystemDefault TrimFields: True FirstLineContainsColumnNames: True ColumnsSeparator: File.CSVColumnsSeparator.Comma CSVTable=> CSVTable
 SET RowIndex TO 0
+SET BlankURL TO 0
 WebAutomation.LaunchEdge.LaunchEdge Url: $'''https://devicerounding.nttdatanucleus.com/''' WindowState: WebAutomation.BrowserWindowState.Maximized ClearCache: False ClearCookies: False WaitForPageToLoadTimeout: 60 Timeout: 60 PiPUserDataFolderMode: WebAutomation.PiPUserDataFolderModeEnum.AutomaticProfile TargetDesktop: $'''{\"DisplayName\":\"Local computer\",\"Route\":{\"ServerType\":\"Local\",\"ServerAddress\":\"\"},\"DesktopType\":\"local\"}''' BrowserInstance=> Browser
 LOOP FOREACH Row IN CSVTable
     SET test TO Row['Rounded']
     IF Row['Rounded'] = $'''No''' THEN
         SET RoundingURL TO Row['RoundingURL']
-        WebAutomation.GoToWebPage.GoToWebPageNoWait BrowserInstance: Browser Url: RoundingURL
-        WAIT (WebAutomation.WaitForWebPageContent.WebPageToContainElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_AssetTagText']) FOR TimeoutMs
-        WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_AssetTagText'] AttributeName: $'''Own Text''' AttributeValue=> PageAssetTag
-        IF $'''Trim(%PageAssetTag%)''' <> $'''Trim(%Row['AssetTag']%)''' THEN
-            DateTime.GetCurrentDateTime.Local DateTimeFormat: DateTime.DateTimeFormat.DateAndTime CurrentDateTime=> NowText
-            Text.AppendLine Text: LogPath LineToAppend: $'''%NowText% + \',\' + %Row['AssetTag']% + \',asset_mismatch,\' + %Row['RoundingUrl']%'''
-            WebAutomation.CloseWebBrowser BrowserInstance: Browser
-        END
-        WebAutomation.SetDropDownListValue.SetDropDownListValueByName BrowserInstance: Browser Control: appmask['Web Page \'h ... ceId=30764\'']['el_CheckStatusDropdown'] OptionNames: Row['CheckStatus'] UseRegularExpression: False WaitForPageToLoadTimeout: 60
-        WebAutomation.SetDropDownListValue.SetDropDownListValueByName BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_MaintenanceTypeDropdown'] OptionNames: Row['MaintenanceType'] UseRegularExpression: False WaitForPageToLoadTimeout: 60
-        IF 3 <> $'''Trim(%Row['RoundingMinutes']%)''' THEN
-            WebAutomation.PopulateTextField.PopulateTextField BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_RoundingTimeTextbox'] Text: Row['RoundingMinutes'] Mode: WebAutomation.PopulateTextMode.Replace EmulateTyping: False UnfocusAfterPopulate: True WaitForPageToLoadTimeout: 60
-            WebAutomation.ExecuteJavascript BrowserInstance: Browser Javascript: $'''function setAndNotify(el, value){
+        IF IsEmpty(RoundingURL) THEN
+            Variables.IncreaseVariable Value: BlankURL IncrementValue: 1
+        ELSE
+            WebAutomation.GoToWebPage.GoToWebPageNoWait BrowserInstance: Browser Url: RoundingURL
+            WAIT (WebAutomation.WaitForWebPageContent.WebPageToContainElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_AssetTagText']) FOR TimeoutMs
+            WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_AssetTagText'] AttributeName: $'''Own Text''' AttributeValue=> PageAssetTag
+            IF $'''Trim(%PageAssetTag%)''' <> $'''Trim(%Row['AssetTag']%)''' THEN
+                DateTime.GetCurrentDateTime.Local DateTimeFormat: DateTime.DateTimeFormat.DateAndTime CurrentDateTime=> NowText
+                Text.AppendLine Text: LogPath LineToAppend: $'''%NowText% + \',\' + %Row['AssetTag']% + \',asset_mismatch,\' + %Row['RoundingUrl']%'''
+                WebAutomation.CloseWebBrowser BrowserInstance: Browser
+            END
+            WebAutomation.SetDropDownListValue.SetDropDownListValueByName BrowserInstance: Browser Control: appmask['Web Page \'h ... ceId=30764\'']['el_CheckStatusDropdown'] OptionNames: Row['CheckStatus'] UseRegularExpression: False WaitForPageToLoadTimeout: 60
+            WebAutomation.SetDropDownListValue.SetDropDownListValueByName BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_MaintenanceTypeDropdown'] OptionNames: Row['MaintenanceType'] UseRegularExpression: False WaitForPageToLoadTimeout: 60
+            IF 3 <> $'''Trim(%Row['RoundingMinutes']%)''' THEN
+                WebAutomation.PopulateTextField.PopulateTextField BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_RoundingTimeTextbox'] Text: Row['RoundingMinutes'] Mode: WebAutomation.PopulateTextMode.Replace EmulateTyping: False UnfocusAfterPopulate: True WaitForPageToLoadTimeout: 60
+                WebAutomation.ExecuteJavascript BrowserInstance: Browser Javascript: $'''function setAndNotify(el, value){
   if(!el_RoundingTimeTextbox) return false;
   el.focus();                // safe even when minimized
   el.value = %Row['RoundingMinutes']%;          // ensure value is what we want
@@ -31,53 +36,53 @@ LOOP FOREACH Row IN CSVTable
   return true;
 }
 ''' Result=> Result2
-        END
-        # ####Checkboxes####
-        WebAutomation.SetCheckboxState.SetCheckboxState BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=123384\'']['el_IHealth_Check'] State: WebAutomation.CheckboxState.Unchecked WaitForPageToLoadTimeout: 60
-        # ##--Check Cable Box Start--##
-        SET CableMgmtCheck TO Row['CableMgmtOK']
-        IF CableMgmtCheck = $'''Yes''' THEN
-            WebAutomation.SetCheckboxState.SetCheckboxState BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_CableMgmt_Check'] State: WebAutomation.CheckboxState.Checked WaitForPageToLoadTimeout: 60
-        END
-        # ##--Check Cable Box End--##
-        # ##--Check Label Box Start--##
-        SET LabelMgmtCheck TO Row['LabelOK']
-        IF LabelMgmtCheck = $'''Yes''' THEN
-            WebAutomation.SetCheckboxState.SetCheckboxState BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Label_Check'] State: WebAutomation.CheckboxState.Checked WaitForPageToLoadTimeout: 60
-        END
-        # ##--Check Label Box End--##
-        # ##--Check Cart Box Start--##
-        SET CartCheck TO Row['CartOK']
-        IF CartCheck = $'''Yes''' THEN
-            WebAutomation.SetCheckboxState.SetCheckboxState BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Cart_Check'] State: WebAutomation.CheckboxState.Checked WaitForPageToLoadTimeout: 60
-        END
-        # ##--Check Cart Box End--##
-        # ##--Check Peripherals Box Start--##
-        SET PeripheralsCheck TO Row['PeripheralsOK']
-        IF PeripheralsCheck = $'''Yes''' THEN
-            WebAutomation.SetCheckboxState.SetCheckboxState BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Peripherals_Check'] State: WebAutomation.CheckboxState.Checked WaitForPageToLoadTimeout: 60
-        END
-        # ##--Check Peripherals Box End--##
-        WebAutomation.Click.Click BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Tab_DeviceInformation'] ClickType: WebAutomation.ClickType.LeftClick MouseClick: False WaitForPageToLoadTimeout: 60 MousePositionRelativeToElement: WebAutomation.RectangleEdgePoint.MiddleCenter OffsetX: 0 OffsetY: 0
-        WAIT (WebAutomation.WaitForWebPageContent.WebPageToContainElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Location_ReadOnly']) FOR TimeoutMs
-        WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Location_ReadOnly'] AttributeName: $'''innerText''' AttributeValue=> PageLocation
-        IF $'''Trim(%PageLocation%)''' <> $'''Trim(%Row['Location']%)''' THEN
-            WebAutomation.Click.Click BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_EditLocation_Button'] ClickType: WebAutomation.ClickType.LeftClick MouseClick: False WaitForPageToLoadTimeout: 60 MousePositionRelativeToElement: WebAutomation.RectangleEdgePoint.MiddleCenter OffsetX: 0 OffsetY: 0
-            WAIT (WebAutomation.WaitForWebPageContent.WebPageToContainElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Dialog_City_Dropdown'])
-            WebAutomation.SetDropDownListValue.SetDropDownListValueByName BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Dialog_City_Dropdown'] OptionNames: Row['City'] UseRegularExpression: False WaitForPageToLoadTimeout: 60
-            WebAutomation.SetDropDownListValue.SetDropDownListValueByName BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Dialog_Location_Dropdown'] OptionNames: Row['Location'] UseRegularExpression: False WaitForPageToLoadTimeout: 60
-            WebAutomation.Click.Click BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Dialog_Save_Button'] ClickType: WebAutomation.ClickType.LeftClick MouseClick: False WaitForPageToLoadTimeout: 60 MousePositionRelativeToElement: WebAutomation.RectangleEdgePoint.MiddleCenter OffsetX: 0 OffsetY: 0
-            WAIT 3
-            WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Location_ReadOnly'] AttributeName: $'''innerText''' AttributeValue=> PageLocationAfter
-            IF $'''Trim(%PageLocationAfter%)''' <> $'''Trim(%Row['Location']%)''' THEN
-                DateTime.GetCurrentDateTime.Local DateTimeFormat: DateTime.DateTimeFormat.DateAndTime CurrentDateTime=> NowText
-                Text.AppendLine Text: NowText LineToAppend: $'''%NowText% + \',\' + %Row['AssetTag']% + \',location_set_failed,\' + %Row['Location']%''' Result=> Result
             END
-        END
-        WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Building_Text'] AttributeName: $'''value''' AttributeValue=> PageBuilding
-        IF $'''Trim(%Row['Building']%)''' <> PageBuilding THEN
-            WebAutomation.PopulateTextField.PopulateTextField BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Building_Text'] Text: Row['Building'] Mode: WebAutomation.PopulateTextMode.Replace EmulateTyping: False UnfocusAfterPopulate: True WaitForPageToLoadTimeout: 60
-            WebAutomation.ExecuteJavascript BrowserInstance: Browser Javascript: $'''function setAndNotify(el, value){
+            # ####Checkboxes####
+            WebAutomation.SetCheckboxState.SetCheckboxState BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=123384\'']['el_IHealth_Check'] State: WebAutomation.CheckboxState.Unchecked WaitForPageToLoadTimeout: 60
+            # ##--Check Cable Box Start--##
+            SET CableMgmtCheck TO Row['CableMgmtOK']
+            IF CableMgmtCheck = $'''Yes''' THEN
+                WebAutomation.SetCheckboxState.SetCheckboxState BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_CableMgmt_Check'] State: WebAutomation.CheckboxState.Checked WaitForPageToLoadTimeout: 60
+            END
+            # ##--Check Cable Box End--##
+            # ##--Check Label Box Start--##
+            SET LabelMgmtCheck TO Row['LabelOK']
+            IF LabelMgmtCheck = $'''Yes''' THEN
+                WebAutomation.SetCheckboxState.SetCheckboxState BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Label_Check'] State: WebAutomation.CheckboxState.Checked WaitForPageToLoadTimeout: 60
+            END
+            # ##--Check Label Box End--##
+            # ##--Check Cart Box Start--##
+            SET CartCheck TO Row['CartOK']
+            IF CartCheck = $'''Yes''' THEN
+                WebAutomation.SetCheckboxState.SetCheckboxState BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Cart_Check'] State: WebAutomation.CheckboxState.Checked WaitForPageToLoadTimeout: 60
+            END
+            # ##--Check Cart Box End--##
+            # ##--Check Peripherals Box Start--##
+            SET PeripheralsCheck TO Row['PeripheralsOK']
+            IF PeripheralsCheck = $'''Yes''' THEN
+                WebAutomation.SetCheckboxState.SetCheckboxState BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Peripherals_Check'] State: WebAutomation.CheckboxState.Checked WaitForPageToLoadTimeout: 60
+            END
+            # ##--Check Peripherals Box End--##
+            WebAutomation.Click.Click BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Tab_DeviceInformation'] ClickType: WebAutomation.ClickType.LeftClick MouseClick: False WaitForPageToLoadTimeout: 60 MousePositionRelativeToElement: WebAutomation.RectangleEdgePoint.MiddleCenter OffsetX: 0 OffsetY: 0
+            WAIT (WebAutomation.WaitForWebPageContent.WebPageToContainElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Location_ReadOnly']) FOR TimeoutMs
+            WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Location_ReadOnly'] AttributeName: $'''innerText''' AttributeValue=> PageLocation
+            IF $'''Trim(%PageLocation%)''' <> $'''Trim(%Row['Location']%)''' THEN
+                WebAutomation.Click.Click BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_EditLocation_Button'] ClickType: WebAutomation.ClickType.LeftClick MouseClick: False WaitForPageToLoadTimeout: 60 MousePositionRelativeToElement: WebAutomation.RectangleEdgePoint.MiddleCenter OffsetX: 0 OffsetY: 0
+                WAIT (WebAutomation.WaitForWebPageContent.WebPageToContainElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Dialog_City_Dropdown'])
+                WebAutomation.SetDropDownListValue.SetDropDownListValueByName BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Dialog_City_Dropdown'] OptionNames: Row['City'] UseRegularExpression: False WaitForPageToLoadTimeout: 60
+                WebAutomation.SetDropDownListValue.SetDropDownListValueByName BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Dialog_Location_Dropdown'] OptionNames: Row['Location'] UseRegularExpression: False WaitForPageToLoadTimeout: 60
+                WebAutomation.Click.Click BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Dialog_Save_Button'] ClickType: WebAutomation.ClickType.LeftClick MouseClick: False WaitForPageToLoadTimeout: 60 MousePositionRelativeToElement: WebAutomation.RectangleEdgePoint.MiddleCenter OffsetX: 0 OffsetY: 0
+                WAIT 3
+                WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Location_ReadOnly'] AttributeName: $'''innerText''' AttributeValue=> PageLocationAfter
+                IF $'''Trim(%PageLocationAfter%)''' <> $'''Trim(%Row['Location']%)''' THEN
+                    DateTime.GetCurrentDateTime.Local DateTimeFormat: DateTime.DateTimeFormat.DateAndTime CurrentDateTime=> NowText
+                    Text.AppendLine Text: NowText LineToAppend: $'''%NowText% + \',\' + %Row['AssetTag']% + \',location_set_failed,\' + %Row['Location']%''' Result=> Result
+                END
+            END
+            WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Building_Text'] AttributeName: $'''value''' AttributeValue=> PageBuilding
+            IF $'''Trim(%Row['Building']%)''' <> PageBuilding THEN
+                WebAutomation.PopulateTextField.PopulateTextField BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Building_Text'] Text: Row['Building'] Mode: WebAutomation.PopulateTextMode.Replace EmulateTyping: False UnfocusAfterPopulate: True WaitForPageToLoadTimeout: 60
+                WebAutomation.ExecuteJavascript BrowserInstance: Browser Javascript: $'''function setAndNotify(el, value){
   if(!el_Building_Text) return false;
   el.focus();                // safe even when minimized
   el.value = %Row['Building']%;          // ensure value is what we want
@@ -87,11 +92,11 @@ LOOP FOREACH Row IN CSVTable
   return true;
 }
 ''' Result=> Result2
-        END
-        WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Floor_Text'] AttributeName: $'''value''' AttributeValue=> PageFloor
-        IF $'''Trim(%Row['Floor']%)''' <> $'''Trim(PageFloor)''' THEN
-            WebAutomation.PopulateTextField.PopulateTextField BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Floor_Text'] Text: Row['Floor'] Mode: WebAutomation.PopulateTextMode.Replace EmulateTyping: False UnfocusAfterPopulate: True WaitForPageToLoadTimeout: 60
-            WebAutomation.ExecuteJavascript BrowserInstance: Browser Javascript: $'''function setAndNotify(el, value){
+            END
+            WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Floor_Text'] AttributeName: $'''value''' AttributeValue=> PageFloor
+            IF $'''Trim(%Row['Floor']%)''' <> $'''Trim(PageFloor)''' THEN
+                WebAutomation.PopulateTextField.PopulateTextField BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Floor_Text'] Text: Row['Floor'] Mode: WebAutomation.PopulateTextMode.Replace EmulateTyping: False UnfocusAfterPopulate: True WaitForPageToLoadTimeout: 60
+                WebAutomation.ExecuteJavascript BrowserInstance: Browser Javascript: $'''function setAndNotify(el, value){
   if(!el_Floor_Text) return false;
   el.focus();                // safe even when minimized
   el.value = %Row['Floor']%;          // ensure value is what we want
@@ -101,11 +106,11 @@ LOOP FOREACH Row IN CSVTable
   return true;
 }
 ''' Result=> Result2
-        END
-        WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Room_Text'] AttributeName: $'''value''' AttributeValue=> PageRoom
-        IF $'''Trim(%Row['Room']%)''' <> $'''Trim(PageRoom)''' THEN
-            WebAutomation.PopulateTextField.PopulateTextField BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Room_Text'] Text: Row['Room'] Mode: WebAutomation.PopulateTextMode.Replace EmulateTyping: False UnfocusAfterPopulate: True WaitForPageToLoadTimeout: 60
-            WebAutomation.ExecuteJavascript BrowserInstance: Browser Javascript: $'''function setAndNotify(el, value){
+            END
+            WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Room_Text'] AttributeName: $'''value''' AttributeValue=> PageRoom
+            IF $'''Trim(%Row['Room']%)''' <> $'''Trim(PageRoom)''' THEN
+                WebAutomation.PopulateTextField.PopulateTextField BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_Room_Text'] Text: Row['Room'] Mode: WebAutomation.PopulateTextMode.Replace EmulateTyping: False UnfocusAfterPopulate: True WaitForPageToLoadTimeout: 60
+                WebAutomation.ExecuteJavascript BrowserInstance: Browser Javascript: $'''function setAndNotify(el, value){
   if(!el_Room_Text) return false;
   el.focus();                // safe even when minimized
   el.value = %Row['Room']%;          // ensure value is what we want
@@ -115,11 +120,11 @@ LOOP FOREACH Row IN CSVTable
   return true;
 }
 ''' Result=> Result2
-        END
-        WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=123384\'']['el_Department_Text'] AttributeName: $'''value''' AttributeValue=> PageDepartment
-        IF $'''Trim(%Row['Department']%)''' <> $'''Trim(%PageDepartment%)''' THEN
-            WebAutomation.PopulateTextField.PopulateTextField BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=123384\'']['el_Department_Text'] Text: Row['Department'] Mode: WebAutomation.PopulateTextMode.Replace EmulateTyping: False UnfocusAfterPopulate: True WaitForPageToLoadTimeout: 60
-            WebAutomation.ExecuteJavascript BrowserInstance: Browser Javascript: $'''function setAndNotify(el, value){
+            END
+            WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=123384\'']['el_Department_Text'] AttributeName: $'''value''' AttributeValue=> PageDepartment
+            IF $'''Trim(%Row['Department']%)''' <> $'''Trim(%PageDepartment%)''' THEN
+                WebAutomation.PopulateTextField.PopulateTextField BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=123384\'']['el_Department_Text'] Text: Row['Department'] Mode: WebAutomation.PopulateTextMode.Replace EmulateTyping: False UnfocusAfterPopulate: True WaitForPageToLoadTimeout: 60
+                WebAutomation.ExecuteJavascript BrowserInstance: Browser Javascript: $'''function setAndNotify(el, value){
   if(!el_Department_Text) return false;
   el.focus();                // safe even when minimized
   el.value = %Row['Department']%;          // ensure value is what we want
@@ -129,14 +134,18 @@ LOOP FOREACH Row IN CSVTable
   return true;
 }
 ''' Result=> Result2
+            END
+            WebAutomation.Click.Click BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_SaveTopRight'] ClickType: WebAutomation.ClickType.LeftClick MouseClick: False WaitForPageToLoadTimeout: 60 MousePositionRelativeToElement: WebAutomation.RectangleEdgePoint.MiddleCenter OffsetX: 0 OffsetY: 0
+            Variables.ModifyDataTableItem DataTable: CSVTable ColumnNameOrIndex: $'''Rounded''' RowIndex: RowIndex Value: $'''Yes'''
+            File.WriteToCSVFile.WriteCSV VariableToWrite: CSVTable CSVFile: CsvPath CsvFileEncoding: File.CSVEncoding.SystemDefault IncludeColumnNames: True IfFileExists: File.IfFileExists.Overwrite ColumnsSeparator: File.CSVColumnsSeparator.Comma
         END
-        WebAutomation.Click.Click BrowserInstance: Browser Control: appmask['Web Page \'h ... eId=203296\'']['el_SaveTopRight'] ClickType: WebAutomation.ClickType.LeftClick MouseClick: False WaitForPageToLoadTimeout: 60 MousePositionRelativeToElement: WebAutomation.RectangleEdgePoint.MiddleCenter OffsetX: 0 OffsetY: 0
-        Variables.ModifyDataTableItem DataTable: CSVTable ColumnNameOrIndex: $'''Rounded''' RowIndex: RowIndex Value: $'''Yes'''
-        Variables.IncreaseVariable Value: RowIndex IncrementValue: 1
-        File.WriteToCSVFile.WriteCSV VariableToWrite: CSVTable CSVFile: CsvPath CsvFileEncoding: File.CSVEncoding.SystemDefault IncludeColumnNames: True IfFileExists: File.IfFileExists.Overwrite ColumnsSeparator: File.CSVColumnsSeparator.Comma
     END
+    Variables.IncreaseVariable Value: RowIndex IncrementValue: 1
 END
 WebAutomation.CloseWebBrowser BrowserInstance: Browser
+IF BlankURL > 0 THEN
+    Display.ShowMessageDialog.ShowMessage Title: $'''Skipped''' Message: $'''Number of Blank URLs Skipped %BlankURL%''' Icon: Display.Icon.None Buttons: Display.Buttons.OK DefaultButton: Display.DefaultButton.Button1 IsTopMost: False ButtonPressed=> ButtonPressed
+END
 
 # [ControlRepository][PowerAutomateDesktop]
 
