@@ -4,6 +4,18 @@ try { [System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.H
 [System.Windows.Forms.Application]::EnableVisualStyles()
 try { [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false) } catch {}
 
+# Some endpoint protection tools (for example, CrowdStrike Script Control) can force
+# the PowerShell runspace into NoLanguage mode. In that mode even language keywords
+# like `if` are rejected with a CommandNotFoundException, which crashes the UI
+# when a button click runs script logic. Ensure the session language mode allows
+# full script execution so the WinForms logic can run as expected.
+try {
+  if ($ExecutionContext -and $ExecutionContext.SessionState -and
+      $ExecutionContext.SessionState.LanguageMode -ne [System.Management.Automation.PSLanguageMode]::FullLanguage) {
+    $ExecutionContext.SessionState.LanguageMode = [System.Management.Automation.PSLanguageMode]::FullLanguage
+  }
+} catch {}
+
 # Capture and report unexpected formatting errors so the application can continue running
 function Register-NewAssetToolExceptionHandlers {
   try {
