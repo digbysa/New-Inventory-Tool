@@ -17,6 +17,9 @@ try {
 } catch {}
 
 function Ensure-NewAssetToolFullLanguageMode {
+  param(
+    [string]$FeatureName = 'this action'
+  )
   try {
     if (-not ($ExecutionContext -and $ExecutionContext.SessionState)) { return $true }
 
@@ -29,7 +32,7 @@ function Ensure-NewAssetToolFullLanguageMode {
     if ($mode -ne [System.Management.Automation.PSLanguageMode]::FullLanguage) {
       try {
         [System.Windows.Forms.MessageBox]::Show(
-          "Active Details Info requires PowerShell's FullLanguage mode. Endpoint protection appears to be blocking script logic. Please allow script execution for this tool and try again.",
+          ("{0} requires PowerShell's FullLanguage mode. Endpoint protection appears to be blocking script logic. Please allow script execution for this tool and try again." -f $FeatureName),
           'New Inventory Tool'
         ) | Out-Null
       } catch {}
@@ -2626,6 +2629,8 @@ $nameValueRow.Controls.Add($btnFixName,1,0)
 $nameRow.Controls.Add($nameValueRow,1,0)
 $tip.SetToolTip($btnCopyHost, 'Copy host name to clipboard')
 $btnCopyHost.Add_Click({
+  if (-not (Ensure-NewAssetToolFullLanguageMode -FeatureName 'Copy host name')) { return }
+
   $textToCopy = $txtHost.Text
   if(-not [string]::IsNullOrWhiteSpace($textToCopy)){
     [System.Windows.Forms.Clipboard]::SetText($textToCopy)
@@ -2875,7 +2880,7 @@ $btnActiveDetails.ForeColor = [System.Drawing.SystemColors]::ControlText
 # If endpoint protection forced the runspace into NoLanguage mode we cannot execute the
 # Active Details logic. Disable the button up front to avoid a crash when clicking it and
 # give the user a hint about how to unblock script execution.
-if (-not (Ensure-NewAssetToolFullLanguageMode)) {
+if (-not (Ensure-NewAssetToolFullLanguageMode -FeatureName 'Active Details Info')) {
   try {
     $btnActiveDetails.Enabled = $false
     $btnActiveDetails.Text = 'Active Details Info (blocked)'
@@ -5285,7 +5290,7 @@ $btnAddPeripheral.Add_Click({
   Show-AddPeripheralDialog $pc
 })
 $btnActiveDetails.Add_Click({
-  if (-not (Ensure-NewAssetToolFullLanguageMode)) { return }
+  if (-not (Ensure-NewAssetToolFullLanguageMode -FeatureName 'Active Details Info')) { return }
 
   $targetName = ''
   try { $targetName = $txtHost.Text } catch {}
