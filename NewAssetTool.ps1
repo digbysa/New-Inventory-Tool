@@ -2872,6 +2872,16 @@ $btnActiveDetails.Margin = '8,0,0,0'
 $btnActiveDetails.Anchor = 'Left'
 $btnActiveDetails.BackColor = [System.Drawing.SystemColors]::Control
 $btnActiveDetails.ForeColor = [System.Drawing.SystemColors]::ControlText
+# If endpoint protection forced the runspace into NoLanguage mode we cannot execute the
+# Active Details logic. Disable the button up front to avoid a crash when clicking it and
+# give the user a hint about how to unblock script execution.
+if (-not (Ensure-NewAssetToolFullLanguageMode)) {
+  try {
+    $btnActiveDetails.Enabled = $false
+    $btnActiveDetails.Text = 'Active Details Info (blocked)'
+    $btnActiveDetails.ToolTipText = "Endpoint protection is blocking script execution. Enable PowerShell's FullLanguage mode to use this action."
+  } catch {}
+}
 $assocButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
 $assocButtonsPanel.Dock = 'Left'
 $assocButtonsPanel.AutoSize = $true
