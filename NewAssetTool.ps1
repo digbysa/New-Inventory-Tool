@@ -4425,6 +4425,17 @@ function Resolve-HostIpAddress([string]$hostName){
   } catch {}
   return $null
 }
+function Get-ComputerLastBoot([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
+  try {
+    $os = Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName $computerName -ErrorAction Stop
+    if($os -and $os.LastBootUpTime){
+      try { return [datetime]$os.LastBootUpTime } catch {}
+      try { return [System.Management.ManagementDateTimeConverter]::ToDateTime($os.LastBootUpTime) } catch {}
+    }
+  } catch {}
+  return $null
+}
 function Show-LiveDetailsDialog($parentRec){
   if(-not $parentRec){ return }
   $hostName = ''
@@ -4433,6 +4444,10 @@ function Show-LiveDetailsDialog($parentRec){
     try { if($parentRec.asset_tag){ $hostName = $parentRec.asset_tag } } catch {}
   }
   $ipAddress = Resolve-HostIpAddress $hostName
+  $subnetLabel = Get-SiteSubnetLabelForIp $ipAddress
+  $ipDisplayText = if([string]::IsNullOrWhiteSpace($ipAddress)){ 'IP address not available.' } elseif([string]::IsNullOrWhiteSpace($subnetLabel)){ $ipAddress } else { "$ipAddress ($subnetLabel)" }
+  $lastBoot = Get-ComputerLastBoot $hostName
+  $lastBootText = if($lastBoot){ Fmt-DateLong $lastBoot } else { 'Last boot not available.' }
   $dialog = New-Object System.Windows.Forms.Form
   $dialog.Text = 'Live Details'
   $dialog.StartPosition = 'CenterParent'
@@ -4458,16 +4473,16 @@ function Show-LiveDetailsDialog($parentRec){
   $details.AutoSize = $true
   $details.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $details.ColumnCount = 2
-  $details.RowCount = 2
+  $details.RowCount = 3
   $details.Dock = 'Top'
   $details.ColumnStyles.Clear()
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.RowStyles.Clear()
-  for($i=0;$i -lt 2;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
+  for($i=0;$i -lt 3;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
 
   $lblDeviceLabel = New-Object System.Windows.Forms.Label
-  $lblDeviceLabel.Text = 'Parent Device:'
+  $lblDeviceLabel.Text = 'Host Name:'
   $lblDeviceLabel.AutoSize = $true
   $lblDeviceLabel.Margin = '0,0,6,6'
   $lblDevice = New-Object System.Windows.Forms.Label
@@ -4482,12 +4497,23 @@ function Show-LiveDetailsDialog($parentRec){
   $lblIp = New-Object System.Windows.Forms.Label
   $lblIp.AutoSize = $true
   $lblIp.Margin = '0,0,0,0'
-  $lblIp.Text = if([string]::IsNullOrWhiteSpace($ipAddress)){ 'IP address not available.' } else { $ipAddress }
+  $lblIp.Text = $ipDisplayText
+
+  $lblLastBootLabel = New-Object System.Windows.Forms.Label
+  $lblLastBootLabel.Text = 'Last Boot:'
+  $lblLastBootLabel.AutoSize = $true
+  $lblLastBootLabel.Margin = '0,0,6,0'
+  $lblLastBoot = New-Object System.Windows.Forms.Label
+  $lblLastBoot.AutoSize = $true
+  $lblLastBoot.Margin = '0,0,0,0'
+  $lblLastBoot.Text = $lastBootText
 
   $details.Controls.Add($lblDeviceLabel,0,0)
   $details.Controls.Add($lblDevice,1,0)
   $details.Controls.Add($lblIpLabel,0,1)
   $details.Controls.Add($lblIp,1,1)
+  $details.Controls.Add($lblLastBootLabel,0,2)
+  $details.Controls.Add($lblLastBoot,1,2)
 
   $buttonPanel = New-Object System.Windows.Forms.TableLayoutPanel
   $buttonPanel.AutoSize = $true
