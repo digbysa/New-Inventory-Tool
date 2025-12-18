@@ -2827,6 +2827,13 @@ $btnValidateDevices.Margin = '0,0,0,0'
 $btnValidateDevices.Anchor = 'Left'
 $btnValidateDevices.BackColor = [System.Drawing.SystemColors]::Control
 $btnValidateDevices.ForeColor = [System.Drawing.SystemColors]::ControlText
+$btnLiveDetails = New-Object ModernUI.RoundedButton
+$btnLiveDetails.Text   = 'Live Details'
+$btnLiveDetails.Size   = '130,32'
+$btnLiveDetails.Margin = '8,0,0,0'
+$btnLiveDetails.Anchor = 'Left'
+$btnLiveDetails.BackColor = [System.Drawing.SystemColors]::Control
+$btnLiveDetails.ForeColor = [System.Drawing.SystemColors]::ControlText
 $assocButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
 $assocButtonsPanel.Dock = 'Left'
 $assocButtonsPanel.AutoSize = $true
@@ -2838,11 +2845,13 @@ $assocButtonsPanel.Padding = '0,4,0,0'
 $assocButtonsPanel.Controls.Add($btnAddPeripheral)
 $assocButtonsPanel.Controls.Add($btnRemove)
 $assocButtonsPanel.Controls.Add($btnValidateDevices)
+$assocButtonsPanel.Controls.Add($btnLiveDetails)
 $assocToolbarPanel.Controls.Add($assocButtonsPanel)
 
 Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled $false
 Set-SearchTextButtonBaseState -Button $btnRemove -BaseEnabled $true
 Set-SearchTextButtonBaseState -Button $btnValidateDevices -BaseEnabled $true
+Set-SearchTextButtonBaseState -Button $btnLiveDetails -BaseEnabled $false
 $assocGridPanel = New-Object System.Windows.Forms.Panel
 $assocGridPanel.Dock = 'Fill'
 $assocGridPanel.Margin = '0,0,0,0'
@@ -3255,10 +3264,25 @@ function Apply-ResponsiveHeights {
     }
     $stripHeight = $assocToolbarPanel.PreferredSize.Height
     if($stripHeight -le 0){
-      $stripHeight = [Math]::Max($assocButtonsPanel.PreferredSize.Height, [Math]::Max([Math]::Max($btnAddPeripheral.PreferredSize.Height, $btnRemove.PreferredSize.Height), $btnValidateDevices.PreferredSize.Height))
+      $stripHeight = [Math]::Max(
+        $assocButtonsPanel.PreferredSize.Height,
+        [Math]::Max(
+          [Math]::Max($btnAddPeripheral.PreferredSize.Height, $btnRemove.PreferredSize.Height),
+          [Math]::Max($btnValidateDevices.PreferredSize.Height, $btnLiveDetails.PreferredSize.Height)
+        )
+      )
     }
     if($stripHeight -le 0){
-      $stripHeight = [Math]::Max($assocToolbarPanel.Height, [Math]::Max($assocButtonsPanel.Height, [Math]::Max([Math]::Max($btnAddPeripheral.Height, $btnRemove.Height), $btnValidateDevices.Height)))
+      $stripHeight = [Math]::Max(
+        $assocToolbarPanel.Height,
+        [Math]::Max(
+          $assocButtonsPanel.Height,
+          [Math]::Max(
+            [Math]::Max($btnAddPeripheral.Height, $btnRemove.Height),
+            [Math]::Max($btnValidateDevices.Height, $btnLiveDetails.Height)
+          )
+        )
+      )
     }
     if($stripHeight -le 0){ $stripHeight = 36 }
     $assocPadding = $grpAssoc.Padding.Vertical + $grpAssoc.Margin.Vertical + $tlpAssoc.Margin.Vertical + $tlpAssoc.Padding.Vertical + $assocToolbarPanel.Margin.Vertical + $assocToolbarPanel.Padding.Vertical + $assocGridPanel.Margin.Vertical + $assocGridPanel.Padding.Vertical
@@ -4388,6 +4412,325 @@ function Show-AddPeripheralDialog($parentRec){
   Apply-ModernThemeToForm -Form $dialog
   try { [void]$dialog.ShowDialog($form) } finally { try { $dialog.Dispose() } catch {} }
 }
+function Resolve-HostIpAddress([string]$hostName){
+  if([string]::IsNullOrWhiteSpace($hostName)){ return $null }
+  try {
+    $addresses = [System.Net.Dns]::GetHostAddresses($hostName)
+    if($addresses){
+      $ipv4 = $addresses | Where-Object { $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork } | Select-Object -First 1
+      if($ipv4){ return $ipv4.ToString() }
+      $first = $addresses | Select-Object -First 1
+      if($first){ return $first.ToString() }
+    }
+  } catch {}
+  return $null
+}
+function Get-ComputerOperatingSystem([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
+  try { return Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName $computerName -ErrorAction Stop } catch {}
+  return $null
+}
+function Get-ComputerLastBoot([string]$computerName, $operatingSystem = $null){
+  if(-not $operatingSystem){ $operatingSystem = Get-ComputerOperatingSystem $computerName }
+  if(-not $operatingSystem){ return $null }
+  try {
+    if($operatingSystem.LastBootUpTime){
+      try { return [datetime]$operatingSystem.LastBootUpTime } catch {}
+      try { return [System.Management.ManagementDateTimeConverter]::ToDateTime($operatingSystem.LastBootUpTime) } catch {}
+    }
+  } catch {}
+  return $null
+}
+function Get-ComputerInstallDate([string]$computerName, $operatingSystem = $null){
+  if(-not $operatingSystem){ $operatingSystem = Get-ComputerOperatingSystem $computerName }
+  if(-not $operatingSystem){ return $null }
+  try {
+    if($operatingSystem.InstallDate){
+      try { return [datetime]$operatingSystem.InstallDate } catch {}
+      try { return [System.Management.ManagementDateTimeConverter]::ToDateTime($operatingSystem.InstallDate) } catch {}
+    }
+  } catch {}
+  return $null
+}
+function Get-ComputerManufacturerModel([string]$computerName){
+  $result = [pscustomobject]@{ Manufacturer = $null; Model = $null }
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $result }
+  try {
+    $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ComputerName $computerName -ErrorAction Stop
+    if($cs){
+      try { if($cs.Manufacturer){ $result.Manufacturer = [string]$cs.Manufacturer } } catch {}
+      try { if($cs.Model){ $result.Model = [string]$cs.Model } } catch {}
+    }
+  } catch {}
+  return $result
+}
+function Get-ComputerLastLoggedOnUser([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
+  try {
+    $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ComputerName $computerName -ErrorAction Stop
+    if($cs){
+      try {
+        $userName = [string]$cs.UserName
+        if(-not [string]::IsNullOrWhiteSpace($userName)){ return $userName }
+      } catch {}
+    }
+  } catch {}
+  return $null
+}
+function Test-ComputerPendingReboot([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
+  $base = $null
+  try {
+    $base = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine,$computerName)
+    if(-not $base){ return $null }
+    $pending = $false
+    try { if($base.OpenSubKey('SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\RebootPending')){ $pending = $true } } catch {}
+    if(-not $pending){ try { if($base.OpenSubKey('SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\Auto Update\\RebootRequired')){ $pending = $true } } catch {} }
+    if(-not $pending){
+      try {
+        $sessionKey = $base.OpenSubKey('SYSTEM\\CurrentControlSet\\Control\\Session Manager')
+        if($sessionKey){
+          try {
+            $pendingOps = $sessionKey.GetValue('PendingFileRenameOperations')
+            if($pendingOps -and ((($pendingOps -is [System.Array]) -and ($pendingOps.Length -gt 0)) -or ([string]$pendingOps).Trim())){ $pending = $true }
+          } catch {}
+          try { $sessionKey.Close() } catch {}
+        }
+      } catch {}
+    }
+    return $pending
+  } catch {
+    return $null
+  } finally {
+    try { if($base){ $base.Close() } } catch {}
+  }
+}
+function Show-LiveDetailsDialog($parentRec){
+  if(-not $parentRec){ return }
+  $hostName = ''
+  try { if($parentRec.name){ $hostName = $parentRec.name } } catch {}
+  if([string]::IsNullOrWhiteSpace($hostName)){
+    try { if($parentRec.asset_tag){ $hostName = $parentRec.asset_tag } } catch {}
+  }
+  $ipAddress = Resolve-HostIpAddress $hostName
+  $subnetLabel = Get-SiteSubnetLabelForIp $ipAddress
+  $ipDisplayText = if([string]::IsNullOrWhiteSpace($ipAddress)){ 'IP address not available.' } elseif([string]::IsNullOrWhiteSpace($subnetLabel)){ $ipAddress } else { "$ipAddress ($subnetLabel)" }
+  $operatingSystem = Get-ComputerOperatingSystem $hostName
+  $lastLoggedOnUser = Get-ComputerLastLoggedOnUser $hostName
+  $lastBoot = Get-ComputerLastBoot $hostName $operatingSystem
+  $lastBootAgeDays = $null
+  if($lastBoot){
+    $lastBootText = Fmt-DateLong $lastBoot
+    try {
+      $age = New-TimeSpan -Start $lastBoot -End (Get-Date)
+      if($age -and ($age.TotalDays -ge 0)){
+        $lastBootAgeDays = [math]::Floor($age.TotalDays)
+        $lastBootText = "$lastBootText [$lastBootAgeDays $(if($lastBootAgeDays -eq 1){ 'day' } else { 'days' }) ago]"
+      }
+    } catch {}
+  } else {
+    $lastBootText = 'Last boot not available.'
+  }
+  $installDate = Get-ComputerInstallDate $hostName $operatingSystem
+  if($installDate){
+    $installDateText = Fmt-DateLong $installDate
+  } else {
+    $installDateText = 'Install date not available.'
+  }
+  $manufacturerInfo = Get-ComputerManufacturerModel $hostName
+  $manufacturerText = if($manufacturerInfo.Manufacturer){ $manufacturerInfo.Manufacturer } else { '(unknown)' }
+  $modelText = if($manufacturerInfo.Model){ $manufacturerInfo.Model } else { '(unknown)' }
+  $pendingReboot = Test-ComputerPendingReboot $hostName
+  if($pendingReboot -eq $true){
+    $pendingRebootText = 'Yes'
+  } elseif($pendingReboot -eq $false){
+    $pendingRebootText = 'No'
+  } else {
+    $pendingRebootText = 'Unknown'
+  }
+  $dialog = New-Object System.Windows.Forms.Form
+  $dialog.Text = 'Live Details'
+  $dialog.StartPosition = 'CenterParent'
+  $dialog.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+  $dialog.MaximizeBox = $false
+  $dialog.MinimizeBox = $false
+  $dialog.ShowIcon = $false
+  $dialog.AutoSize = $true
+  $dialog.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $dialog.Padding = New-Object System.Windows.Forms.Padding(12)
+
+  $layout = New-Object System.Windows.Forms.TableLayoutPanel
+  $layout.Dock = 'Fill'
+  $layout.AutoSize = $true
+  $layout.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $layout.ColumnCount = 1
+  $layout.RowCount = 2
+  $layout.RowStyles.Clear()
+  $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+  $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+
+  $details = New-Object System.Windows.Forms.TableLayoutPanel
+  $details.AutoSize = $true
+  $details.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $details.ColumnCount = 2
+  $details.RowCount = 11
+  $details.Dock = 'Fill'
+  $details.ColumnStyles.Clear()
+  $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $details.RowStyles.Clear()
+  for($i=0;$i -lt 11;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
+
+  $headingFont = New-Object System.Drawing.Font($dialog.Font, [System.Drawing.FontStyle]::Bold)
+
+  $lblNetworkHeading = New-Object System.Windows.Forms.Label
+  $lblNetworkHeading.Text = 'Network Info'
+  $lblNetworkHeading.Font = $headingFont
+  $lblNetworkHeading.AutoSize = $true
+  $lblNetworkHeading.Margin = '0,0,0,6'
+
+  $lblDeviceLabel = New-Object System.Windows.Forms.Label
+  $lblDeviceLabel.Text = 'Hostname:'
+  $lblDeviceLabel.AutoSize = $true
+  $lblDeviceLabel.Margin = '0,0,6,6'
+  $lblDevice = New-Object System.Windows.Forms.Label
+  $lblDevice.AutoSize = $true
+  $lblDevice.Margin = '0,0,0,6'
+  $lblDevice.Text = if([string]::IsNullOrWhiteSpace($hostName)){ '(unknown)' } else { $hostName }
+
+  $lblIpLabel = New-Object System.Windows.Forms.Label
+  $lblIpLabel.Text = 'IP Address:'
+  $lblIpLabel.AutoSize = $true
+  $lblIpLabel.Margin = '0,0,6,6'
+  $lblIp = New-Object System.Windows.Forms.Label
+  $lblIp.AutoSize = $true
+  $lblIp.Margin = '0,0,0,6'
+  $lblIp.Text = $ipDisplayText
+
+  $lblLastLoggedOnLabel = New-Object System.Windows.Forms.Label
+  $lblLastLoggedOnLabel.Text = 'Last Logged On:'
+  $lblLastLoggedOnLabel.AutoSize = $true
+  $lblLastLoggedOnLabel.Margin = '0,0,6,12'
+  $lblLastLoggedOn = New-Object System.Windows.Forms.Label
+  $lblLastLoggedOn.AutoSize = $true
+  $lblLastLoggedOn.Margin = '0,0,0,12'
+  $lblLastLoggedOn.Text = if([string]::IsNullOrWhiteSpace($lastLoggedOnUser)){ 'Last logged on user not available.' } else { $lastLoggedOnUser }
+
+  $lblHardwareHeading = New-Object System.Windows.Forms.Label
+  $lblHardwareHeading.Text = 'Hardware Info'
+  $lblHardwareHeading.Font = $headingFont
+  $lblHardwareHeading.AutoSize = $true
+  $lblHardwareHeading.Margin = '0,0,0,6'
+
+  $lblManufacturerLabel = New-Object System.Windows.Forms.Label
+  $lblManufacturerLabel.Text = 'Manufacturer:'
+  $lblManufacturerLabel.AutoSize = $true
+  $lblManufacturerLabel.Margin = '0,0,6,6'
+  $lblManufacturer = New-Object System.Windows.Forms.Label
+  $lblManufacturer.AutoSize = $true
+  $lblManufacturer.Margin = '0,0,0,6'
+  $lblManufacturer.Text = $manufacturerText
+
+  $lblModelLabel = New-Object System.Windows.Forms.Label
+  $lblModelLabel.Text = 'System Model:'
+  $lblModelLabel.AutoSize = $true
+  $lblModelLabel.Margin = '0,0,6,6'
+  $lblModel = New-Object System.Windows.Forms.Label
+  $lblModel.AutoSize = $true
+  $lblModel.Margin = '0,0,0,6'
+  $lblModel.Text = $modelText
+
+  $lblInstallDateLabel = New-Object System.Windows.Forms.Label
+  $lblInstallDateLabel.Text = 'Install Date:'
+  $lblInstallDateLabel.AutoSize = $true
+  $lblInstallDateLabel.Margin = '0,0,6,12'
+  $lblInstallDate = New-Object System.Windows.Forms.Label
+  $lblInstallDate.AutoSize = $true
+  $lblInstallDate.Margin = '0,0,0,12'
+  $lblInstallDate.Text = $installDateText
+
+  $lblBootHeading = New-Object System.Windows.Forms.Label
+  $lblBootHeading.Text = 'Boot Info'
+  $lblBootHeading.Font = $headingFont
+  $lblBootHeading.AutoSize = $true
+  $lblBootHeading.Margin = '0,0,0,6'
+
+  $lblLastBootLabel = New-Object System.Windows.Forms.Label
+  $lblLastBootLabel.Text = 'Last Boot:'
+  $lblLastBootLabel.AutoSize = $true
+  $lblLastBootLabel.Margin = '0,0,6,6'
+  $lblLastBoot = New-Object System.Windows.Forms.Label
+  $lblLastBoot.AutoSize = $true
+  $lblLastBoot.Margin = '0,0,0,6'
+  $lblLastBoot.Text = $lastBootText
+  if($lastBootAgeDays -gt 5){
+    $lblLastBoot.ForeColor = [System.Drawing.Color]::Red
+  } elseif($lastBootAgeDays -gt 3){
+    $lblLastBoot.ForeColor = [System.Drawing.Color]::Orange
+  }
+
+  $lblRebootLabel = New-Object System.Windows.Forms.Label
+  $lblRebootLabel.Text = 'Reboot Pending:'
+  $lblRebootLabel.AutoSize = $true
+  $lblRebootLabel.Margin = '0,0,6,0'
+  $lblReboot = New-Object System.Windows.Forms.Label
+  $lblReboot.AutoSize = $true
+  $lblReboot.Margin = '0,0,0,0'
+  $lblReboot.Text = $pendingRebootText
+  if($pendingReboot -eq $true){ $lblReboot.ForeColor = [System.Drawing.Color]::Red }
+
+  $details.Controls.Add($lblNetworkHeading,0,0)
+  $details.SetColumnSpan($lblNetworkHeading,2)
+  $details.Controls.Add($lblDeviceLabel,0,1)
+  $details.Controls.Add($lblDevice,1,1)
+  $details.Controls.Add($lblIpLabel,0,2)
+  $details.Controls.Add($lblIp,1,2)
+  $details.Controls.Add($lblLastLoggedOnLabel,0,3)
+  $details.Controls.Add($lblLastLoggedOn,1,3)
+  $details.Controls.Add($lblHardwareHeading,0,4)
+  $details.SetColumnSpan($lblHardwareHeading,2)
+  $details.Controls.Add($lblManufacturerLabel,0,5)
+  $details.Controls.Add($lblManufacturer,1,5)
+  $details.Controls.Add($lblModelLabel,0,6)
+  $details.Controls.Add($lblModel,1,6)
+  $details.Controls.Add($lblInstallDateLabel,0,7)
+  $details.Controls.Add($lblInstallDate,1,7)
+  $details.Controls.Add($lblBootHeading,0,8)
+  $details.SetColumnSpan($lblBootHeading,2)
+  $details.Controls.Add($lblLastBootLabel,0,9)
+  $details.Controls.Add($lblLastBoot,1,9)
+  $details.Controls.Add($lblRebootLabel,0,10)
+  $details.Controls.Add($lblReboot,1,10)
+
+  $buttonPanel = New-Object System.Windows.Forms.TableLayoutPanel
+  $buttonPanel.AutoSize = $true
+  $buttonPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $buttonPanel.ColumnCount = 2
+  $buttonPanel.RowCount = 1
+  $buttonPanel.Anchor = 'Bottom, Right'
+  $buttonPanel.ColumnStyles.Clear()
+  $buttonPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+  $buttonPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $buttonPanel.RowStyles.Clear()
+  $buttonPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+
+  $btnDialogClose = New-Object ModernUI.RoundedButton
+  $btnDialogClose.Text = 'Close'
+  $btnDialogClose.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+  $btnDialogClose.Margin = '0,12,0,0'
+  $spacer = New-Object System.Windows.Forms.Panel
+  $spacer.Dock = 'Fill'
+  $buttonPanel.Controls.Add($spacer,0,0)
+  $buttonPanel.Controls.Add($btnDialogClose,1,0)
+  $dialog.CancelButton = $btnDialogClose
+
+  $layout.Controls.Add($details,0,0)
+  $layout.Controls.Add($buttonPanel,0,1)
+  $dialog.Controls.Add($layout)
+  $dialog.Add_Shown({ $btnDialogClose.Focus() })
+  Apply-ModernThemeToForm -Form $dialog
+  try { [void]$dialog.ShowDialog($form) } finally { try { $dialog.Dispose() } catch {} }
+}
 function Remove-Selected-Associations($parentRec){
   if($dgv.SelectedRows.Count -eq 0){ return }
   foreach($row in $dgv.SelectedRows){
@@ -4474,6 +4817,7 @@ function Populate-UI($displayRec,$parentRec){
   Update-ManualRoundButton   $parentRec
   if($btnAddPeripheral){ Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled ([bool]$parentRec) }
   if($btnValidateDevices){ Set-SearchTextButtonBaseState -Button $btnValidateDevices -BaseEnabled ([bool]$displayRec) }
+  if($btnLiveDetails){ Set-SearchTextButtonBaseState -Button $btnLiveDetails -BaseEnabled ([bool]$parentRec) }
   Validate-ParentAndName $displayRec $parentRec
   Update-FixNameButton $displayRec $parentRec
 }
@@ -4946,6 +5290,7 @@ function Clear-UI(){
   $btnFixName.Enabled = $false
   if($btnAddPeripheral){ Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled $false }
   if($btnValidateDevices){ Set-SearchTextButtonBaseState -Button $btnValidateDevices -BaseEnabled $false }
+  if($btnLiveDetails){ Set-SearchTextButtonBaseState -Button $btnLiveDetails -BaseEnabled $false }
   $statusLabel.Text = "Ready - scan or enter a device."
   Size-AssocForRows(1) | Out-Null
 }
@@ -4973,6 +5318,17 @@ $btnAddPeripheral.Add_Click({
     }
   } catch {}
   Show-AddPeripheralDialog $pc
+})
+$btnLiveDetails.Add_Click({
+  $pc = $script:CurrentParent
+  if(-not $pc){
+    $pc = Resolve-ParentComputer $script:CurrentDisplay
+  }
+  if(-not $pc){
+    [System.Windows.Forms.MessageBox]::Show("No parent device available to show.","Live Details") | Out-Null
+    return
+  }
+  Show-LiveDetailsDialog $pc
 })
 # Double-click a grid row to open that record
 $dgv.Add_CellDoubleClick({
