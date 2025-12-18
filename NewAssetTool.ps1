@@ -4464,6 +4464,19 @@ function Get-ComputerManufacturerModel([string]$computerName){
   } catch {}
   return $result
 }
+function Get-ComputerLastLoggedOnUser([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
+  try {
+    $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ComputerName $computerName -ErrorAction Stop
+    if($cs){
+      try {
+        $userName = [string]$cs.UserName
+        if(-not [string]::IsNullOrWhiteSpace($userName)){ return $userName }
+      } catch {}
+    }
+  } catch {}
+  return $null
+}
 function Test-ComputerPendingReboot([string]$computerName){
   if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
   $base = $null
@@ -4503,6 +4516,7 @@ function Show-LiveDetailsDialog($parentRec){
   $subnetLabel = Get-SiteSubnetLabelForIp $ipAddress
   $ipDisplayText = if([string]::IsNullOrWhiteSpace($ipAddress)){ 'IP address not available.' } elseif([string]::IsNullOrWhiteSpace($subnetLabel)){ $ipAddress } else { "$ipAddress ($subnetLabel)" }
   $operatingSystem = Get-ComputerOperatingSystem $hostName
+  $lastLoggedOnUser = Get-ComputerLastLoggedOnUser $hostName
   $lastBoot = Get-ComputerLastBoot $hostName $operatingSystem
   $lastBootAgeDays = $null
   if($lastBoot){
@@ -4559,13 +4573,13 @@ function Show-LiveDetailsDialog($parentRec){
   $details.AutoSize = $true
   $details.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $details.ColumnCount = 2
-  $details.RowCount = 7
+  $details.RowCount = 8
   $details.Dock = 'Top'
   $details.ColumnStyles.Clear()
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.RowStyles.Clear()
-  for($i=0;$i -lt 7;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
+  for($i=0;$i -lt 8;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
 
   $lblDeviceLabel = New-Object System.Windows.Forms.Label
   $lblDeviceLabel.Text = 'Host Name:'
@@ -4585,6 +4599,15 @@ function Show-LiveDetailsDialog($parentRec){
   $lblIp.Margin = '0,0,0,0'
   $lblIp.Text = $ipDisplayText
 
+  $lblLastLoggedOnLabel = New-Object System.Windows.Forms.Label
+  $lblLastLoggedOnLabel.Text = 'Last Logged On:'
+  $lblLastLoggedOnLabel.AutoSize = $true
+  $lblLastLoggedOnLabel.Margin = '0,0,6,0'
+  $lblLastLoggedOn = New-Object System.Windows.Forms.Label
+  $lblLastLoggedOn.AutoSize = $true
+  $lblLastLoggedOn.Margin = '0,0,0,0'
+  $lblLastLoggedOn.Text = if([string]::IsNullOrWhiteSpace($lastLoggedOnUser)){ 'Last logged on user not available.' } else { $lastLoggedOnUser }
+
   $lblLastBootLabel = New-Object System.Windows.Forms.Label
   $lblLastBootLabel.Text = 'Last Boot:'
   $lblLastBootLabel.AutoSize = $true
@@ -4603,8 +4626,10 @@ function Show-LiveDetailsDialog($parentRec){
   $details.Controls.Add($lblDevice,1,0)
   $details.Controls.Add($lblIpLabel,0,1)
   $details.Controls.Add($lblIp,1,1)
-  $details.Controls.Add($lblLastBootLabel,0,2)
-  $details.Controls.Add($lblLastBoot,1,2)
+  $details.Controls.Add($lblLastLoggedOnLabel,0,2)
+  $details.Controls.Add($lblLastLoggedOn,1,2)
+  $details.Controls.Add($lblLastBootLabel,0,3)
+  $details.Controls.Add($lblLastBoot,1,3)
   $lblRebootLabel = New-Object System.Windows.Forms.Label
   $lblRebootLabel.Text = 'Reboot Pending:'
   $lblRebootLabel.AutoSize = $true
@@ -4642,14 +4667,14 @@ function Show-LiveDetailsDialog($parentRec){
   $lblInstallDate.Margin = '0,0,0,0'
   $lblInstallDate.Text = $installDateText
 
-  $details.Controls.Add($lblRebootLabel,0,3)
-  $details.Controls.Add($lblReboot,1,3)
-  $details.Controls.Add($lblManufacturerLabel,0,4)
-  $details.Controls.Add($lblManufacturer,1,4)
-  $details.Controls.Add($lblModelLabel,0,5)
-  $details.Controls.Add($lblModel,1,5)
-  $details.Controls.Add($lblInstallDateLabel,0,6)
-  $details.Controls.Add($lblInstallDate,1,6)
+  $details.Controls.Add($lblRebootLabel,0,4)
+  $details.Controls.Add($lblReboot,1,4)
+  $details.Controls.Add($lblManufacturerLabel,0,5)
+  $details.Controls.Add($lblManufacturer,1,5)
+  $details.Controls.Add($lblModelLabel,0,6)
+  $details.Controls.Add($lblModel,1,6)
+  $details.Controls.Add($lblInstallDateLabel,0,7)
+  $details.Controls.Add($lblInstallDate,1,7)
 
   $buttonPanel = New-Object System.Windows.Forms.TableLayoutPanel
   $buttonPanel.AutoSize = $true
