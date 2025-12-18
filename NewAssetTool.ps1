@@ -4447,7 +4447,19 @@ function Show-LiveDetailsDialog($parentRec){
   $subnetLabel = Get-SiteSubnetLabelForIp $ipAddress
   $ipDisplayText = if([string]::IsNullOrWhiteSpace($ipAddress)){ 'IP address not available.' } elseif([string]::IsNullOrWhiteSpace($subnetLabel)){ $ipAddress } else { "$ipAddress ($subnetLabel)" }
   $lastBoot = Get-ComputerLastBoot $hostName
-  $lastBootText = if($lastBoot){ Fmt-DateLong $lastBoot } else { 'Last boot not available.' }
+  $lastBootAgeDays = $null
+  if($lastBoot){
+    $lastBootText = Fmt-DateLong $lastBoot
+    try {
+      $age = New-TimeSpan -Start $lastBoot -End (Get-Date)
+      if($age -and ($age.TotalDays -ge 0)){
+        $lastBootAgeDays = [math]::Floor($age.TotalDays)
+        $lastBootText = "$lastBootText [$lastBootAgeDays $(if($lastBootAgeDays -eq 1){ 'day' } else { 'days' }) ago]"
+      }
+    } catch {}
+  } else {
+    $lastBootText = 'Last boot not available.'
+  }
   $dialog = New-Object System.Windows.Forms.Form
   $dialog.Text = 'Live Details'
   $dialog.StartPosition = 'CenterParent'
@@ -4507,6 +4519,11 @@ function Show-LiveDetailsDialog($parentRec){
   $lblLastBoot.AutoSize = $true
   $lblLastBoot.Margin = '0,0,0,0'
   $lblLastBoot.Text = $lastBootText
+  if($lastBootAgeDays -gt 5){
+    $lblLastBoot.ForeColor = [System.Drawing.Color]::Red
+  } elseif($lastBootAgeDays -gt 3){
+    $lblLastBoot.ForeColor = [System.Drawing.Color]::Orange
+  }
 
   $details.Controls.Add($lblDeviceLabel,0,0)
   $details.Controls.Add($lblDevice,1,0)
