@@ -4436,16 +4436,6 @@ function Get-ComputerLastBoot([string]$computerName){
   } catch {}
   return $null
 }
-function Get-ComputerLoggedOnUser([string]$computerName){
-  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
-  try {
-    $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ComputerName $computerName -ErrorAction Stop
-    if($cs -and $cs.UserName){
-      return $cs.UserName
-    }
-  } catch {}
-  return $null
-}
 function Show-LiveDetailsDialog($parentRec){
   if(-not $parentRec){ return }
   $hostName = ''
@@ -4457,13 +4447,7 @@ function Show-LiveDetailsDialog($parentRec){
   $subnetLabel = Get-SiteSubnetLabelForIp $ipAddress
   $ipDisplayText = if([string]::IsNullOrWhiteSpace($ipAddress)){ 'IP address not available.' } elseif([string]::IsNullOrWhiteSpace($subnetLabel)){ $ipAddress } else { "$ipAddress ($subnetLabel)" }
   $lastBoot = Get-ComputerLastBoot $hostName
-  $lastBootText = if($lastBoot){
-    $daysAgo = [int][Math]::Floor((Get-Date) - $lastBoot).TotalDays
-    $daysAgoText = if($daysAgo -eq 1){ '1 day ago' } else { "$daysAgo days ago" }
-    (Fmt-DateLong $lastBoot) + " [" + $daysAgoText + "]"
-  } else { 'Last boot not available.' }
-  $loggedOnUser = Get-ComputerLoggedOnUser $hostName
-  $loggedOnUserText = if($loggedOnUser){ $loggedOnUser } else { 'None' }
+  $lastBootText = if($lastBoot){ Fmt-DateLong $lastBoot } else { 'Last boot not available.' }
   $dialog = New-Object System.Windows.Forms.Form
   $dialog.Text = 'Live Details'
   $dialog.StartPosition = 'CenterParent'
@@ -4489,13 +4473,13 @@ function Show-LiveDetailsDialog($parentRec){
   $details.AutoSize = $true
   $details.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $details.ColumnCount = 2
-  $details.RowCount = 4
+  $details.RowCount = 3
   $details.Dock = 'Top'
   $details.ColumnStyles.Clear()
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.RowStyles.Clear()
-  for($i=0;$i -lt 4;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
+  for($i=0;$i -lt 3;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
 
   $lblDeviceLabel = New-Object System.Windows.Forms.Label
   $lblDeviceLabel.Text = 'Host Name:'
@@ -4523,23 +4507,6 @@ function Show-LiveDetailsDialog($parentRec){
   $lblLastBoot.AutoSize = $true
   $lblLastBoot.Margin = '0,0,0,0'
   $lblLastBoot.Text = $lastBootText
-  if($lastBoot){
-    $daysAgo = [int][Math]::Floor((Get-Date) - $lastBoot).TotalDays
-    if($daysAgo -gt 5){
-      $lblLastBoot.ForeColor = [System.Drawing.Color]::Red
-    } elseif($daysAgo -gt 3){
-      $lblLastBoot.ForeColor = [System.Drawing.Color]::Orange
-    }
-  }
-
-  $lblLastUserLabel = New-Object System.Windows.Forms.Label
-  $lblLastUserLabel.Text = 'Logged On User:'
-  $lblLastUserLabel.AutoSize = $true
-  $lblLastUserLabel.Margin = '0,6,6,0'
-  $lblLastUser = New-Object System.Windows.Forms.Label
-  $lblLastUser.AutoSize = $true
-  $lblLastUser.Margin = '0,6,0,0'
-  $lblLastUser.Text = $loggedOnUserText
 
   $details.Controls.Add($lblDeviceLabel,0,0)
   $details.Controls.Add($lblDevice,1,0)
@@ -4547,8 +4514,6 @@ function Show-LiveDetailsDialog($parentRec){
   $details.Controls.Add($lblIp,1,1)
   $details.Controls.Add($lblLastBootLabel,0,2)
   $details.Controls.Add($lblLastBoot,1,2)
-  $details.Controls.Add($lblLastUserLabel,0,3)
-  $details.Controls.Add($lblLastUser,1,3)
 
   $buttonPanel = New-Object System.Windows.Forms.TableLayoutPanel
   $buttonPanel.AutoSize = $true
