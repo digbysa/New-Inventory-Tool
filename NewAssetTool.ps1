@@ -4566,23 +4566,31 @@ function Show-LiveDetailsDialog($parentRec){
   $layout.ColumnCount = 1
   $layout.RowCount = 2
   $layout.RowStyles.Clear()
-  $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
   $layout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 
   $details = New-Object System.Windows.Forms.TableLayoutPanel
   $details.AutoSize = $true
   $details.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $details.ColumnCount = 2
-  $details.RowCount = 8
-  $details.Dock = 'Top'
+  $details.RowCount = 11
+  $details.Dock = 'Fill'
   $details.ColumnStyles.Clear()
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.RowStyles.Clear()
-  for($i=0;$i -lt 8;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
+  for($i=0;$i -lt 11;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
+
+  $headingFont = New-Object System.Drawing.Font($dialog.Font, [System.Drawing.FontStyle]::Bold)
+
+  $lblNetworkHeading = New-Object System.Windows.Forms.Label
+  $lblNetworkHeading.Text = 'Network Info'
+  $lblNetworkHeading.Font = $headingFont
+  $lblNetworkHeading.AutoSize = $true
+  $lblNetworkHeading.Margin = '0,0,0,6'
 
   $lblDeviceLabel = New-Object System.Windows.Forms.Label
-  $lblDeviceLabel.Text = 'Host Name:'
+  $lblDeviceLabel.Text = 'Hostname:'
   $lblDeviceLabel.AutoSize = $true
   $lblDeviceLabel.Margin = '0,0,6,6'
   $lblDevice = New-Object System.Windows.Forms.Label
@@ -4593,28 +4601,67 @@ function Show-LiveDetailsDialog($parentRec){
   $lblIpLabel = New-Object System.Windows.Forms.Label
   $lblIpLabel.Text = 'IP Address:'
   $lblIpLabel.AutoSize = $true
-  $lblIpLabel.Margin = '0,0,6,0'
+  $lblIpLabel.Margin = '0,0,6,6'
   $lblIp = New-Object System.Windows.Forms.Label
   $lblIp.AutoSize = $true
-  $lblIp.Margin = '0,0,0,0'
+  $lblIp.Margin = '0,0,0,6'
   $lblIp.Text = $ipDisplayText
 
   $lblLastLoggedOnLabel = New-Object System.Windows.Forms.Label
   $lblLastLoggedOnLabel.Text = 'Last Logged On:'
   $lblLastLoggedOnLabel.AutoSize = $true
-  $lblLastLoggedOnLabel.Margin = '0,0,6,0'
+  $lblLastLoggedOnLabel.Margin = '0,0,6,12'
   $lblLastLoggedOn = New-Object System.Windows.Forms.Label
   $lblLastLoggedOn.AutoSize = $true
-  $lblLastLoggedOn.Margin = '0,0,0,0'
+  $lblLastLoggedOn.Margin = '0,0,0,12'
   $lblLastLoggedOn.Text = if([string]::IsNullOrWhiteSpace($lastLoggedOnUser)){ 'Last logged on user not available.' } else { $lastLoggedOnUser }
+
+  $lblHardwareHeading = New-Object System.Windows.Forms.Label
+  $lblHardwareHeading.Text = 'Hardware Info'
+  $lblHardwareHeading.Font = $headingFont
+  $lblHardwareHeading.AutoSize = $true
+  $lblHardwareHeading.Margin = '0,0,0,6'
+
+  $lblManufacturerLabel = New-Object System.Windows.Forms.Label
+  $lblManufacturerLabel.Text = 'Manufacturer:'
+  $lblManufacturerLabel.AutoSize = $true
+  $lblManufacturerLabel.Margin = '0,0,6,6'
+  $lblManufacturer = New-Object System.Windows.Forms.Label
+  $lblManufacturer.AutoSize = $true
+  $lblManufacturer.Margin = '0,0,0,6'
+  $lblManufacturer.Text = $manufacturerText
+
+  $lblModelLabel = New-Object System.Windows.Forms.Label
+  $lblModelLabel.Text = 'System Model:'
+  $lblModelLabel.AutoSize = $true
+  $lblModelLabel.Margin = '0,0,6,6'
+  $lblModel = New-Object System.Windows.Forms.Label
+  $lblModel.AutoSize = $true
+  $lblModel.Margin = '0,0,0,6'
+  $lblModel.Text = $modelText
+
+  $lblInstallDateLabel = New-Object System.Windows.Forms.Label
+  $lblInstallDateLabel.Text = 'Install Date:'
+  $lblInstallDateLabel.AutoSize = $true
+  $lblInstallDateLabel.Margin = '0,0,6,12'
+  $lblInstallDate = New-Object System.Windows.Forms.Label
+  $lblInstallDate.AutoSize = $true
+  $lblInstallDate.Margin = '0,0,0,12'
+  $lblInstallDate.Text = $installDateText
+
+  $lblBootHeading = New-Object System.Windows.Forms.Label
+  $lblBootHeading.Text = 'Boot Info'
+  $lblBootHeading.Font = $headingFont
+  $lblBootHeading.AutoSize = $true
+  $lblBootHeading.Margin = '0,0,0,6'
 
   $lblLastBootLabel = New-Object System.Windows.Forms.Label
   $lblLastBootLabel.Text = 'Last Boot:'
   $lblLastBootLabel.AutoSize = $true
-  $lblLastBootLabel.Margin = '0,0,6,0'
+  $lblLastBootLabel.Margin = '0,0,6,6'
   $lblLastBoot = New-Object System.Windows.Forms.Label
   $lblLastBoot.AutoSize = $true
-  $lblLastBoot.Margin = '0,0,0,0'
+  $lblLastBoot.Margin = '0,0,0,6'
   $lblLastBoot.Text = $lastBootText
   if($lastBootAgeDays -gt 5){
     $lblLastBoot.ForeColor = [System.Drawing.Color]::Red
@@ -4622,14 +4669,6 @@ function Show-LiveDetailsDialog($parentRec){
     $lblLastBoot.ForeColor = [System.Drawing.Color]::Orange
   }
 
-  $details.Controls.Add($lblDeviceLabel,0,0)
-  $details.Controls.Add($lblDevice,1,0)
-  $details.Controls.Add($lblIpLabel,0,1)
-  $details.Controls.Add($lblIp,1,1)
-  $details.Controls.Add($lblLastLoggedOnLabel,0,2)
-  $details.Controls.Add($lblLastLoggedOn,1,2)
-  $details.Controls.Add($lblLastBootLabel,0,3)
-  $details.Controls.Add($lblLastBoot,1,3)
   $lblRebootLabel = New-Object System.Windows.Forms.Label
   $lblRebootLabel.Text = 'Reboot Pending:'
   $lblRebootLabel.AutoSize = $true
@@ -4640,48 +4679,35 @@ function Show-LiveDetailsDialog($parentRec){
   $lblReboot.Text = $pendingRebootText
   if($pendingReboot -eq $true){ $lblReboot.ForeColor = [System.Drawing.Color]::Red }
 
-  $lblManufacturerLabel = New-Object System.Windows.Forms.Label
-  $lblManufacturerLabel.Text = 'Manufacturer:'
-  $lblManufacturerLabel.AutoSize = $true
-  $lblManufacturerLabel.Margin = '0,0,6,0'
-  $lblManufacturer = New-Object System.Windows.Forms.Label
-  $lblManufacturer.AutoSize = $true
-  $lblManufacturer.Margin = '0,0,0,0'
-  $lblManufacturer.Text = $manufacturerText
-
-  $lblModelLabel = New-Object System.Windows.Forms.Label
-  $lblModelLabel.Text = 'System Model:'
-  $lblModelLabel.AutoSize = $true
-  $lblModelLabel.Margin = '0,0,6,0'
-  $lblModel = New-Object System.Windows.Forms.Label
-  $lblModel.AutoSize = $true
-  $lblModel.Margin = '0,0,0,0'
-  $lblModel.Text = $modelText
-
-  $lblInstallDateLabel = New-Object System.Windows.Forms.Label
-  $lblInstallDateLabel.Text = 'Install Date:'
-  $lblInstallDateLabel.AutoSize = $true
-  $lblInstallDateLabel.Margin = '0,0,6,0'
-  $lblInstallDate = New-Object System.Windows.Forms.Label
-  $lblInstallDate.AutoSize = $true
-  $lblInstallDate.Margin = '0,0,0,0'
-  $lblInstallDate.Text = $installDateText
-
-  $details.Controls.Add($lblRebootLabel,0,4)
-  $details.Controls.Add($lblReboot,1,4)
+  $details.Controls.Add($lblNetworkHeading,0,0)
+  $details.SetColumnSpan($lblNetworkHeading,2)
+  $details.Controls.Add($lblDeviceLabel,0,1)
+  $details.Controls.Add($lblDevice,1,1)
+  $details.Controls.Add($lblIpLabel,0,2)
+  $details.Controls.Add($lblIp,1,2)
+  $details.Controls.Add($lblLastLoggedOnLabel,0,3)
+  $details.Controls.Add($lblLastLoggedOn,1,3)
+  $details.Controls.Add($lblHardwareHeading,0,4)
+  $details.SetColumnSpan($lblHardwareHeading,2)
   $details.Controls.Add($lblManufacturerLabel,0,5)
   $details.Controls.Add($lblManufacturer,1,5)
   $details.Controls.Add($lblModelLabel,0,6)
   $details.Controls.Add($lblModel,1,6)
   $details.Controls.Add($lblInstallDateLabel,0,7)
   $details.Controls.Add($lblInstallDate,1,7)
+  $details.Controls.Add($lblBootHeading,0,8)
+  $details.SetColumnSpan($lblBootHeading,2)
+  $details.Controls.Add($lblLastBootLabel,0,9)
+  $details.Controls.Add($lblLastBoot,1,9)
+  $details.Controls.Add($lblRebootLabel,0,10)
+  $details.Controls.Add($lblReboot,1,10)
 
   $buttonPanel = New-Object System.Windows.Forms.TableLayoutPanel
   $buttonPanel.AutoSize = $true
   $buttonPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $buttonPanel.ColumnCount = 2
   $buttonPanel.RowCount = 1
-  $buttonPanel.Dock = 'Top'
+  $buttonPanel.Anchor = 'Bottom, Right'
   $buttonPanel.ColumnStyles.Clear()
   $buttonPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
   $buttonPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
