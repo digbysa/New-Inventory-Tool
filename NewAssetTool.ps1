@@ -4425,16 +4425,72 @@ function Resolve-HostIpAddress([string]$hostName){
   } catch {}
   return $null
 }
-function Get-ComputerLastBoot([string]$computerName){
+function Get-ComputerOperatingSystem([string]$computerName){
   if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
+  try { return Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName $computerName -ErrorAction Stop } catch {}
+  return $null
+}
+function Get-ComputerLastBoot([string]$computerName, $operatingSystem = $null){
+  if(-not $operatingSystem){ $operatingSystem = Get-ComputerOperatingSystem $computerName }
+  if(-not $operatingSystem){ return $null }
   try {
-    $os = Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName $computerName -ErrorAction Stop
-    if($os -and $os.LastBootUpTime){
-      try { return [datetime]$os.LastBootUpTime } catch {}
-      try { return [System.Management.ManagementDateTimeConverter]::ToDateTime($os.LastBootUpTime) } catch {}
+    if($operatingSystem.LastBootUpTime){
+      try { return [datetime]$operatingSystem.LastBootUpTime } catch {}
+      try { return [System.Management.ManagementDateTimeConverter]::ToDateTime($operatingSystem.LastBootUpTime) } catch {}
     }
   } catch {}
   return $null
+}
+function Get-ComputerInstallDate([string]$computerName, $operatingSystem = $null){
+  if(-not $operatingSystem){ $operatingSystem = Get-ComputerOperatingSystem $computerName }
+  if(-not $operatingSystem){ return $null }
+  try {
+    if($operatingSystem.InstallDate){
+      try { return [datetime]$operatingSystem.InstallDate } catch {}
+      try { return [System.Management.ManagementDateTimeConverter]::ToDateTime($operatingSystem.InstallDate) } catch {}
+    }
+  } catch {}
+  return $null
+}
+function Get-ComputerManufacturerModel([string]$computerName){
+  $result = [pscustomobject]@{ Manufacturer = $null; Model = $null }
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $result }
+  try {
+    $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ComputerName $computerName -ErrorAction Stop
+    if($cs){
+      try { if($cs.Manufacturer){ $result.Manufacturer = [string]$cs.Manufacturer } } catch {}
+      try { if($cs.Model){ $result.Model = [string]$cs.Model } } catch {}
+    }
+  } catch {}
+  return $result
+}
+function Test-ComputerPendingReboot([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
+  $base = $null
+  try {
+    $base = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine,$computerName)
+    if(-not $base){ return $null }
+    $pending = $false
+    try { if($base.OpenSubKey('SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\RebootPending')){ $pending = $true } } catch {}
+    if(-not $pending){ try { if($base.OpenSubKey('SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\Auto Update\\RebootRequired')){ $pending = $true } } catch {} }
+    if(-not $pending){
+      try {
+        $sessionKey = $base.OpenSubKey('SYSTEM\\CurrentControlSet\\Control\\Session Manager')
+        if($sessionKey){
+          try {
+            $pendingOps = $sessionKey.GetValue('PendingFileRenameOperations')
+            if($pendingOps -and ((($pendingOps -is [System.Array]) -and ($pendingOps.Length -gt 0)) -or ([string]$pendingOps).Trim())){ $pending = $true }
+          } catch {}
+          try { $sessionKey.Close() } catch {}
+        }
+      } catch {}
+    }
+    return $pending
+  } catch {
+    return $null
+  } finally {
+    try { if($base){ $base.Close() } } catch {}
+  }
 }
 function Show-LiveDetailsDialog($parentRec){
   if(-not $parentRec){ return }
@@ -4446,7 +4502,8 @@ function Show-LiveDetailsDialog($parentRec){
   $ipAddress = Resolve-HostIpAddress $hostName
   $subnetLabel = Get-SiteSubnetLabelForIp $ipAddress
   $ipDisplayText = if([string]::IsNullOrWhiteSpace($ipAddress)){ 'IP address not available.' } elseif([string]::IsNullOrWhiteSpace($subnetLabel)){ $ipAddress } else { "$ipAddress ($subnetLabel)" }
-  $lastBoot = Get-ComputerLastBoot $hostName
+  $operatingSystem = Get-ComputerOperatingSystem $hostName
+  $lastBoot = Get-ComputerLastBoot $hostName $operatingSystem
   $lastBootAgeDays = $null
   if($lastBoot){
     $lastBootText = Fmt-DateLong $lastBoot
@@ -4459,6 +4516,23 @@ function Show-LiveDetailsDialog($parentRec){
     } catch {}
   } else {
     $lastBootText = 'Last boot not available.'
+  }
+  $installDate = Get-ComputerInstallDate $hostName $operatingSystem
+  if($installDate){
+    $installDateText = Fmt-DateLong $installDate
+  } else {
+    $installDateText = 'Install date not available.'
+  }
+  $manufacturerInfo = Get-ComputerManufacturerModel $hostName
+  $manufacturerText = if($manufacturerInfo.Manufacturer){ $manufacturerInfo.Manufacturer } else { '(unknown)' }
+  $modelText = if($manufacturerInfo.Model){ $manufacturerInfo.Model } else { '(unknown)' }
+  $pendingReboot = Test-ComputerPendingReboot $hostName
+  if($pendingReboot -eq $true){
+    $pendingRebootText = 'Yes'
+  } elseif($pendingReboot -eq $false){
+    $pendingRebootText = 'No'
+  } else {
+    $pendingRebootText = 'Unknown'
   }
   $dialog = New-Object System.Windows.Forms.Form
   $dialog.Text = 'Live Details'
@@ -4485,13 +4559,13 @@ function Show-LiveDetailsDialog($parentRec){
   $details.AutoSize = $true
   $details.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $details.ColumnCount = 2
-  $details.RowCount = 3
+  $details.RowCount = 7
   $details.Dock = 'Top'
   $details.ColumnStyles.Clear()
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.RowStyles.Clear()
-  for($i=0;$i -lt 3;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
+  for($i=0;$i -lt 7;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
 
   $lblDeviceLabel = New-Object System.Windows.Forms.Label
   $lblDeviceLabel.Text = 'Host Name:'
@@ -4531,6 +4605,51 @@ function Show-LiveDetailsDialog($parentRec){
   $details.Controls.Add($lblIp,1,1)
   $details.Controls.Add($lblLastBootLabel,0,2)
   $details.Controls.Add($lblLastBoot,1,2)
+  $lblRebootLabel = New-Object System.Windows.Forms.Label
+  $lblRebootLabel.Text = 'Reboot Pending:'
+  $lblRebootLabel.AutoSize = $true
+  $lblRebootLabel.Margin = '0,0,6,0'
+  $lblReboot = New-Object System.Windows.Forms.Label
+  $lblReboot.AutoSize = $true
+  $lblReboot.Margin = '0,0,0,0'
+  $lblReboot.Text = $pendingRebootText
+  if($pendingReboot -eq $true){ $lblReboot.ForeColor = [System.Drawing.Color]::Red }
+
+  $lblManufacturerLabel = New-Object System.Windows.Forms.Label
+  $lblManufacturerLabel.Text = 'Manufacturer:'
+  $lblManufacturerLabel.AutoSize = $true
+  $lblManufacturerLabel.Margin = '0,0,6,0'
+  $lblManufacturer = New-Object System.Windows.Forms.Label
+  $lblManufacturer.AutoSize = $true
+  $lblManufacturer.Margin = '0,0,0,0'
+  $lblManufacturer.Text = $manufacturerText
+
+  $lblModelLabel = New-Object System.Windows.Forms.Label
+  $lblModelLabel.Text = 'System Model:'
+  $lblModelLabel.AutoSize = $true
+  $lblModelLabel.Margin = '0,0,6,0'
+  $lblModel = New-Object System.Windows.Forms.Label
+  $lblModel.AutoSize = $true
+  $lblModel.Margin = '0,0,0,0'
+  $lblModel.Text = $modelText
+
+  $lblInstallDateLabel = New-Object System.Windows.Forms.Label
+  $lblInstallDateLabel.Text = 'Install Date:'
+  $lblInstallDateLabel.AutoSize = $true
+  $lblInstallDateLabel.Margin = '0,0,6,0'
+  $lblInstallDate = New-Object System.Windows.Forms.Label
+  $lblInstallDate.AutoSize = $true
+  $lblInstallDate.Margin = '0,0,0,0'
+  $lblInstallDate.Text = $installDateText
+
+  $details.Controls.Add($lblRebootLabel,0,3)
+  $details.Controls.Add($lblReboot,1,3)
+  $details.Controls.Add($lblManufacturerLabel,0,4)
+  $details.Controls.Add($lblManufacturer,1,4)
+  $details.Controls.Add($lblModelLabel,0,5)
+  $details.Controls.Add($lblModel,1,5)
+  $details.Controls.Add($lblInstallDateLabel,0,6)
+  $details.Controls.Add($lblInstallDate,1,6)
 
   $buttonPanel = New-Object System.Windows.Forms.TableLayoutPanel
   $buttonPanel.AutoSize = $true
