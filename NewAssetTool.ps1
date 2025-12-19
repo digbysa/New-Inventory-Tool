@@ -4452,6 +4452,58 @@ function Get-ComputerInstallDate([string]$computerName, $operatingSystem = $null
   } catch {}
   return $null
 }
+function Get-ComputerProfileCount([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
+  try {
+    $profiles = Get-CimInstance -ClassName Win32_UserProfile -ComputerName $computerName -ErrorAction Stop
+    if(-not $profiles){ return 0 }
+    try {
+      $nonSpecialProfiles = $profiles | Where-Object { $_.LocalPath -and ($_.Special -ne $true) }
+      return [int](($nonSpecialProfiles | Measure-Object).Count)
+    } catch {}
+    try { return [int](($profiles | Measure-Object).Count) } catch {}
+  } catch {}
+  return $null
+}
+function Get-ComputerDriveUsage([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
+  try {
+    $drive = Get-CimInstance -ClassName Win32_LogicalDisk -ComputerName $computerName -Filter "DeviceID='C:'" -ErrorAction Stop
+    if($drive){
+      $totalBytes = $null
+      $freeBytes = $null
+      try { $totalBytes = [double]$drive.Size } catch {}
+      try { $freeBytes = [double]$drive.FreeSpace } catch {}
+      if(($totalBytes -is [double]) -and $totalBytes -gt 0 -and ($freeBytes -is [double])){
+        $usedBytes = [math]::Max(0,$totalBytes - $freeBytes)
+        $percentUsed = [math]::Min([math]::Max([math]::Round(($usedBytes / $totalBytes) * 100),0),100)
+        return [pscustomobject]@{
+          TotalBytes = $totalBytes
+          FreeBytes = $freeBytes
+          UsedBytes = $usedBytes
+          PercentUsed = $percentUsed
+        }
+      }
+    }
+  } catch {}
+  return $null
+}
+function Get-ComputerPrimaryDiskInfo([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
+  try {
+    $disk = Get-CimInstance -ClassName Win32_DiskDrive -ComputerName $computerName -ErrorAction Stop | Select-Object -First 1
+    if($disk){
+      $model = $null
+      $sizeBytes = $null
+      try { if($disk.Model){ $model = [string]$disk.Model } } catch {}
+      try { $sizeBytes = [double]$disk.Size } catch {}
+      if($model -or ($sizeBytes -is [double])){
+        return [pscustomobject]@{ Model = $model; SizeBytes = $sizeBytes }
+      }
+    }
+  } catch {}
+  return $null
+}
 function Get-ComputerManufacturerModel([string]$computerName){
   $result = [pscustomobject]@{ Manufacturer = $null; Model = $null }
   if([string]::IsNullOrWhiteSpace($computerName)){ return $result }
@@ -4548,6 +4600,37 @@ function Show-LiveDetailsDialog($parentRec){
   } else {
     $pendingRebootText = 'Unknown'
   }
+  $profileCount = Get-ComputerProfileCount $hostName
+  if($profileCount -ne $null){
+    $profileCountText = "$profileCount $(if($profileCount -eq 1){ 'profile' } else { 'profiles' })"
+  } else {
+    $profileCountText = 'Profile count not available.'
+  }
+  $driveUsage = Get-ComputerDriveUsage $hostName
+  $primaryDisk = Get-ComputerPrimaryDiskInfo $hostName
+  $driveUsageText = 'C: drive usage not available.'
+  $driveUsagePercent = $null
+  if($driveUsage){
+    $driveUsagePercent = [math]::Round($driveUsage.PercentUsed)
+    $totalGb = [math]::Round($driveUsage.TotalBytes / 1GB, 1)
+    $usedGb = [math]::Round($driveUsage.UsedBytes / 1GB, 1)
+    $freeGb = [math]::Round($driveUsage.FreeBytes / 1GB, 1)
+    $driveUsageText = "${usedGb} GB used of ${totalGb} GB (${driveUsagePercent}% used, ${freeGb} GB free)"
+  } elseif($primaryDisk){
+    $diskSizeText = $null
+    if($primaryDisk.SizeBytes -is [double] -and $primaryDisk.SizeBytes -gt 0){
+      $diskSizeText = "{0} GB" -f ([math]::Round($primaryDisk.SizeBytes / 1GB, 1))
+    }
+    $diskDescription = $null
+    if($primaryDisk.Model){ $diskDescription = $primaryDisk.Model }
+    if($diskDescription -and $diskSizeText){
+      $driveUsageText = "Drive usage not available. Primary disk: $diskDescription ($diskSizeText)."
+    } elseif($diskDescription){
+      $driveUsageText = "Drive usage not available. Primary disk: $diskDescription."
+    } elseif($diskSizeText){
+      $driveUsageText = "Drive usage not available. Primary disk size: $diskSizeText."
+    }
+  }
   $dialog = New-Object System.Windows.Forms.Form
   $dialog.Text = 'Live Details'
   $dialog.StartPosition = 'CenterParent'
@@ -4573,13 +4656,13 @@ function Show-LiveDetailsDialog($parentRec){
   $details.AutoSize = $true
   $details.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $details.ColumnCount = 2
-  $details.RowCount = 11
+  $details.RowCount = 13
   $details.Dock = 'Fill'
   $details.ColumnStyles.Clear()
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.RowStyles.Clear()
-  for($i=0;$i -lt 11;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
+  for($i=0;$i -lt 13;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
 
   $headingFont = New-Object System.Drawing.Font($dialog.Font, [System.Drawing.FontStyle]::Bold)
 
@@ -4643,17 +4726,59 @@ function Show-LiveDetailsDialog($parentRec){
   $lblInstallDateLabel = New-Object System.Windows.Forms.Label
   $lblInstallDateLabel.Text = 'Install Date:'
   $lblInstallDateLabel.AutoSize = $true
-  $lblInstallDateLabel.Margin = '0,0,6,12'
+  $lblInstallDateLabel.Margin = '0,0,6,6'
   $lblInstallDate = New-Object System.Windows.Forms.Label
   $lblInstallDate.AutoSize = $true
-  $lblInstallDate.Margin = '0,0,0,12'
+  $lblInstallDate.Margin = '0,0,0,6'
   $lblInstallDate.Text = $installDateText
+
+  $lblDriveLabel = New-Object System.Windows.Forms.Label
+  $lblDriveLabel.Text = 'C: Drive:'
+  $lblDriveLabel.AutoSize = $true
+  $lblDriveLabel.Margin = '0,0,6,12'
+  $drivePanel = New-Object System.Windows.Forms.TableLayoutPanel
+  $drivePanel.AutoSize = $true
+  $drivePanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $drivePanel.ColumnCount = 1
+  $drivePanel.RowCount = 2
+  $drivePanel.ColumnStyles.Clear()
+  $drivePanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+  $drivePanel.RowStyles.Clear()
+  $drivePanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $drivePanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $pbarDrive = New-Object System.Windows.Forms.ProgressBar
+  $pbarDrive.Style = 'Continuous'
+  $pbarDrive.Minimum = 0
+  $pbarDrive.Maximum = 100
+  $pbarDrive.Width = 200
+  $pbarDrive.Margin = '0,0,0,3'
+  if($driveUsagePercent -ne $null){
+    $drivePercentValue = [int][math]::Min([math]::Max($driveUsagePercent,$pbarDrive.Minimum),$pbarDrive.Maximum)
+    try { $pbarDrive.Value = $drivePercentValue } catch {}
+  } else {
+    $pbarDrive.Enabled = $false
+  }
+  $lblDriveUsage = New-Object System.Windows.Forms.Label
+  $lblDriveUsage.AutoSize = $true
+  $lblDriveUsage.Margin = '0,3,0,12'
+  $lblDriveUsage.Text = $driveUsageText
+  $drivePanel.Controls.Add($pbarDrive,0,0)
+  $drivePanel.Controls.Add($lblDriveUsage,0,1)
 
   $lblBootHeading = New-Object System.Windows.Forms.Label
   $lblBootHeading.Text = 'Boot Info'
   $lblBootHeading.Font = $headingFont
   $lblBootHeading.AutoSize = $true
   $lblBootHeading.Margin = '0,0,0,6'
+
+  $lblProfileCountLabel = New-Object System.Windows.Forms.Label
+  $lblProfileCountLabel.Text = 'Profiles:'
+  $lblProfileCountLabel.AutoSize = $true
+  $lblProfileCountLabel.Margin = '0,0,6,6'
+  $lblProfileCount = New-Object System.Windows.Forms.Label
+  $lblProfileCount.AutoSize = $true
+  $lblProfileCount.Margin = '0,0,0,6'
+  $lblProfileCount.Text = $profileCountText
 
   $lblLastBootLabel = New-Object System.Windows.Forms.Label
   $lblLastBootLabel.Text = 'Last Boot:'
@@ -4695,12 +4820,16 @@ function Show-LiveDetailsDialog($parentRec){
   $details.Controls.Add($lblModel,1,6)
   $details.Controls.Add($lblInstallDateLabel,0,7)
   $details.Controls.Add($lblInstallDate,1,7)
-  $details.Controls.Add($lblBootHeading,0,8)
+  $details.Controls.Add($lblDriveLabel,0,8)
+  $details.Controls.Add($drivePanel,1,8)
+  $details.Controls.Add($lblBootHeading,0,9)
   $details.SetColumnSpan($lblBootHeading,2)
-  $details.Controls.Add($lblLastBootLabel,0,9)
-  $details.Controls.Add($lblLastBoot,1,9)
-  $details.Controls.Add($lblRebootLabel,0,10)
-  $details.Controls.Add($lblReboot,1,10)
+  $details.Controls.Add($lblProfileCountLabel,0,10)
+  $details.Controls.Add($lblProfileCount,1,10)
+  $details.Controls.Add($lblLastBootLabel,0,11)
+  $details.Controls.Add($lblLastBoot,1,11)
+  $details.Controls.Add($lblRebootLabel,0,12)
+  $details.Controls.Add($lblReboot,1,12)
 
   $buttonPanel = New-Object System.Windows.Forms.TableLayoutPanel
   $buttonPanel.AutoSize = $true
