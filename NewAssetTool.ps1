@@ -3790,6 +3790,33 @@ function Apply-AssociatedDeviceValidation([pscustomobject]$wmiData){
     $row.Cells['Serial'].ToolTipText = $tooltip
   }
 }
+
+function Get-UnlinkedMonitorSerials($monitorSerials){
+  $missing = New-Object System.Collections.ArrayList
+  if(-not $monitorSerials){ return $missing }
+
+  $linked = New-Object System.Collections.ArrayList
+  foreach($row in $dgv.Rows){
+    if(-not $row -or $row.IsNewRow){ continue }
+    $type = ''
+    $serial = ''
+    try { $type = [string]$row.Cells['Type'].Value } catch {}
+    try { $serial = [string]$row.Cells['Serial'].Value } catch {}
+    if([string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($serial)){ continue }
+    if($type.Trim().ToUpper() -ne 'MONITOR'){ continue }
+    $normalized = $serial.Trim().ToUpper()
+    if(-not $linked.Contains($normalized)){ [void]$linked.Add($normalized) }
+  }
+
+  foreach($m in $monitorSerials){
+    if([string]::IsNullOrWhiteSpace($m)){ continue }
+    $normalized = $m.Trim().ToUpper()
+    if($linked.Contains($normalized)){ continue }
+    if(-not $missing.Contains($normalized)){ [void]$missing.Add($normalized) }
+  }
+
+  return $missing
+}
 function Validate-AssociatedDevices([string]$computerName){
   if([string]::IsNullOrWhiteSpace($computerName)){
     [System.Windows.Forms.MessageBox]::Show("Enter a device name before validating.","Validate Devices") | Out-Null
@@ -3805,7 +3832,27 @@ function Validate-AssociatedDevices([string]$computerName){
     [System.Windows.Forms.MessageBox]::Show("Device is not pingable.","Validate Devices") | Out-Null
     return
   }
+  $monitorSerials = @()
+  try { if($wmiData.MonitorSerials){ $monitorSerials = $wmiData.MonitorSerials } } catch {}
   Apply-AssociatedDeviceValidation $wmiData
+  $missingMonitors = Get-UnlinkedMonitorSerials $monitorSerials
+  if($missingMonitors -and $missingMonitors.Count -gt 0){
+    $pc = $script:CurrentParent
+    if(-not $pc -and $script:CurrentDisplay){
+      $pc = Resolve-ParentComputer $script:CurrentDisplay
+    }
+    $isExcluded = $false
+    try{
+      if($pc -and (-not $chkShowExcluded.Checked)){
+        $mt = ('' + $pc.u_device_rounding).Trim()
+        if($mt -match '^(?i)Excluded$'){ $isExcluded = $true }
+      }
+    } catch {}
+    if($pc -and -not $isExcluded){
+      $serialToLink = $missingMonitors | Select-Object -First 1
+      Show-AddPeripheralDialog $pc $serialToLink "This monitor is connected but not linked. Click Add to link."
+    }
+  }
 }
 function Make-Card($title,$kvPairs,[System.Drawing.Color]$ritmColor,[bool]$showRITM,[bool]$showRetire,$tagPayload){
   $p = New-Object System.Windows.Forms.Panel
@@ -4160,7 +4207,7 @@ function Link-Peripheral([string]$query,$parentRec,$lookupResult=$null){
   Update-FixNameButton $script:CurrentDisplay $script:CurrentParent
   return $true
 }
-function Show-AddPeripheralDialog($parentRec){
+function Show-AddPeripheralDialog($parentRec,[string]$defaultSearchText='',[string]$infoMessage=''){
   if(-not $parentRec){ return }
   $dialog = New-Object System.Windows.Forms.Form
   $dialog.Text = 'Add Peripheral (Name/Asset/Serial)'
@@ -4192,7 +4239,17 @@ function Show-AddPeripheralDialog($parentRec){
   $inputPanel.RowCount = 3
   $inputPanel.Dock = 'Top'
   $inputPanel.RowStyles.Clear()
-  for($i=0;$i -lt 3;$i++){ [void]$inputPanel.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) ) }
+  $inputRowCount = if([string]::IsNullOrWhiteSpace($infoMessage)){ 3 } else { 4 }
+  $inputPanel.RowCount = $inputRowCount
+  for($i=0;$i -lt $inputRowCount;$i++){ [void]$inputPanel.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) ) }
+  if(-not [string]::IsNullOrWhiteSpace($infoMessage)){
+    $lblInfo = New-Object System.Windows.Forms.Label
+    $lblInfo.Text = $infoMessage
+    $lblInfo.AutoSize = $true
+    $lblInfo.Margin = '0,0,0,6'
+    $lblInfo.ForeColor = [System.Drawing.Color]::DarkOrange
+    $inputPanel.Controls.Add($lblInfo,0,0)
+  }
   $lblSearch = New-Object System.Windows.Forms.Label
   $lblSearch.Text = 'Universal Search (name / asset / serial):'
   $lblSearch.AutoSize = $true
@@ -4205,9 +4262,9 @@ function Show-AddPeripheralDialog($parentRec){
   $lblHint.AutoSize = $true
   $lblHint.ForeColor = $script:ThemeColors.MutedText
   $lblHint.Margin = '0,0,0,0'
-  $inputPanel.Controls.Add($lblSearch,0,0)
-  $inputPanel.Controls.Add($txtSearch,0,1)
-  $inputPanel.Controls.Add($lblHint,0,2)
+  $inputPanel.Controls.Add($lblSearch,0,($inputPanel.RowStyles.Count - 3))
+  $inputPanel.Controls.Add($txtSearch,0,($inputPanel.RowStyles.Count - 2))
+  $inputPanel.Controls.Add($lblHint,0,($inputPanel.RowStyles.Count - 1))
 
   # Preview area
   $grpPreview = New-Object System.Windows.Forms.GroupBox
@@ -4408,7 +4465,15 @@ function Show-AddPeripheralDialog($parentRec){
       $dialog.Close()
     }
   })
-  $dialog.Add_Shown({ $txtSearch.Focus() })
+  $dialog.Add_Shown({
+    $txtSearch.Focus()
+    if(-not [string]::IsNullOrWhiteSpace($defaultSearchText)){
+      $txtSearch.Text = $defaultSearchText
+      try { $txtSearch.SelectionStart = $txtSearch.Text.Length } catch {}
+      $result = Resolve-PeripheralLookup $txtSearch.Text
+      & $applyPreview $result
+    }
+  })
   Apply-ModernThemeToForm -Form $dialog
   try { [void]$dialog.ShowDialog($form) } finally { try { $dialog.Dispose() } catch {} }
 }
@@ -4451,6 +4516,49 @@ function Get-ComputerInstallDate([string]$computerName, $operatingSystem = $null
     }
   } catch {}
   return $null
+}
+function Get-ComputerProfileCount([string]$computerName){
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
+  try {
+    $profiles = Get-CimInstance -ClassName Win32_UserProfile -ComputerName $computerName -ErrorAction Stop
+    if(-not $profiles){ return 0 }
+    try {
+      $nonSpecialProfiles = $profiles | Where-Object { $_.LocalPath -and ($_.Special -ne $true) }
+      return [int](($nonSpecialProfiles | Measure-Object).Count)
+    } catch {}
+    try { return [int](($profiles | Measure-Object).Count) } catch {}
+  } catch {}
+  return $null
+}
+function Get-ComputerDriveUsage([string]$computerName){
+  $results = New-Object System.Collections.Generic.List[object]
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $results.ToArray() }
+  try {
+    $drives = Get-CimInstance -ClassName Win32_LogicalDisk -ComputerName $computerName -Filter "DriveType=3" -ErrorAction Stop
+    foreach($drive in $drives){
+      $deviceId = $null
+      try { if($drive.DeviceID){ $deviceId = [string]$drive.DeviceID } } catch {}
+      $totalBytes = $null
+      $freeBytes = $null
+      try { $totalBytes = [double]$drive.Size } catch {}
+      try { $freeBytes = [double]$drive.FreeSpace } catch {}
+      if(($totalBytes -is [double]) -and $totalBytes -gt 0 -and ($freeBytes -is [double])){
+        $usedBytes = [math]::Max(0,$totalBytes - $freeBytes)
+        $percentUsed = [math]::Min([math]::Max([math]::Round(($usedBytes / $totalBytes) * 100),0),100)
+        $results.Add([pscustomobject]@{
+          DeviceId = if([string]::IsNullOrWhiteSpace($deviceId)){ '(unknown)' } else { $deviceId }
+          TotalBytes = $totalBytes
+          FreeBytes = $freeBytes
+          UsedBytes = $usedBytes
+          PercentUsed = $percentUsed
+        }) | Out-Null
+      }
+    }
+    if($results.Count -gt 0){
+      return ($results | Sort-Object DeviceId)
+    }
+  } catch {}
+  return $results.ToArray()
 }
 function Get-ComputerManufacturerModel([string]$computerName){
   $result = [pscustomobject]@{ Manufacturer = $null; Model = $null }
@@ -4548,6 +4656,12 @@ function Show-LiveDetailsDialog($parentRec){
   } else {
     $pendingRebootText = 'Unknown'
   }
+  $profileCount = Get-ComputerProfileCount $hostName
+  if($profileCount -ne $null){
+    $profileCountText = "$profileCount $(if($profileCount -eq 1){ 'profile' } else { 'profiles' })"
+  } else {
+    $profileCountText = 'Profile count not available.'
+  }
   $dialog = New-Object System.Windows.Forms.Form
   $dialog.Text = 'Live Details'
   $dialog.StartPosition = 'CenterParent'
@@ -4573,13 +4687,13 @@ function Show-LiveDetailsDialog($parentRec){
   $details.AutoSize = $true
   $details.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $details.ColumnCount = 2
-  $details.RowCount = 11
+  $details.RowCount = 12
   $details.Dock = 'Fill'
   $details.ColumnStyles.Clear()
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.RowStyles.Clear()
-  for($i=0;$i -lt 11;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
+  for($i=0;$i -lt 12;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
 
   $headingFont = New-Object System.Drawing.Font($dialog.Font, [System.Drawing.FontStyle]::Bold)
 
@@ -4655,6 +4769,15 @@ function Show-LiveDetailsDialog($parentRec){
   $lblBootHeading.AutoSize = $true
   $lblBootHeading.Margin = '0,0,0,6'
 
+  $lblProfileCountLabel = New-Object System.Windows.Forms.Label
+  $lblProfileCountLabel.Text = 'Profiles:'
+  $lblProfileCountLabel.AutoSize = $true
+  $lblProfileCountLabel.Margin = '0,0,6,6'
+  $lblProfileCount = New-Object System.Windows.Forms.Label
+  $lblProfileCount.AutoSize = $true
+  $lblProfileCount.Margin = '0,0,0,6'
+  $lblProfileCount.Text = $profileCountText
+
   $lblLastBootLabel = New-Object System.Windows.Forms.Label
   $lblLastBootLabel.Text = 'Last Boot:'
   $lblLastBootLabel.AutoSize = $true
@@ -4697,10 +4820,12 @@ function Show-LiveDetailsDialog($parentRec){
   $details.Controls.Add($lblInstallDate,1,7)
   $details.Controls.Add($lblBootHeading,0,8)
   $details.SetColumnSpan($lblBootHeading,2)
-  $details.Controls.Add($lblLastBootLabel,0,9)
-  $details.Controls.Add($lblLastBoot,1,9)
-  $details.Controls.Add($lblRebootLabel,0,10)
-  $details.Controls.Add($lblReboot,1,10)
+  $details.Controls.Add($lblProfileCountLabel,0,9)
+  $details.Controls.Add($lblProfileCount,1,9)
+  $details.Controls.Add($lblLastBootLabel,0,10)
+  $details.Controls.Add($lblLastBoot,1,10)
+  $details.Controls.Add($lblRebootLabel,0,11)
+  $details.Controls.Add($lblReboot,1,11)
 
   $buttonPanel = New-Object System.Windows.Forms.TableLayoutPanel
   $buttonPanel.AutoSize = $true
