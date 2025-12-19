@@ -4531,10 +4531,13 @@ function Get-ComputerProfileCount([string]$computerName){
   return $null
 }
 function Get-ComputerDriveUsage([string]$computerName){
-  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
+  $results = New-Object System.Collections.Generic.List[object]
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $results.ToArray() }
   try {
-    $drive = Get-CimInstance -ClassName Win32_LogicalDisk -ComputerName $computerName -Filter "DeviceID='C:'" -ErrorAction Stop
-    if($drive){
+    $drives = Get-CimInstance -ClassName Win32_LogicalDisk -ComputerName $computerName -Filter "DriveType=3" -ErrorAction Stop
+    foreach($drive in $drives){
+      $deviceId = $null
+      try { if($drive.DeviceID){ $deviceId = [string]$drive.DeviceID } } catch {}
       $totalBytes = $null
       $freeBytes = $null
       try { $totalBytes = [double]$drive.Size } catch {}
@@ -4542,16 +4545,20 @@ function Get-ComputerDriveUsage([string]$computerName){
       if(($totalBytes -is [double]) -and $totalBytes -gt 0 -and ($freeBytes -is [double])){
         $usedBytes = [math]::Max(0,$totalBytes - $freeBytes)
         $percentUsed = [math]::Min([math]::Max([math]::Round(($usedBytes / $totalBytes) * 100),0),100)
-        return [pscustomobject]@{
+        $results.Add([pscustomobject]@{
+          DeviceId = if([string]::IsNullOrWhiteSpace($deviceId)){ '(unknown)' } else { $deviceId }
           TotalBytes = $totalBytes
           FreeBytes = $freeBytes
           UsedBytes = $usedBytes
           PercentUsed = $percentUsed
-        }
+        }) | Out-Null
       }
     }
+    if($results.Count -gt 0){
+      return ($results | Sort-Object DeviceId)
+    }
   } catch {}
-  return $null
+  return $results.ToArray()
 }
 function Get-ComputerManufacturerModel([string]$computerName){
   $result = [pscustomobject]@{ Manufacturer = $null; Model = $null }
@@ -4656,15 +4663,6 @@ function Show-LiveDetailsDialog($parentRec){
     $profileCountText = 'Profile count not available.'
   }
   $driveUsage = Get-ComputerDriveUsage $hostName
-  $driveUsageText = 'C: drive usage not available.'
-  $driveUsagePercent = $null
-  if($driveUsage){
-    $driveUsagePercent = [math]::Round($driveUsage.PercentUsed)
-    $totalGb = [math]::Round($driveUsage.TotalBytes / 1GB, 1)
-    $usedGb = [math]::Round($driveUsage.UsedBytes / 1GB, 1)
-    $freeGb = [math]::Round($driveUsage.FreeBytes / 1GB, 1)
-    $driveUsageText = "${usedGb} GB used of ${totalGb} GB (${driveUsagePercent}% used, ${freeGb} GB free)"
-  }
   $dialog = New-Object System.Windows.Forms.Form
   $dialog.Text = 'Live Details'
   $dialog.StartPosition = 'CenterParent'
@@ -4767,37 +4765,51 @@ function Show-LiveDetailsDialog($parentRec){
   $lblInstallDate.Text = $installDateText
 
   $lblDriveLabel = New-Object System.Windows.Forms.Label
-  $lblDriveLabel.Text = 'C: Drive:'
+  $lblDriveLabel.Text = 'Drives:'
   $lblDriveLabel.AutoSize = $true
   $lblDriveLabel.Margin = '0,0,6,12'
   $drivePanel = New-Object System.Windows.Forms.TableLayoutPanel
   $drivePanel.AutoSize = $true
   $drivePanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $drivePanel.ColumnCount = 1
-  $drivePanel.RowCount = 2
   $drivePanel.ColumnStyles.Clear()
   $drivePanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
   $drivePanel.RowStyles.Clear()
-  $drivePanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-  $drivePanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-  $pbarDrive = New-Object System.Windows.Forms.ProgressBar
-  $pbarDrive.Style = 'Continuous'
-  $pbarDrive.Minimum = 0
-  $pbarDrive.Maximum = 100
-  $pbarDrive.Width = 200
-  $pbarDrive.Margin = '0,0,0,3'
-  if($driveUsagePercent -ne $null){
-    $drivePercentValue = [int][math]::Min([math]::Max($driveUsagePercent,$pbarDrive.Minimum),$pbarDrive.Maximum)
-    try { $pbarDrive.Value = $drivePercentValue } catch {}
+  $drivePanel.RowCount = 0
+  if($driveUsage -and $driveUsage.Count -gt 0){
+    $driveIndex = 0
+    foreach($usage in $driveUsage){
+      $drivePanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+      $drivePanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+      $drivePanel.RowCount += 2
+      $pbarDrive = New-Object System.Windows.Forms.ProgressBar
+      $pbarDrive.Style = 'Continuous'
+      $pbarDrive.Minimum = 0
+      $pbarDrive.Maximum = 100
+      $pbarDrive.Width = 200
+      $pbarDrive.Margin = '0,0,0,3'
+      $drivePercentValue = [int][math]::Min([math]::Max([math]::Round($usage.PercentUsed),$pbarDrive.Minimum),$pbarDrive.Maximum)
+      try { $pbarDrive.Value = $drivePercentValue } catch {}
+      $lblDriveUsage = New-Object System.Windows.Forms.Label
+      $lblDriveUsage.AutoSize = $true
+      $lblDriveUsage.Margin = if($driveIndex -eq $driveUsage.Count - 1){ '0,3,0,12' } else { '0,3,0,8' }
+      $totalGb = [math]::Round($usage.TotalBytes / 1GB, 1)
+      $usedGb = [math]::Round($usage.UsedBytes / 1GB, 1)
+      $freeGb = [math]::Round($usage.FreeBytes / 1GB, 1)
+      $lblDriveUsage.Text = "${($usage.DeviceId)} drive: ${usedGb} GB used of ${totalGb} GB (${drivePercentValue}% used, ${freeGb} GB free)"
+      $drivePanel.Controls.Add($pbarDrive,0,$drivePanel.RowCount - 2)
+      $drivePanel.Controls.Add($lblDriveUsage,0,$drivePanel.RowCount - 1)
+      $driveIndex++
+    }
   } else {
-    $pbarDrive.Enabled = $false
+    $drivePanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+    $drivePanel.RowCount = 1
+    $lblDriveUsage = New-Object System.Windows.Forms.Label
+    $lblDriveUsage.AutoSize = $true
+    $lblDriveUsage.Margin = '0,0,0,12'
+    $lblDriveUsage.Text = 'Drive usage not available.'
+    $drivePanel.Controls.Add($lblDriveUsage,0,0)
   }
-  $lblDriveUsage = New-Object System.Windows.Forms.Label
-  $lblDriveUsage.AutoSize = $true
-  $lblDriveUsage.Margin = '0,3,0,12'
-  $lblDriveUsage.Text = $driveUsageText
-  $drivePanel.Controls.Add($pbarDrive,0,0)
-  $drivePanel.Controls.Add($lblDriveUsage,0,1)
 
   $lblBootHeading = New-Object System.Windows.Forms.Label
   $lblBootHeading.Text = 'Boot Info'
