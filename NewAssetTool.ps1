@@ -4488,22 +4488,6 @@ function Get-ComputerDriveUsage([string]$computerName){
   } catch {}
   return $null
 }
-function Get-ComputerPrimaryDiskInfo([string]$computerName){
-  if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
-  try {
-    $disk = Get-CimInstance -ClassName Win32_DiskDrive -ComputerName $computerName -ErrorAction Stop | Select-Object -First 1
-    if($disk){
-      $model = $null
-      $sizeBytes = $null
-      try { if($disk.Model){ $model = [string]$disk.Model } } catch {}
-      try { $sizeBytes = [double]$disk.Size } catch {}
-      if($model -or ($sizeBytes -is [double])){
-        return [pscustomobject]@{ Model = $model; SizeBytes = $sizeBytes }
-      }
-    }
-  } catch {}
-  return $null
-}
 function Get-ComputerManufacturerModel([string]$computerName){
   $result = [pscustomobject]@{ Manufacturer = $null; Model = $null }
   if([string]::IsNullOrWhiteSpace($computerName)){ return $result }
@@ -4607,7 +4591,6 @@ function Show-LiveDetailsDialog($parentRec){
     $profileCountText = 'Profile count not available.'
   }
   $driveUsage = Get-ComputerDriveUsage $hostName
-  $primaryDisk = Get-ComputerPrimaryDiskInfo $hostName
   $driveUsageText = 'C: drive usage not available.'
   $driveUsagePercent = $null
   if($driveUsage){
@@ -4616,20 +4599,6 @@ function Show-LiveDetailsDialog($parentRec){
     $usedGb = [math]::Round($driveUsage.UsedBytes / 1GB, 1)
     $freeGb = [math]::Round($driveUsage.FreeBytes / 1GB, 1)
     $driveUsageText = "${usedGb} GB used of ${totalGb} GB (${driveUsagePercent}% used, ${freeGb} GB free)"
-  } elseif($primaryDisk){
-    $diskSizeText = $null
-    if($primaryDisk.SizeBytes -is [double] -and $primaryDisk.SizeBytes -gt 0){
-      $diskSizeText = "{0} GB" -f ([math]::Round($primaryDisk.SizeBytes / 1GB, 1))
-    }
-    $diskDescription = $null
-    if($primaryDisk.Model){ $diskDescription = $primaryDisk.Model }
-    if($diskDescription -and $diskSizeText){
-      $driveUsageText = "Drive usage not available. Primary disk: $diskDescription ($diskSizeText)."
-    } elseif($diskDescription){
-      $driveUsageText = "Drive usage not available. Primary disk: $diskDescription."
-    } elseif($diskSizeText){
-      $driveUsageText = "Drive usage not available. Primary disk size: $diskSizeText."
-    }
   }
   $dialog = New-Object System.Windows.Forms.Form
   $dialog.Text = 'Live Details'
