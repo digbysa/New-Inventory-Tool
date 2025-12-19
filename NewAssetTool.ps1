@@ -3790,6 +3790,33 @@ function Apply-AssociatedDeviceValidation([pscustomobject]$wmiData){
     $row.Cells['Serial'].ToolTipText = $tooltip
   }
 }
+
+function Get-UnlinkedMonitorSerials($monitorSerials){
+  $missing = New-Object System.Collections.ArrayList
+  if(-not $monitorSerials){ return $missing }
+
+  $linked = New-Object System.Collections.ArrayList
+  foreach($row in $dgv.Rows){
+    if(-not $row -or $row.IsNewRow){ continue }
+    $type = ''
+    $serial = ''
+    try { $type = [string]$row.Cells['Type'].Value } catch {}
+    try { $serial = [string]$row.Cells['Serial'].Value } catch {}
+    if([string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($serial)){ continue }
+    if($type.Trim().ToUpper() -ne 'MONITOR'){ continue }
+    $normalized = $serial.Trim().ToUpper()
+    if(-not $linked.Contains($normalized)){ [void]$linked.Add($normalized) }
+  }
+
+  foreach($m in $monitorSerials){
+    if([string]::IsNullOrWhiteSpace($m)){ continue }
+    $normalized = $m.Trim().ToUpper()
+    if($linked.Contains($normalized)){ continue }
+    if(-not $missing.Contains($normalized)){ [void]$missing.Add($normalized) }
+  }
+
+  return $missing
+}
 function Validate-AssociatedDevices([string]$computerName){
   if([string]::IsNullOrWhiteSpace($computerName)){
     [System.Windows.Forms.MessageBox]::Show("Enter a device name before validating.","Validate Devices") | Out-Null
@@ -3805,7 +3832,27 @@ function Validate-AssociatedDevices([string]$computerName){
     [System.Windows.Forms.MessageBox]::Show("Device is not pingable.","Validate Devices") | Out-Null
     return
   }
+  $monitorSerials = @()
+  try { if($wmiData.MonitorSerials){ $monitorSerials = $wmiData.MonitorSerials } } catch {}
   Apply-AssociatedDeviceValidation $wmiData
+  $missingMonitors = Get-UnlinkedMonitorSerials $monitorSerials
+  if($missingMonitors -and $missingMonitors.Count -gt 0){
+    $pc = $script:CurrentParent
+    if(-not $pc -and $script:CurrentDisplay){
+      $pc = Resolve-ParentComputer $script:CurrentDisplay
+    }
+    $isExcluded = $false
+    try{
+      if($pc -and (-not $chkShowExcluded.Checked)){
+        $mt = ('' + $pc.u_device_rounding).Trim()
+        if($mt -match '^(?i)Excluded$'){ $isExcluded = $true }
+      }
+    } catch {}
+    if($pc -and -not $isExcluded){
+      $serialToLink = $missingMonitors | Select-Object -First 1
+      Show-AddPeripheralDialog $pc $serialToLink "This monitor is connected but not linked. Click Add to link."
+    }
+  }
 }
 function Make-Card($title,$kvPairs,[System.Drawing.Color]$ritmColor,[bool]$showRITM,[bool]$showRetire,$tagPayload){
   $p = New-Object System.Windows.Forms.Panel
@@ -4160,7 +4207,7 @@ function Link-Peripheral([string]$query,$parentRec,$lookupResult=$null){
   Update-FixNameButton $script:CurrentDisplay $script:CurrentParent
   return $true
 }
-function Show-AddPeripheralDialog($parentRec){
+function Show-AddPeripheralDialog($parentRec,[string]$defaultSearchText='',[string]$infoMessage=''){
   if(-not $parentRec){ return }
   $dialog = New-Object System.Windows.Forms.Form
   $dialog.Text = 'Add Peripheral (Name/Asset/Serial)'
@@ -4192,7 +4239,17 @@ function Show-AddPeripheralDialog($parentRec){
   $inputPanel.RowCount = 3
   $inputPanel.Dock = 'Top'
   $inputPanel.RowStyles.Clear()
-  for($i=0;$i -lt 3;$i++){ [void]$inputPanel.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) ) }
+  $inputRowCount = if([string]::IsNullOrWhiteSpace($infoMessage)){ 3 } else { 4 }
+  $inputPanel.RowCount = $inputRowCount
+  for($i=0;$i -lt $inputRowCount;$i++){ [void]$inputPanel.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)) ) }
+  if(-not [string]::IsNullOrWhiteSpace($infoMessage)){
+    $lblInfo = New-Object System.Windows.Forms.Label
+    $lblInfo.Text = $infoMessage
+    $lblInfo.AutoSize = $true
+    $lblInfo.Margin = '0,0,0,6'
+    $lblInfo.ForeColor = [System.Drawing.Color]::DarkOrange
+    $inputPanel.Controls.Add($lblInfo,0,0)
+  }
   $lblSearch = New-Object System.Windows.Forms.Label
   $lblSearch.Text = 'Universal Search (name / asset / serial):'
   $lblSearch.AutoSize = $true
@@ -4205,9 +4262,9 @@ function Show-AddPeripheralDialog($parentRec){
   $lblHint.AutoSize = $true
   $lblHint.ForeColor = $script:ThemeColors.MutedText
   $lblHint.Margin = '0,0,0,0'
-  $inputPanel.Controls.Add($lblSearch,0,0)
-  $inputPanel.Controls.Add($txtSearch,0,1)
-  $inputPanel.Controls.Add($lblHint,0,2)
+  $inputPanel.Controls.Add($lblSearch,0,($inputPanel.RowStyles.Count - 3))
+  $inputPanel.Controls.Add($txtSearch,0,($inputPanel.RowStyles.Count - 2))
+  $inputPanel.Controls.Add($lblHint,0,($inputPanel.RowStyles.Count - 1))
 
   # Preview area
   $grpPreview = New-Object System.Windows.Forms.GroupBox
@@ -4408,7 +4465,15 @@ function Show-AddPeripheralDialog($parentRec){
       $dialog.Close()
     }
   })
-  $dialog.Add_Shown({ $txtSearch.Focus() })
+  $dialog.Add_Shown({
+    $txtSearch.Focus()
+    if(-not [string]::IsNullOrWhiteSpace($defaultSearchText)){
+      $txtSearch.Text = $defaultSearchText
+      try { $txtSearch.SelectionStart = $txtSearch.Text.Length } catch {}
+      $result = Resolve-PeripheralLookup $txtSearch.Text
+      & $applyPreview $result
+    }
+  })
   Apply-ModernThemeToForm -Form $dialog
   try { [void]$dialog.ShowDialog($form) } finally { try { $dialog.Dispose() } catch {} }
 }
