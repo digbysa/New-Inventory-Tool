@@ -4662,7 +4662,6 @@ function Show-LiveDetailsDialog($parentRec){
   } else {
     $profileCountText = 'Profile count not available.'
   }
-  $driveUsage = Get-ComputerDriveUsage $hostName
   $dialog = New-Object System.Windows.Forms.Form
   $dialog.Text = 'Live Details'
   $dialog.StartPosition = 'CenterParent'
@@ -4688,13 +4687,13 @@ function Show-LiveDetailsDialog($parentRec){
   $details.AutoSize = $true
   $details.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $details.ColumnCount = 2
-  $details.RowCount = 13
+  $details.RowCount = 12
   $details.Dock = 'Fill'
   $details.ColumnStyles.Clear()
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.RowStyles.Clear()
-  for($i=0;$i -lt 13;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
+  for($i=0;$i -lt 12;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
 
   $headingFont = New-Object System.Drawing.Font($dialog.Font, [System.Drawing.FontStyle]::Bold)
 
@@ -4758,58 +4757,11 @@ function Show-LiveDetailsDialog($parentRec){
   $lblInstallDateLabel = New-Object System.Windows.Forms.Label
   $lblInstallDateLabel.Text = 'Install Date:'
   $lblInstallDateLabel.AutoSize = $true
-  $lblInstallDateLabel.Margin = '0,0,6,6'
+  $lblInstallDateLabel.Margin = '0,0,6,12'
   $lblInstallDate = New-Object System.Windows.Forms.Label
   $lblInstallDate.AutoSize = $true
-  $lblInstallDate.Margin = '0,0,0,6'
+  $lblInstallDate.Margin = '0,0,0,12'
   $lblInstallDate.Text = $installDateText
-
-  $lblDriveLabel = New-Object System.Windows.Forms.Label
-  $lblDriveLabel.Text = 'Drives:'
-  $lblDriveLabel.AutoSize = $true
-  $lblDriveLabel.Margin = '0,0,6,12'
-  $drivePanel = New-Object System.Windows.Forms.TableLayoutPanel
-  $drivePanel.AutoSize = $true
-  $drivePanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
-  $drivePanel.ColumnCount = 1
-  $drivePanel.ColumnStyles.Clear()
-  $drivePanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-  $drivePanel.RowStyles.Clear()
-  $drivePanel.RowCount = 0
-  if($driveUsage -and $driveUsage.Count -gt 0){
-    $driveIndex = 0
-    foreach($usage in $driveUsage){
-      $drivePanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-      $drivePanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-      $drivePanel.RowCount += 2
-      $pbarDrive = New-Object System.Windows.Forms.ProgressBar
-      $pbarDrive.Style = 'Continuous'
-      $pbarDrive.Minimum = 0
-      $pbarDrive.Maximum = 100
-      $pbarDrive.Width = 200
-      $pbarDrive.Margin = '0,0,0,3'
-      $drivePercentValue = [int][math]::Min([math]::Max([math]::Round($usage.PercentUsed),$pbarDrive.Minimum),$pbarDrive.Maximum)
-      try { $pbarDrive.Value = $drivePercentValue } catch {}
-      $lblDriveUsage = New-Object System.Windows.Forms.Label
-      $lblDriveUsage.AutoSize = $true
-      $lblDriveUsage.Margin = if($driveIndex -eq $driveUsage.Count - 1){ '0,3,0,12' } else { '0,3,0,8' }
-      $totalGb = [math]::Round($usage.TotalBytes / 1GB, 1)
-      $usedGb = [math]::Round($usage.UsedBytes / 1GB, 1)
-      $freeGb = [math]::Round($usage.FreeBytes / 1GB, 1)
-      $lblDriveUsage.Text = "${($usage.DeviceId)} drive: ${usedGb} GB used of ${totalGb} GB (${drivePercentValue}% used, ${freeGb} GB free)"
-      $drivePanel.Controls.Add($pbarDrive,0,$drivePanel.RowCount - 2)
-      $drivePanel.Controls.Add($lblDriveUsage,0,$drivePanel.RowCount - 1)
-      $driveIndex++
-    }
-  } else {
-    $drivePanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-    $drivePanel.RowCount = 1
-    $lblDriveUsage = New-Object System.Windows.Forms.Label
-    $lblDriveUsage.AutoSize = $true
-    $lblDriveUsage.Margin = '0,0,0,12'
-    $lblDriveUsage.Text = 'Drive usage not available.'
-    $drivePanel.Controls.Add($lblDriveUsage,0,0)
-  }
 
   $lblBootHeading = New-Object System.Windows.Forms.Label
   $lblBootHeading.Text = 'Boot Info'
@@ -4866,16 +4818,14 @@ function Show-LiveDetailsDialog($parentRec){
   $details.Controls.Add($lblModel,1,6)
   $details.Controls.Add($lblInstallDateLabel,0,7)
   $details.Controls.Add($lblInstallDate,1,7)
-  $details.Controls.Add($lblDriveLabel,0,8)
-  $details.Controls.Add($drivePanel,1,8)
-  $details.Controls.Add($lblBootHeading,0,9)
+  $details.Controls.Add($lblBootHeading,0,8)
   $details.SetColumnSpan($lblBootHeading,2)
-  $details.Controls.Add($lblProfileCountLabel,0,10)
-  $details.Controls.Add($lblProfileCount,1,10)
-  $details.Controls.Add($lblLastBootLabel,0,11)
-  $details.Controls.Add($lblLastBoot,1,11)
-  $details.Controls.Add($lblRebootLabel,0,12)
-  $details.Controls.Add($lblReboot,1,12)
+  $details.Controls.Add($lblProfileCountLabel,0,9)
+  $details.Controls.Add($lblProfileCount,1,9)
+  $details.Controls.Add($lblLastBootLabel,0,10)
+  $details.Controls.Add($lblLastBoot,1,10)
+  $details.Controls.Add($lblRebootLabel,0,11)
+  $details.Controls.Add($lblReboot,1,11)
 
   $buttonPanel = New-Object System.Windows.Forms.TableLayoutPanel
   $buttonPanel.AutoSize = $true
