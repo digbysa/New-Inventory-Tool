@@ -4572,6 +4572,32 @@ function Get-ComputerManufacturerModel([string]$computerName){
   } catch {}
   return $result
 }
+function Get-ComputerCurrentLoggedOnUsers([string]$computerName){
+  $results = New-Object System.Collections.Generic.List[string]
+  if([string]::IsNullOrWhiteSpace($computerName)){ return $results.ToArray() }
+  try {
+    $sessions = Get-CimInstance -ClassName Win32_LogonSession -ComputerName $computerName -Filter "LogonType=2 OR LogonType=10 OR LogonType=11" -ErrorAction Stop
+    foreach($session in $sessions){
+      try {
+        $accounts = Get-CimAssociatedInstance -InputObject $session -Association Win32_LoggedOnUser -ErrorAction Stop
+        foreach($acct in $accounts){
+          try {
+            $name = ''
+            if($acct.Domain -and $acct.Name){
+              $name = "$($acct.Domain)\\$($acct.Name)"
+            } elseif($acct.Name){
+              $name = [string]$acct.Name
+            }
+            if(-not [string]::IsNullOrWhiteSpace($name) -and -not $results.Contains($name)){
+              $results.Add($name) | Out-Null
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+  } catch {}
+  return ($results.ToArray() | Sort-Object)
+}
 function Get-ComputerLastLoggedOnUser([string]$computerName){
   if([string]::IsNullOrWhiteSpace($computerName)){ return $null }
   try {
@@ -4624,6 +4650,12 @@ function Show-LiveDetailsDialog($parentRec){
   $subnetLabel = Get-SiteSubnetLabelForIp $ipAddress
   $ipDisplayText = if([string]::IsNullOrWhiteSpace($ipAddress)){ 'IP address not available.' } elseif([string]::IsNullOrWhiteSpace($subnetLabel)){ $ipAddress } else { "$ipAddress ($subnetLabel)" }
   $operatingSystem = Get-ComputerOperatingSystem $hostName
+  $currentLoggedOnUsers = Get-ComputerCurrentLoggedOnUsers $hostName
+  if($currentLoggedOnUsers -and $currentLoggedOnUsers.Count -gt 0){
+    $currentLoggedOnText = ($currentLoggedOnUsers -join ', ')
+  } else {
+    $currentLoggedOnText = 'No interactive users currently logged on.'
+  }
   $lastLoggedOnUser = Get-ComputerLastLoggedOnUser $hostName
   $lastBoot = Get-ComputerLastBoot $hostName $operatingSystem
   $lastBootAgeDays = $null
@@ -4687,13 +4719,13 @@ function Show-LiveDetailsDialog($parentRec){
   $details.AutoSize = $true
   $details.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $details.ColumnCount = 2
-  $details.RowCount = 12
+  $details.RowCount = 13
   $details.Dock = 'Fill'
   $details.ColumnStyles.Clear()
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
   $details.RowStyles.Clear()
-  for($i=0;$i -lt 12;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
+  for($i=0;$i -lt 13;$i++){ [void]$details.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize))) }
 
   $headingFont = New-Object System.Drawing.Font($dialog.Font, [System.Drawing.FontStyle]::Bold)
 
@@ -4720,6 +4752,15 @@ function Show-LiveDetailsDialog($parentRec){
   $lblIp.AutoSize = $true
   $lblIp.Margin = '0,0,0,6'
   $lblIp.Text = $ipDisplayText
+
+  $lblCurrentlyLoggedOnLabel = New-Object System.Windows.Forms.Label
+  $lblCurrentlyLoggedOnLabel.Text = 'Currently Logged On:'
+  $lblCurrentlyLoggedOnLabel.AutoSize = $true
+  $lblCurrentlyLoggedOnLabel.Margin = '0,0,6,6'
+  $lblCurrentlyLoggedOn = New-Object System.Windows.Forms.Label
+  $lblCurrentlyLoggedOn.AutoSize = $true
+  $lblCurrentlyLoggedOn.Margin = '0,0,0,6'
+  $lblCurrentlyLoggedOn.Text = $currentLoggedOnText
 
   $lblLastLoggedOnLabel = New-Object System.Windows.Forms.Label
   $lblLastLoggedOnLabel.Text = 'Last Logged On:'
@@ -4808,24 +4849,26 @@ function Show-LiveDetailsDialog($parentRec){
   $details.Controls.Add($lblDevice,1,1)
   $details.Controls.Add($lblIpLabel,0,2)
   $details.Controls.Add($lblIp,1,2)
-  $details.Controls.Add($lblLastLoggedOnLabel,0,3)
-  $details.Controls.Add($lblLastLoggedOn,1,3)
-  $details.Controls.Add($lblHardwareHeading,0,4)
+  $details.Controls.Add($lblCurrentlyLoggedOnLabel,0,3)
+  $details.Controls.Add($lblCurrentlyLoggedOn,1,3)
+  $details.Controls.Add($lblLastLoggedOnLabel,0,4)
+  $details.Controls.Add($lblLastLoggedOn,1,4)
+  $details.Controls.Add($lblHardwareHeading,0,5)
   $details.SetColumnSpan($lblHardwareHeading,2)
-  $details.Controls.Add($lblManufacturerLabel,0,5)
-  $details.Controls.Add($lblManufacturer,1,5)
-  $details.Controls.Add($lblModelLabel,0,6)
-  $details.Controls.Add($lblModel,1,6)
-  $details.Controls.Add($lblInstallDateLabel,0,7)
-  $details.Controls.Add($lblInstallDate,1,7)
-  $details.Controls.Add($lblBootHeading,0,8)
+  $details.Controls.Add($lblManufacturerLabel,0,6)
+  $details.Controls.Add($lblManufacturer,1,6)
+  $details.Controls.Add($lblModelLabel,0,7)
+  $details.Controls.Add($lblModel,1,7)
+  $details.Controls.Add($lblInstallDateLabel,0,8)
+  $details.Controls.Add($lblInstallDate,1,8)
+  $details.Controls.Add($lblBootHeading,0,9)
   $details.SetColumnSpan($lblBootHeading,2)
-  $details.Controls.Add($lblProfileCountLabel,0,9)
-  $details.Controls.Add($lblProfileCount,1,9)
-  $details.Controls.Add($lblLastBootLabel,0,10)
-  $details.Controls.Add($lblLastBoot,1,10)
-  $details.Controls.Add($lblRebootLabel,0,11)
-  $details.Controls.Add($lblReboot,1,11)
+  $details.Controls.Add($lblProfileCountLabel,0,10)
+  $details.Controls.Add($lblProfileCount,1,10)
+  $details.Controls.Add($lblLastBootLabel,0,11)
+  $details.Controls.Add($lblLastBoot,1,11)
+  $details.Controls.Add($lblRebootLabel,0,12)
+  $details.Controls.Add($lblReboot,1,12)
 
   $buttonPanel = New-Object System.Windows.Forms.TableLayoutPanel
   $buttonPanel.AutoSize = $true
