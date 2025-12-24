@@ -3227,6 +3227,23 @@ $statusPathLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
 $statusPathLabel.Margin = New-Object System.Windows.Forms.Padding(6,3,6,3)
 $statusPathLabel.Text = $statusPathLabelDefault
 $status.Items.Add($statusPathLabel) | Out-Null
+$roundingStatusPrefix = New-Object System.Windows.Forms.ToolStripStatusLabel
+$roundingStatusPrefix.Text = "Rounding Number:"
+$roundingStatusPrefix.Margin = New-Object System.Windows.Forms.Padding(6,3,2,3)
+$roundingStatusPrefix.ForeColor = [System.Drawing.Color]::DimGray
+$status.Items.Add($roundingStatusPrefix) | Out-Null
+$roundingTodayLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
+$roundingTodayLabel.Text = "Today 0 / 30,"
+$roundingTodayLabel.Margin = New-Object System.Windows.Forms.Padding(2,3,2,3)
+$status.Items.Add($roundingTodayLabel) | Out-Null
+$roundingWeekLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
+$roundingWeekLabel.Text = "This week 0 / 150,"
+$roundingWeekLabel.Margin = New-Object System.Windows.Forms.Padding(2,3,2,3)
+$status.Items.Add($roundingWeekLabel) | Out-Null
+$roundingRemainingLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
+$roundingRemainingLabel.Text = "Remaining per day 0"
+$roundingRemainingLabel.Margin = New-Object System.Windows.Forms.Padding(2,3,6,3)
+$status.Items.Add($roundingRemainingLabel) | Out-Null
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $statusLabel.Alignment = [System.Windows.Forms.ToolStripItemAlignment]::Right
 $statusLabel.Margin = New-Object System.Windows.Forms.Padding(6,3,6,3)
@@ -5595,6 +5612,11 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
   $rowOut = $row | Select-Object $script:RoundingEventColumns
   if(-not $exists){ $rowOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
   else { $rowOut | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
+  if (-not ($script:RoundingEvents -is [System.Collections.IList])) {
+    $script:RoundingEvents = @($script:RoundingEvents)
+  }
+  $script:RoundingEvents += $row
+  Update-RoundingProgressStatus
   if($chkCableNeeded.Checked){
     $excelPath = Join-Path $script:OutputFolder 'CablingNeeded.xlsx'
     $excel = $null
@@ -5843,6 +5865,60 @@ function Ensure-RoundingCsvNewline([string]$file){
     }
   } catch { }
 }
+function Get-RoundingEventTimestamp($e){
+  $timestamp = $null
+  if($e -and $e.PSObject.Properties['Timestamp'] -and $e.Timestamp){
+    try { $timestamp = [datetime]::Parse($e.Timestamp) } catch {
+      try { $timestamp = Get-Date $e.Timestamp } catch {}
+    }
+  } elseif($e -and $e.Timestamp){
+    try { $timestamp = Get-Date $e.Timestamp } catch {}
+  }
+  return $timestamp
+}
+function Update-RoundingProgressStatus {
+  if(-not $roundingTodayLabel -or -not $roundingWeekLabel -or -not $roundingRemainingLabel){ return }
+  $todayCount = 0
+  $weekCount = 0
+  $now = Get-Date
+  $today = $now.Date
+  $dayOfWeek = [int]$today.DayOfWeek
+  $offset = if($dayOfWeek -eq 0){ 6 } else { $dayOfWeek - 1 }
+  $weekStart = $today.AddDays(-$offset)
+  $weekEnd = $weekStart.AddDays(4)
+  if($script:RoundingEvents){
+    foreach($e in $script:RoundingEvents){
+      $timestamp = Get-RoundingEventTimestamp $e
+      if(-not $timestamp){ continue }
+      $eventDate = $timestamp.Date
+      if($eventDate -eq $today){ $todayCount++ }
+      if($eventDate -ge $weekStart -and $eventDate -le $weekEnd){ $weekCount++ }
+    }
+  }
+  $todayTarget = 30
+  $weekTarget = 150
+  $remaining = [Math]::Max(0, $weekTarget - $weekCount)
+  $daysLeft = 0
+  if($today -le $weekEnd){
+    $daysLeft = [Math]::Max(0, ($weekEnd - $today).Days)
+  }
+  $remainingPerDay = if($daysLeft -gt 0){ [Math]::Ceiling($remaining / $daysLeft) } else { $remaining }
+  $roundingTodayLabel.Text = ("Today {0} / {1}," -f $todayCount, $todayTarget)
+  $roundingWeekLabel.Text = ("This week {0} / {1}," -f $weekCount, $weekTarget)
+  $roundingRemainingLabel.Text = ("Remaining per day {0}" -f $remainingPerDay)
+  $green = [System.Drawing.Color]::ForestGreen
+  $orange = [System.Drawing.Color]::DarkOrange
+  $red = [System.Drawing.Color]::Crimson
+  $roundingTodayLabel.ForeColor = if($todayCount -ge $todayTarget){ $green } else { $orange }
+  $roundingWeekLabel.ForeColor = if($weekCount -ge $weekTarget){ $green } else { $orange }
+  if($remainingPerDay -le 30){
+    $roundingRemainingLabel.ForeColor = $green
+  } elseif($remainingPerDay -le 75){
+    $roundingRemainingLabel.ForeColor = $orange
+  } else {
+    $roundingRemainingLabel.ForeColor = $red
+  }
+}
 function Load-RoundingEvents {
   $script:RoundingEvents = @()
   try {
@@ -5854,6 +5930,7 @@ function Load-RoundingEvents {
       try { $script:RoundingEvents = Import-Csv $file } catch { $script:RoundingEvents = @() }
     }
   } catch { $script:RoundingEvents = @() }
+  Update-RoundingProgressStatus
 }
 Load-RoundingEvents
 # Filtering removed from Nearby grid; keep stub to refresh visibility/count labels.
@@ -6817,6 +6894,7 @@ if ($pc) {
     if ($pc) { $pc | Add-Member -NotePropertyName LastRounded -NotePropertyValue (Get-Date) -Force }
     $saved++
   }
+  Update-RoundingProgressStatus
   if ($saved -gt 0) {
     [System.Windows.Forms.MessageBox]::Show(("Saved {0} rounding event(s)." -f $saved),"Nearby Save") | Out-Null
     Rebuild-Nearby
