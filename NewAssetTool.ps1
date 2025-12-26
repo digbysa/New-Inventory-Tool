@@ -6050,6 +6050,44 @@ if($assetTag -and $script:RoundingEvents){
   if($fallback){ return $fallback }
   return $null
 }
+function Get-RoundingEventField([object]$event,[string]$name){
+  if(-not $event){ return $null }
+  try {
+    if($event.PSObject.Properties[$name] -and $event.$name){
+      $value = ('' + $event.$name).Trim()
+      if(-not [string]::IsNullOrWhiteSpace($value)){ return $value }
+    } elseif($event.$name){
+      $value = ('' + $event.$name).Trim()
+      if(-not [string]::IsNullOrWhiteSpace($value)){ return $value }
+    }
+  } catch {}
+  return $null
+}
+function Get-LatestRoundingEventForAsset([string]$assetTag){
+  $best = $null
+  $bestTime = $null
+  if($assetTag -and $script:RoundingEvents){
+    $needle = $assetTag.Trim().ToUpper()
+    foreach($e in $script:RoundingEvents){
+      try {
+        $assetRaw = Get-RoundingEventField $e 'AssetTag'
+        if(-not $assetRaw){ continue }
+        $candidate = $assetRaw.Trim().ToUpper()
+        if($candidate -ne $needle){ continue }
+        $timestamp = $null
+        $timestampRaw = Get-RoundingEventField $e 'Timestamp'
+        if($timestampRaw){
+          try { $timestamp = [datetime]::Parse($timestampRaw) } catch {}
+        }
+        if($timestamp -and (-not $bestTime -or $timestamp -gt $bestTime)){
+          $bestTime = $timestamp
+          $best = $e
+        }
+      } catch {}
+    }
+  }
+  return $best
+}
 # ---- Build Nearby UI ----
 $nearToolbar = New-Object System.Windows.Forms.Panel
 $nearToolbar.Dock = 'Top'
@@ -6693,19 +6731,41 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $r = $dgvNearby.Rows[$rowIdx]
     $hostName = $pc.name
     $cachedIp = Get-NearbyCachedIp $hostName
+    $roundingEvent = Get-LatestRoundingEventForAsset $at
+    $location = $pc.location
+    $building = $pc.u_building
+    $floor = $pc.u_floor
+    $room = $pc.u_room
+    $department = $pc.u_department_location
+    $maintenanceRaw = ''
+    if($roundingEvent){
+      $eventLocation = Get-RoundingEventField $roundingEvent 'Location'
+      if($eventLocation){ $location = $eventLocation }
+      $eventBuilding = Get-RoundingEventField $roundingEvent 'Building'
+      if($eventBuilding){ $building = $eventBuilding }
+      $eventFloor = Get-RoundingEventField $roundingEvent 'Floor'
+      if($eventFloor){ $floor = $eventFloor }
+      $eventRoom = Get-RoundingEventField $roundingEvent 'Room'
+      if($eventRoom){ $room = $eventRoom }
+      $eventDepartment = Get-RoundingEventField $roundingEvent 'Department'
+      if($eventDepartment){ $department = $eventDepartment }
+      $eventMaintenance = Get-RoundingEventField $roundingEvent 'MaintenanceType'
+      if($eventMaintenance){ $maintenanceRaw = $eventMaintenance }
+    }
     $r.Cells['Host'].Value      = $hostName
     $r.Cells['IP'].Value        = $cachedIp
     Update-NearbyIpTooltip -Cell $r.Cells['IP'] -IpAddress $cachedIp
     $r.Cells['Asset'].Value     = $pc.asset_tag
-    $r.Cells['Location'].Value  = $pc.location
-    $r.Cells['Building'].Value  = $pc.u_building
-    $r.Cells['Floor'].Value     = $pc.u_floor
-    $r.Cells['Room'].Value      = $pc.u_room
-    $r.Cells['Department'].Value = $pc.u_department_location
+    $r.Cells['Location'].Value  = $location
+    $r.Cells['Building'].Value  = $building
+    $r.Cells['Floor'].Value     = $floor
+    $r.Cells['Room'].Value      = $room
+    $r.Cells['Department'].Value = $department
     $mtRaw = ''
     try {
       if($pc.PSObject.Properties['u_device_rounding']){ $mtRaw = '' + $pc.u_device_rounding }
     } catch {}
+    if(-not [string]::IsNullOrWhiteSpace($maintenanceRaw)){ $mtRaw = $maintenanceRaw }
     $r.Cells['MaintenanceType'].Value = Get-MaintenanceTypeOrDefault $mtRaw ([string]$pc.name)
     $r.Cells['LastRounded'].Value = (Fmt-DateLong $lr)
     $r.Cells['DaysAgo'].Value   = $days
