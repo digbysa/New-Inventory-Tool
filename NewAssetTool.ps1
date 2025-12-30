@@ -5616,6 +5616,8 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
     $script:RoundingEvents = @($script:RoundingEvents)
   }
   $script:RoundingEvents += $row
+  Update-LatestRoundingEventIndexForEvent $row
+  $script:LastSavedRoundingEvent = $row
   Update-RoundingProgressStatus
   if($chkCableNeeded.Checked){
     $excelPath = Join-Path $script:OutputFolder 'CablingNeeded.xlsx'
@@ -5775,6 +5777,12 @@ if (-not $script:NEAR_STATUSES) {
 if (-not (Get-Variable -Scope Script -Name RoundingEvents -ErrorAction SilentlyContinue)) {
   $script:RoundingEvents = @()
 }
+if (-not (Get-Variable -Scope Script -Name LatestRoundingEventByAsset -ErrorAction SilentlyContinue)) {
+  $script:LatestRoundingEventByAsset = @{}
+}
+if (-not (Get-Variable -Scope Script -Name LatestRoundingTimestampByAsset -ErrorAction SilentlyContinue)) {
+  $script:LatestRoundingTimestampByAsset = @{}
+}
 if (-not (Get-Variable -Scope Script -Name NearbyIpCache -ErrorAction SilentlyContinue)) {
   $script:NearbyIpCache = New-Object 'System.Collections.Generic.Dictionary[string,string]'
 }
@@ -5930,6 +5938,7 @@ function Load-RoundingEvents {
       try { $script:RoundingEvents = Import-Csv $file } catch { $script:RoundingEvents = @() }
     }
   } catch { $script:RoundingEvents = @() }
+  Build-LatestRoundingEventIndex
   Update-RoundingProgressStatus
 }
 Load-RoundingEvents
@@ -6027,23 +6036,10 @@ function Update-NearbyCheckboxLabels {
 }
 function Get-LatestRoundForAsset([string]$assetTag,[Nullable[datetime]]$fallback){
   $best = $null
-if($assetTag -and $script:RoundingEvents){
+  if($assetTag -and $script:LatestRoundingTimestampByAsset){
     $needle = $assetTag.Trim().ToUpper()
-    foreach($e in $script:RoundingEvents){
-      try {
-        $assetRaw = ''
-        if($e.PSObject.Properties['AssetTag'] -and $e.AssetTag){ $assetRaw = $e.AssetTag }
-        elseif($e.AssetTag){ $assetRaw = $e.AssetTag }
-        $candidate = $assetRaw.Trim().ToUpper()
-        if($candidate -ne $needle){ continue }
-        $timestamp = $null
-        if($e.PSObject.Properties['Timestamp'] -and $e.Timestamp){
-          try { $timestamp = [datetime]::Parse($e.Timestamp) } catch {}
-        } elseif($e.Timestamp){
-          try { $timestamp = Get-Date $e.Timestamp } catch {}
-        }
-        if($timestamp -and (-not $best -or $timestamp -gt $best)){ $best = $timestamp }
-      } catch {}
+    if($script:LatestRoundingTimestampByAsset.ContainsKey($needle)){
+      $best = $script:LatestRoundingTimestampByAsset[$needle]
     }
   }
   if($best){ return $best }
@@ -6064,29 +6060,59 @@ function Get-RoundingEventField([object]$event,[string]$name){
   return $null
 }
 function Get-LatestRoundingEventForAsset([string]$assetTag){
-  $best = $null
-  $bestTime = $null
-  if($assetTag -and $script:RoundingEvents){
-    $needle = $assetTag.Trim().ToUpper()
-    foreach($e in $script:RoundingEvents){
-      try {
-        $assetRaw = Get-RoundingEventField $e 'AssetTag'
-        if(-not $assetRaw){ continue }
-        $candidate = $assetRaw.Trim().ToUpper()
-        if($candidate -ne $needle){ continue }
-        $timestamp = $null
-        $timestampRaw = Get-RoundingEventField $e 'Timestamp'
-        if($timestampRaw){
-          try { $timestamp = [datetime]::Parse($timestampRaw) } catch {}
-        }
-        if($timestamp -and (-not $bestTime -or $timestamp -gt $bestTime)){
-          $bestTime = $timestamp
-          $best = $e
-        }
-      } catch {}
-    }
+  if(-not $assetTag){ return $null }
+  if(-not $script:LatestRoundingEventByAsset){ return $null }
+  $needle = $assetTag.Trim().ToUpper()
+  if($script:LatestRoundingEventByAsset.ContainsKey($needle)){
+    return $script:LatestRoundingEventByAsset[$needle]
   }
-  return $best
+  return $null
+}
+function Build-LatestRoundingEventIndex {
+  $script:LatestRoundingEventByAsset = @{}
+  $script:LatestRoundingTimestampByAsset = @{}
+  if(-not $script:RoundingEvents){ return }
+  foreach($e in $script:RoundingEvents){
+    try {
+      $assetRaw = Get-RoundingEventField $e 'AssetTag'
+      if(-not $assetRaw){ continue }
+      $candidate = $assetRaw.Trim().ToUpper()
+      if(-not $candidate){ continue }
+      $timestampRaw = Get-RoundingEventField $e 'Timestamp'
+      $timestamp = $null
+      if($timestampRaw){
+        try { $timestamp = [datetime]::Parse($timestampRaw) } catch {}
+      }
+      if(-not $timestamp){ continue }
+      if(-not $script:LatestRoundingTimestampByAsset.ContainsKey($candidate) -or $timestamp -gt $script:LatestRoundingTimestampByAsset[$candidate]){
+        $script:LatestRoundingTimestampByAsset[$candidate] = $timestamp
+        $script:LatestRoundingEventByAsset[$candidate] = $e
+      }
+    } catch {}
+  }
+}
+function Update-LatestRoundingEventIndexForEvent {
+  param([object]$Event)
+
+  if(-not $Event){ return }
+  try {
+    $assetRaw = Get-RoundingEventField $Event 'AssetTag'
+    if(-not $assetRaw){ return }
+    $candidate = $assetRaw.Trim().ToUpper()
+    if(-not $candidate){ return }
+    $timestampRaw = Get-RoundingEventField $Event 'Timestamp'
+    $timestamp = $null
+    if($timestampRaw){
+      try { $timestamp = [datetime]::Parse($timestampRaw) } catch {}
+    }
+    if(-not $timestamp){ return }
+    if(-not $script:LatestRoundingTimestampByAsset){ $script:LatestRoundingTimestampByAsset = @{} }
+    if(-not $script:LatestRoundingEventByAsset){ $script:LatestRoundingEventByAsset = @{} }
+    if(-not $script:LatestRoundingTimestampByAsset.ContainsKey($candidate) -or $timestamp -gt $script:LatestRoundingTimestampByAsset[$candidate]){
+      $script:LatestRoundingTimestampByAsset[$candidate] = $timestamp
+      $script:LatestRoundingEventByAsset[$candidate] = $Event
+    }
+  } catch {}
 }
 # ---- Build Nearby UI ----
 $nearToolbar = New-Object System.Windows.Forms.Panel
@@ -6215,11 +6241,17 @@ $btnPingAll.Text = 'Ping All'
 $btnPingAll.AutoSize = $true
 $btnPingAll.Anchor = 'Top,Right'
 $btnPingAll.Margin = '0,0,0,0'
+$btnRebuildNearby = New-Object ModernUI.RoundedButton
+$btnRebuildNearby.Text = 'Rebuild Nearby'
+$btnRebuildNearby.AutoSize = $true
+$btnRebuildNearby.Anchor = 'Top,Right'
+$btnRebuildNearby.Margin = '0,0,0,0'
 $nearToolbar.Controls.Add($btnPingAll)
+$nearToolbar.Controls.Add($btnRebuildNearby)
 function Update-NearToolbarButtons {
   if (-not $nearToolbar) { return }
   $buttons = @()
-  foreach ($button in @($btnZoomIn, $btnZoomOut, $btnClearScopes, $btnPingAll)) {
+  foreach ($button in @($btnZoomIn, $btnZoomOut, $btnClearScopes, $btnPingAll, $btnRebuildNearby)) {
     if ($button -and $button.Visible) { $buttons += $button }
   }
   if (-not $buttons) { return }
@@ -6686,10 +6718,15 @@ function Get-RoundingStatusColor([Nullable[DateTime]]$dt){
   return [System.Drawing.Color]::MistyRose
 }
 function Rebuild-Nearby {
+  param(
+    [switch]$ReloadRoundingEvents
+  )
 try { $dgvNearby.SuspendLayout() } catch {}
 try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   try { Write-Host ("Rebuild-Nearby: Active scopes=" + ($(if($script:ActiveNearbyScopes){$script:ActiveNearbyScopes.Count}else{0}))) } catch {}
-  Load-RoundingEvents
+  if($ReloadRoundingEvents){
+    Load-RoundingEvents
+  }
   $todaySet = Get-RoundedToday-Set
   $excludedSet = Get-ExcludedDevices-Set
   $todayCount = 0
@@ -6873,6 +6910,9 @@ $btnClearScopes.Add_Click({
   $dgvNearby.Rows.Clear()
   Update-ScopeLabel
 })
+$btnRebuildNearby.Add_Click({
+  Rebuild-Nearby -ReloadRoundingEvents
+})
 # Bulk Save from Nearby
 $btnNearSave.Add_Click({
   $out = $script:OutputFolder
@@ -6951,6 +6991,8 @@ if ($pc) {
       $script:RoundingEvents = @($script:RoundingEvents)
     }
     $script:RoundingEvents += $ev
+    Update-LatestRoundingEventIndexForEvent $ev
+    $script:LastSavedRoundingEvent = $ev
     if ($pc) { $pc | Add-Member -NotePropertyName LastRounded -NotePropertyValue (Get-Date) -Force }
     $saved++
   }
@@ -6966,18 +7008,12 @@ if ($pc) {
 $btnSave.Add_Click({
   Start-Sleep -Milliseconds 120
   try {
-    $out = $script:OutputFolder
-$file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'RoundingEvents.csv'
-    if (Test-Path $file) {
-      $rows = Import-Csv $file
-      if ($rows.Count -gt 0) {
-        $last = $rows[-1]
-        # only add scope if it's today's event
-        $dt = Get-Date $last.Timestamp
-        if ($dt.Date -eq (Get-Date).Date) {
-          Add-NearbyScope $last.City $last.Location $last.Building $last.Floor
-          Rebuild-Nearby
-        }
+    $last = $script:LastSavedRoundingEvent
+    if ($last) {
+      $dt = Get-Date $last.Timestamp
+      if ($dt.Date -eq (Get-Date).Date) {
+        Add-NearbyScope $last.City $last.Location $last.Building $last.Floor
+        Rebuild-Nearby
       }
     }
   } catch { }
