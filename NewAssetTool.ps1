@@ -5421,6 +5421,7 @@ function Do-Lookup(){
 function Clear-UI(){
   Reset-RoundingTimer
   $script:CurrentDisplay = $null; $script:CurrentParent  = $null
+  $script:ManualRoundUsed = $false
   if($script:editing){
     foreach($ctrl in @($cmbCity,$cmbLocation,$cmbBuilding,$cmbFloor,$cmbRoom)){
       if($ctrl){ $ctrl.Visible = $false }
@@ -5600,7 +5601,7 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
     Department       = $deptValue
     RoundingUrl      = $url
     Comments         = $txtComments.Text
-    Rounded          = 'No'
+    Rounded          = if ($script:ManualRoundUsed) { 'Yes' } else { 'No' }
   }
   $cmbDept.Visible = $false  # Hidden until Edit Location is active
   $rowOut = $row | Select-Object $script:RoundingEventColumns
@@ -5613,6 +5614,7 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
   Update-LatestRoundingEventIndexForEvent $row
   $script:LastSavedRoundingEvent = $row
   Update-RoundingProgressStatus
+  $script:ManualRoundUsed = $false
   if($chkCableNeeded.Checked){
     $excelPath = Join-Path $script:OutputFolder 'CablingNeeded.xlsx'
     $excel = $null
@@ -5682,7 +5684,10 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
   try { $form.Cursor = [System.Windows.Forms.Cursors]::Default; $form.UseWaitCursor = $false } catch {}
 })
 $btnManualRound.Add_Click({
-  if($btnManualRound.Tag){ Start-Process -FilePath $btnManualRound.Tag }
+  if($btnManualRound.Tag){
+    $script:ManualRoundUsed = $true
+    Start-Process -FilePath $btnManualRound.Tag
+  }
   else { [System.Windows.Forms.MessageBox]::Show("No rounding URL found for this device.","Manual Round") | Out-Null }
 })
 $btnFixName.Add_Click({ Fix-DisplayName })
