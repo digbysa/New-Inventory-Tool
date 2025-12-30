@@ -5941,7 +5941,6 @@ function Load-RoundingEvents {
   Build-LatestRoundingEventIndex
   Update-RoundingProgressStatus
 }
-Load-RoundingEvents
 # Filtering removed from Nearby grid; keep stub to refresh visibility/count labels.
 function Apply-NearbyFilters {
   if (-not $dgvNearby) { Update-ScopeLabel; return }
@@ -6091,6 +6090,7 @@ function Build-LatestRoundingEventIndex {
     } catch {}
   }
 }
+Load-RoundingEvents
 function Update-LatestRoundingEventIndexForEvent {
   param([object]$Event)
 
