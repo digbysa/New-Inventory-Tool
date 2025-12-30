@@ -5513,6 +5513,15 @@ $btnLiveDetails.Add_Click({
     [System.Windows.Forms.MessageBox]::Show("No parent device available to show.","Live Details") | Out-Null
     return
   }
+  $deviceName = ''
+  try { $deviceName = $pc.name } catch {}
+  if([string]::IsNullOrWhiteSpace($deviceName)){
+    try { $deviceName = $txtHost.Text } catch {}
+  }
+  if(-not (Test-ComputerPingable $deviceName)){
+    [System.Windows.Forms.MessageBox]::Show("Device is not pingable.","Live Details") | Out-Null
+    return
+  }
   Show-LiveDetailsDialog $pc
 })
 # Double-click a grid row to open that record
