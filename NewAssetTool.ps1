@@ -436,7 +436,6 @@ function Set-ScanSearchControl {
 
 $script:DeviceTypeSummaryControl = $null
 $script:SearchTextButtonStates = @{}
-$script:RoundNowDisabledTooltip = 'A detected device type is required to use this feature.'
 $script:EditLocationOriginal = $null
 
 function Get-CurrentSearchInputText {
@@ -471,19 +470,6 @@ function Update-SearchDependentButtonStates {
   $deviceTypeText = Get-CurrentDeviceTypeText
   $hasDeviceType = -not [string]::IsNullOrWhiteSpace($deviceTypeText)
 
-  if ($btnRoundNow) {
-    try {
-      $shouldEnableRoundNow = -not $hasDeviceType
-      if ($btnRoundNow.Enabled -ne $shouldEnableRoundNow) {
-        $btnRoundNow.Enabled = $shouldEnableRoundNow
-      }
-      if ($tip) {
-        $tooltipText = if ($shouldEnableRoundNow) { '' } else { $script:RoundNowDisabledTooltip }
-        $tip.SetToolTip($btnRoundNow, $tooltipText)
-      }
-    } catch {}
-  }
-
   foreach ($entry in $script:SearchTextButtonStates.Values) {
     $button = $entry.Button
     if (-not $button) { continue }
@@ -495,10 +481,6 @@ function Update-SearchDependentButtonStates {
       }
     } catch {}
   }
-}
-
-function Update-RoundNowButtonState {
-  Update-SearchDependentButtonStates
 }
 
 function Set-SearchTextButtonBaseState {
@@ -517,7 +499,7 @@ function Set-SearchTextButtonBaseState {
     Button = $Button
     BaseEnabled = [bool]$BaseEnabled
   }
-  try { Update-RoundNowButtonState } catch {}
+  try { Update-SearchDependentButtonStates } catch {}
 }
 # ===== Script directory resolver (robust, PS 5.1-safe) =====
 function Get-OwnScriptDir {
@@ -2587,6 +2569,7 @@ $nameValueRow.Controls.Add($btnFixName,1,0)
 
 $nameRow.Controls.Add($nameValueRow,1,0)
 $tip.SetToolTip($btnCopyHost, 'Copy host name to clipboard')
+$tip.SetToolTip($btnFixName, 'Update the device name to match the expected format')
 $btnCopyHost.Add_Click({
   $textToCopy = $txtHost.Text
   if(-not [string]::IsNullOrWhiteSpace($textToCopy)){
@@ -2735,6 +2718,7 @@ if(-not $btnEditLoc){
   $btnEditLoc.Size = '120,26'
 }
 $btnEditLoc.Margin = New-Object System.Windows.Forms.Padding(0)
+$tip.SetToolTip($btnEditLoc, 'Edit and save the device location fields')
 
 if(-not $btnCancelEditLoc){
   $btnCancelEditLoc = New-Object ModernUI.RoundedButton
@@ -2743,6 +2727,7 @@ if(-not $btnCancelEditLoc){
   $btnCancelEditLoc.Visible = $false
 }
 $btnCancelEditLoc.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tip.SetToolTip($btnCancelEditLoc, 'Discard location edits')
 
 if(-not $locButtonsPanel){
   $locButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
@@ -2813,6 +2798,7 @@ $btnAddPeripheral.Margin = '0,0,8,0'
 $btnAddPeripheral.Anchor = 'Left'
 $btnAddPeripheral.BackColor = [System.Drawing.SystemColors]::Control
 $btnAddPeripheral.ForeColor = [System.Drawing.SystemColors]::ControlText
+$tip.SetToolTip($btnAddPeripheral, 'Associate a new peripheral to this device')
 $btnRemove = New-Object ModernUI.RoundedButton
 $btnRemove.Text   = 'Remove Peripheral'
 $btnRemove.Size   = '160,32'
@@ -2820,6 +2806,7 @@ $btnRemove.Margin = '0,0,8,0'
 $btnRemove.Anchor = 'Left'
 $btnRemove.BackColor = [System.Drawing.SystemColors]::Control
 $btnRemove.ForeColor = [System.Drawing.SystemColors]::ControlText
+$tip.SetToolTip($btnRemove, 'Remove the selected peripheral from this device')
 $btnValidateDevices = New-Object ModernUI.RoundedButton
 $btnValidateDevices.Text   = 'Validate Devices'
 $btnValidateDevices.Size   = '150,32'
@@ -2827,6 +2814,7 @@ $btnValidateDevices.Margin = '0,0,0,0'
 $btnValidateDevices.Anchor = 'Left'
 $btnValidateDevices.BackColor = [System.Drawing.SystemColors]::Control
 $btnValidateDevices.ForeColor = [System.Drawing.SystemColors]::ControlText
+$tip.SetToolTip($btnValidateDevices, 'Validate the listed devices against inventory data')
 $btnLiveDetails = New-Object ModernUI.RoundedButton
 $btnLiveDetails.Text   = 'Live Details'
 $btnLiveDetails.Size   = '130,32'
@@ -2834,6 +2822,7 @@ $btnLiveDetails.Margin = '8,0,0,0'
 $btnLiveDetails.Anchor = 'Left'
 $btnLiveDetails.BackColor = [System.Drawing.SystemColors]::Control
 $btnLiveDetails.ForeColor = [System.Drawing.SystemColors]::ControlText
+$tip.SetToolTip($btnLiveDetails, 'Open live details for the selected device')
 $assocButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
 $assocButtonsPanel.Dock = 'Left'
 $assocButtonsPanel.AutoSize = $true
@@ -3083,7 +3072,9 @@ $chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate p
 $btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Size='150,36'; $btnCheckComplete.TabIndex = 8
 $btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Size='132,36'; $btnSave.TabIndex = 9
 $btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 10
-$btnRoundNow=New-Object ModernUI.RoundedButton; $btnRoundNow.Text="Round Now"; $btnRoundNow.Size='140,36'; $btnRoundNow.Enabled=$false; $btnRoundNow.TabIndex = 11
+$tip.SetToolTip($btnCheckComplete, 'Mark the checklist as complete')
+$tip.SetToolTip($btnSave, 'Save the rounding event')
+$tip.SetToolTip($btnManualRound, 'Open the manual rounding link')
 
 Set-SearchTextButtonBaseState -Button $btnSave -BaseEnabled $true
 
@@ -3093,8 +3084,6 @@ $btnSave.BackColor = [System.Drawing.SystemColors]::Control
 $btnSave.ForeColor = [System.Drawing.SystemColors]::ControlText
 $btnManualRound.BackColor = [System.Drawing.SystemColors]::Control
 $btnManualRound.ForeColor = [System.Drawing.SystemColors]::ControlText
-$btnRoundNow.BackColor = [System.Drawing.SystemColors]::Control
-$btnRoundNow.ForeColor = [System.Drawing.SystemColors]::ControlText
 
 $lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 12
 $txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=13; $txtComments.WordWrap = $true
@@ -3185,13 +3174,9 @@ $actionsPanel.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $btnCheckComplete.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
 $btnSave.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
 $btnManualRound.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
-$btnRoundNow.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 $actionsPanel.Controls.Add($btnCheckComplete)
 $actionsPanel.Controls.Add($btnSave)
 $actionsPanel.Controls.Add($btnManualRound)
-$actionsPanel.Controls.Add($btnRoundNow)
-
-Update-RoundNowButtonState
 
 $lblComments.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $txtComments.Margin = New-Object System.Windows.Forms.Padding(0,4,0,0)
@@ -4398,6 +4383,8 @@ function Show-AddPeripheralDialog($parentRec,[string]$defaultSearchText='',[stri
   $btnDialogCancel.Text = 'Cancel'
   $btnDialogCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
   $btnDialogCancel.Margin = '0,8,0,0'
+  $tip.SetToolTip($btnDialogAdd, 'Add the selected peripheral to this device')
+  $tip.SetToolTip($btnDialogCancel, 'Close without adding a peripheral')
   $spacer = New-Object System.Windows.Forms.Panel
   $spacer.Dock = 'Fill'
   $buttonPanel.Controls.Add($spacer,0,0)
@@ -4903,6 +4890,7 @@ function Show-LiveDetailsDialog($parentRec){
   $btnDialogClose.Text = 'Close'
   $btnDialogClose.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
   $btnDialogClose.Margin = '0,12,0,0'
+  $tip.SetToolTip($btnDialogClose, 'Close the live details window')
   $spacer = New-Object System.Windows.Forms.Panel
   $spacer.Dock = 'Fill'
   $buttonPanel.Controls.Add($spacer,0,0)
@@ -5487,9 +5475,6 @@ $txtScan.Add_TextChanged({
   } else {
     if($script:editing){ Cancel-EditLocation }
   }
-  try {
-    if(Get-Command Update-RoundNowButtonState -ErrorAction SilentlyContinue){ Update-RoundNowButtonState }
-  } catch {}
 })
 $btnEditLoc.Add_Click({ Toggle-EditLocation })
 if($btnCancelEditLoc){ $btnCancelEditLoc.Add_Click({ Cancel-EditLocation }) }
@@ -5765,9 +5750,6 @@ if (-not (Get-Variable -Scope Script -Name NearbyLastSortColumn -ErrorAction Sil
 if (-not (Get-Variable -Scope Script -Name NearbyLastSortDirection -ErrorAction SilentlyContinue)) {
   $script:NearbyLastSortDirection = 'Asc'
 }
-if (-not (Get-Variable -Scope Script -Name NearbyLastScrollIndex -ErrorAction SilentlyContinue)) {
-  $script:NearbyLastScrollIndex = $null
-}
 if (-not $script:NEAR_STATUSES) {
   # Full set minus "Complete"
   $script:NEAR_STATUSES = @(
@@ -5797,6 +5779,9 @@ if (-not (Get-Variable -Scope Script -Name LatestRoundingTimestampByAsset -Error
 }
 if (-not (Get-Variable -Scope Script -Name NearbyIpCache -ErrorAction SilentlyContinue)) {
   $script:NearbyIpCache = New-Object 'System.Collections.Generic.Dictionary[string,string]'
+}
+if (-not (Get-Variable -Scope Script -Name NearbyLastScrollIndex -ErrorAction SilentlyContinue)) {
+  $script:NearbyLastScrollIndex = $null
 }
 function Get-NearbyPingCacheKey {
   param([string]$HostName)
@@ -6139,6 +6124,7 @@ $btnNearbyShowAll = New-Object ModernUI.RoundedButton
 $btnNearbyShowAll.Text = 'Show All'
 $btnNearbyShowAll.AutoSize = $true
 $btnNearbyShowAll.Location = '8,32'
+$tip.SetToolTip($btnNearbyShowAll, 'Toggle all Nearby filters on or off')
 $chkTodayRounded = New-Object System.Windows.Forms.CheckBox
 $chkTodayRounded.Text = "Today's Rounded"
 $chkTodayRounded.AutoSize = $true
@@ -6181,6 +6167,7 @@ $btnClearScopes.Text = "Clear List"
 $btnClearScopes.AutoSize = $true
 $btnClearScopes.Anchor = 'Top,Right'
 $btnClearScopes.Margin = '0,0,0,0'
+$tip.SetToolTip($btnClearScopes, 'Clear all nearby scopes from the list')
 $btnZoomOut = New-Object ModernUI.RoundedButton
 $btnZoomOut.Text = '-'
 $btnZoomOut.AutoSize = $true
@@ -6258,6 +6245,8 @@ $btnRebuildNearby.Text = 'Rebuild Nearby'
 $btnRebuildNearby.AutoSize = $true
 $btnRebuildNearby.Anchor = 'Top,Right'
 $btnRebuildNearby.Margin = '0,0,0,0'
+$tip.SetToolTip($btnPingAll, 'Ping all devices listed in Nearby')
+$tip.SetToolTip($btnRebuildNearby, 'Rebuild the Nearby list from active scopes')
 $nearToolbar.Controls.Add($btnPingAll)
 $nearToolbar.Controls.Add($btnRebuildNearby)
 function Update-NearToolbarButtons {
@@ -6657,6 +6646,7 @@ $btnNearSave.Text = "Save"
 $btnNearSave.Anchor = 'Bottom,Right'
 $btnNearSave.Size = '120,30'
 $btnNearSave.Location = New-Object System.Drawing.Point(($form.ClientSize.Width - 160), 8)
+$tip.SetToolTip($btnNearSave, 'Bulk save rounding events for selected Nearby rows')
 $nearBottom.Add_Resize({ $btnNearSave.Location = New-Object System.Drawing.Point(($nearBottom.ClientSize.Width - 128 - 12), 8) })
 $nearBottom.Controls.AddRange(@($lblNearNote,$btnNearSave))
 # Build Nearby tab page
@@ -6735,7 +6725,7 @@ function Rebuild-Nearby {
   )
 try { $dgvNearby.SuspendLayout() } catch {}
 try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
-  $scrollIndex = $null
+    $scrollIndex = $null
   if ($dgvNearby) {
     try { $scrollIndex = $dgvNearby.FirstDisplayedScrollingRowIndex } catch { $scrollIndex = $null }
     if ($scrollIndex -ne $null -and $scrollIndex -ge 0) { $script:NearbyLastScrollIndex = $scrollIndex }
@@ -6842,7 +6832,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   Apply-NearbyFilters
   Update-NearbyCheckboxLabels $todayCount $excludedCount $recentCount
 try { $dgvNearby.ResumeLayout() } catch {}
-  if ($dgvNearby -and $dgvNearby.Rows.Count -gt 0 -and $script:NearbyLastScrollIndex -ne $null) {
+if ($dgvNearby -and $dgvNearby.Rows.Count -gt 0 -and $script:NearbyLastScrollIndex -ne $null) {
     $targetIndex = [Math]::Min($script:NearbyLastScrollIndex, ($dgvNearby.Rows.Count - 1))
     if ($targetIndex -ge 0) {
       try { $dgvNearby.FirstDisplayedScrollingRowIndex = $targetIndex } catch {}
