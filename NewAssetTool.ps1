@@ -2569,6 +2569,7 @@ $nameValueRow.Controls.Add($btnFixName,1,0)
 
 $nameRow.Controls.Add($nameValueRow,1,0)
 $tip.SetToolTip($btnCopyHost, 'Copy host name to clipboard')
+$tip.SetToolTip($btnFixName, 'Update the device name to match the expected format')
 $btnCopyHost.Add_Click({
   $textToCopy = $txtHost.Text
   if(-not [string]::IsNullOrWhiteSpace($textToCopy)){
@@ -2717,6 +2718,7 @@ if(-not $btnEditLoc){
   $btnEditLoc.Size = '120,26'
 }
 $btnEditLoc.Margin = New-Object System.Windows.Forms.Padding(0)
+$tip.SetToolTip($btnEditLoc, 'Edit and save the device location fields')
 
 if(-not $btnCancelEditLoc){
   $btnCancelEditLoc = New-Object ModernUI.RoundedButton
@@ -2725,6 +2727,7 @@ if(-not $btnCancelEditLoc){
   $btnCancelEditLoc.Visible = $false
 }
 $btnCancelEditLoc.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
+$tip.SetToolTip($btnCancelEditLoc, 'Discard location edits')
 
 if(-not $locButtonsPanel){
   $locButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
@@ -2795,6 +2798,7 @@ $btnAddPeripheral.Margin = '0,0,8,0'
 $btnAddPeripheral.Anchor = 'Left'
 $btnAddPeripheral.BackColor = [System.Drawing.SystemColors]::Control
 $btnAddPeripheral.ForeColor = [System.Drawing.SystemColors]::ControlText
+$tip.SetToolTip($btnAddPeripheral, 'Associate a new peripheral to this device')
 $btnRemove = New-Object ModernUI.RoundedButton
 $btnRemove.Text   = 'Remove Peripheral'
 $btnRemove.Size   = '160,32'
@@ -2802,6 +2806,7 @@ $btnRemove.Margin = '0,0,8,0'
 $btnRemove.Anchor = 'Left'
 $btnRemove.BackColor = [System.Drawing.SystemColors]::Control
 $btnRemove.ForeColor = [System.Drawing.SystemColors]::ControlText
+$tip.SetToolTip($btnRemove, 'Remove the selected peripheral from this device')
 $btnValidateDevices = New-Object ModernUI.RoundedButton
 $btnValidateDevices.Text   = 'Validate Devices'
 $btnValidateDevices.Size   = '150,32'
@@ -2809,6 +2814,7 @@ $btnValidateDevices.Margin = '0,0,0,0'
 $btnValidateDevices.Anchor = 'Left'
 $btnValidateDevices.BackColor = [System.Drawing.SystemColors]::Control
 $btnValidateDevices.ForeColor = [System.Drawing.SystemColors]::ControlText
+$tip.SetToolTip($btnValidateDevices, 'Validate the listed devices against inventory data')
 $btnLiveDetails = New-Object ModernUI.RoundedButton
 $btnLiveDetails.Text   = 'Live Details'
 $btnLiveDetails.Size   = '130,32'
@@ -2816,6 +2822,7 @@ $btnLiveDetails.Margin = '8,0,0,0'
 $btnLiveDetails.Anchor = 'Left'
 $btnLiveDetails.BackColor = [System.Drawing.SystemColors]::Control
 $btnLiveDetails.ForeColor = [System.Drawing.SystemColors]::ControlText
+$tip.SetToolTip($btnLiveDetails, 'Open live details for the selected device')
 $assocButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
 $assocButtonsPanel.Dock = 'Left'
 $assocButtonsPanel.AutoSize = $true
@@ -3065,6 +3072,9 @@ $chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate p
 $btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Size='150,36'; $btnCheckComplete.TabIndex = 8
 $btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Size='132,36'; $btnSave.TabIndex = 9
 $btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 10
+$tip.SetToolTip($btnCheckComplete, 'Mark the checklist as complete')
+$tip.SetToolTip($btnSave, 'Save the rounding event')
+$tip.SetToolTip($btnManualRound, 'Open the manual rounding link')
 
 Set-SearchTextButtonBaseState -Button $btnSave -BaseEnabled $true
 
@@ -4373,6 +4383,8 @@ function Show-AddPeripheralDialog($parentRec,[string]$defaultSearchText='',[stri
   $btnDialogCancel.Text = 'Cancel'
   $btnDialogCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
   $btnDialogCancel.Margin = '0,8,0,0'
+  $tip.SetToolTip($btnDialogAdd, 'Add the selected peripheral to this device')
+  $tip.SetToolTip($btnDialogCancel, 'Close without adding a peripheral')
   $spacer = New-Object System.Windows.Forms.Panel
   $spacer.Dock = 'Fill'
   $buttonPanel.Controls.Add($spacer,0,0)
@@ -4878,6 +4890,7 @@ function Show-LiveDetailsDialog($parentRec){
   $btnDialogClose.Text = 'Close'
   $btnDialogClose.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
   $btnDialogClose.Margin = '0,12,0,0'
+  $tip.SetToolTip($btnDialogClose, 'Close the live details window')
   $spacer = New-Object System.Windows.Forms.Panel
   $spacer.Dock = 'Fill'
   $buttonPanel.Controls.Add($spacer,0,0)
@@ -6111,6 +6124,7 @@ $btnNearbyShowAll = New-Object ModernUI.RoundedButton
 $btnNearbyShowAll.Text = 'Show All'
 $btnNearbyShowAll.AutoSize = $true
 $btnNearbyShowAll.Location = '8,32'
+$tip.SetToolTip($btnNearbyShowAll, 'Toggle all Nearby filters on or off')
 $chkTodayRounded = New-Object System.Windows.Forms.CheckBox
 $chkTodayRounded.Text = "Today's Rounded"
 $chkTodayRounded.AutoSize = $true
@@ -6153,6 +6167,7 @@ $btnClearScopes.Text = "Clear List"
 $btnClearScopes.AutoSize = $true
 $btnClearScopes.Anchor = 'Top,Right'
 $btnClearScopes.Margin = '0,0,0,0'
+$tip.SetToolTip($btnClearScopes, 'Clear all nearby scopes from the list')
 $btnZoomOut = New-Object ModernUI.RoundedButton
 $btnZoomOut.Text = '-'
 $btnZoomOut.AutoSize = $true
@@ -6230,6 +6245,8 @@ $btnRebuildNearby.Text = 'Rebuild Nearby'
 $btnRebuildNearby.AutoSize = $true
 $btnRebuildNearby.Anchor = 'Top,Right'
 $btnRebuildNearby.Margin = '0,0,0,0'
+$tip.SetToolTip($btnPingAll, 'Ping all devices listed in Nearby')
+$tip.SetToolTip($btnRebuildNearby, 'Rebuild the Nearby list from active scopes')
 $nearToolbar.Controls.Add($btnPingAll)
 $nearToolbar.Controls.Add($btnRebuildNearby)
 function Update-NearToolbarButtons {
@@ -6629,6 +6646,7 @@ $btnNearSave.Text = "Save"
 $btnNearSave.Anchor = 'Bottom,Right'
 $btnNearSave.Size = '120,30'
 $btnNearSave.Location = New-Object System.Drawing.Point(($form.ClientSize.Width - 160), 8)
+$tip.SetToolTip($btnNearSave, 'Bulk save rounding events for selected Nearby rows')
 $nearBottom.Add_Resize({ $btnNearSave.Location = New-Object System.Drawing.Point(($nearBottom.ClientSize.Width - 128 - 12), 8) })
 $nearBottom.Controls.AddRange(@($lblNearNote,$btnNearSave))
 # Build Nearby tab page
