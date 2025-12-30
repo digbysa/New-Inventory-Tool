@@ -436,7 +436,6 @@ function Set-ScanSearchControl {
 
 $script:DeviceTypeSummaryControl = $null
 $script:SearchTextButtonStates = @{}
-$script:RoundNowDisabledTooltip = 'A detected device type is required to use this feature.'
 $script:EditLocationOriginal = $null
 
 function Get-CurrentSearchInputText {
@@ -471,19 +470,6 @@ function Update-SearchDependentButtonStates {
   $deviceTypeText = Get-CurrentDeviceTypeText
   $hasDeviceType = -not [string]::IsNullOrWhiteSpace($deviceTypeText)
 
-  if ($btnRoundNow) {
-    try {
-      $shouldEnableRoundNow = -not $hasDeviceType
-      if ($btnRoundNow.Enabled -ne $shouldEnableRoundNow) {
-        $btnRoundNow.Enabled = $shouldEnableRoundNow
-      }
-      if ($tip) {
-        $tooltipText = if ($shouldEnableRoundNow) { '' } else { $script:RoundNowDisabledTooltip }
-        $tip.SetToolTip($btnRoundNow, $tooltipText)
-      }
-    } catch {}
-  }
-
   foreach ($entry in $script:SearchTextButtonStates.Values) {
     $button = $entry.Button
     if (-not $button) { continue }
@@ -495,10 +481,6 @@ function Update-SearchDependentButtonStates {
       }
     } catch {}
   }
-}
-
-function Update-RoundNowButtonState {
-  Update-SearchDependentButtonStates
 }
 
 function Set-SearchTextButtonBaseState {
@@ -517,7 +499,7 @@ function Set-SearchTextButtonBaseState {
     Button = $Button
     BaseEnabled = [bool]$BaseEnabled
   }
-  try { Update-RoundNowButtonState } catch {}
+  try { Update-SearchDependentButtonStates } catch {}
 }
 # ===== Script directory resolver (robust, PS 5.1-safe) =====
 function Get-OwnScriptDir {
@@ -3083,7 +3065,6 @@ $chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate p
 $btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Size='150,36'; $btnCheckComplete.TabIndex = 8
 $btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Size='132,36'; $btnSave.TabIndex = 9
 $btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 10
-$btnRoundNow=New-Object ModernUI.RoundedButton; $btnRoundNow.Text="Round Now"; $btnRoundNow.Size='140,36'; $btnRoundNow.Enabled=$false; $btnRoundNow.TabIndex = 11
 
 Set-SearchTextButtonBaseState -Button $btnSave -BaseEnabled $true
 
@@ -3093,8 +3074,6 @@ $btnSave.BackColor = [System.Drawing.SystemColors]::Control
 $btnSave.ForeColor = [System.Drawing.SystemColors]::ControlText
 $btnManualRound.BackColor = [System.Drawing.SystemColors]::Control
 $btnManualRound.ForeColor = [System.Drawing.SystemColors]::ControlText
-$btnRoundNow.BackColor = [System.Drawing.SystemColors]::Control
-$btnRoundNow.ForeColor = [System.Drawing.SystemColors]::ControlText
 
 $lblComments=New-Object System.Windows.Forms.Label; $lblComments.Text='Comments'; $lblComments.AutoSize=$true; $lblComments.TabIndex = 12
 $txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$true; $txtComments.AcceptsReturn=$true; $txtComments.ScrollBars='Vertical'; $txtComments.Dock='Fill'; $txtComments.TabIndex=13; $txtComments.WordWrap = $true
@@ -3185,13 +3164,9 @@ $actionsPanel.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $btnCheckComplete.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
 $btnSave.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
 $btnManualRound.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
-$btnRoundNow.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 $actionsPanel.Controls.Add($btnCheckComplete)
 $actionsPanel.Controls.Add($btnSave)
 $actionsPanel.Controls.Add($btnManualRound)
-$actionsPanel.Controls.Add($btnRoundNow)
-
-Update-RoundNowButtonState
 
 $lblComments.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $txtComments.Margin = New-Object System.Windows.Forms.Padding(0,4,0,0)
@@ -5487,9 +5462,6 @@ $txtScan.Add_TextChanged({
   } else {
     if($script:editing){ Cancel-EditLocation }
   }
-  try {
-    if(Get-Command Update-RoundNowButtonState -ErrorAction SilentlyContinue){ Update-RoundNowButtonState }
-  } catch {}
 })
 $btnEditLoc.Add_Click({ Toggle-EditLocation })
 if($btnCancelEditLoc){ $btnCancelEditLoc.Add_Click({ Cancel-EditLocation }) }
