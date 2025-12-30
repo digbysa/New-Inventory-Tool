@@ -5767,6 +5767,9 @@ if (-not (Get-Variable -Scope Script -Name LatestRoundingTimestampByAsset -Error
 if (-not (Get-Variable -Scope Script -Name NearbyIpCache -ErrorAction SilentlyContinue)) {
   $script:NearbyIpCache = New-Object 'System.Collections.Generic.Dictionary[string,string]'
 }
+if (-not (Get-Variable -Scope Script -Name NearbyLastScrollIndex -ErrorAction SilentlyContinue)) {
+  $script:NearbyLastScrollIndex = $null
+}
 function Get-NearbyPingCacheKey {
   param([string]$HostName)
 
@@ -6704,6 +6707,11 @@ function Rebuild-Nearby {
   )
 try { $dgvNearby.SuspendLayout() } catch {}
 try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
+    $scrollIndex = $null
+  if ($dgvNearby) {
+    try { $scrollIndex = $dgvNearby.FirstDisplayedScrollingRowIndex } catch { $scrollIndex = $null }
+    if ($scrollIndex -ne $null -and $scrollIndex -ge 0) { $script:NearbyLastScrollIndex = $scrollIndex }
+  }
   try { Write-Host ("Rebuild-Nearby: Active scopes=" + ($(if($script:ActiveNearbyScopes){$script:ActiveNearbyScopes.Count}else{0}))) } catch {}
   if($ReloadRoundingEvents){
     Load-RoundingEvents
@@ -6806,6 +6814,12 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   Apply-NearbyFilters
   Update-NearbyCheckboxLabels $todayCount $excludedCount $recentCount
 try { $dgvNearby.ResumeLayout() } catch {}
+if ($dgvNearby -and $dgvNearby.Rows.Count -gt 0 -and $script:NearbyLastScrollIndex -ne $null) {
+    $targetIndex = [Math]::Min($script:NearbyLastScrollIndex, ($dgvNearby.Rows.Count - 1))
+    if ($targetIndex -ge 0) {
+      try { $dgvNearby.FirstDisplayedScrollingRowIndex = $targetIndex } catch {}
+    }
+  }
 try { $form.Cursor = [System.Windows.Forms.Cursors]::Default } catch {}}
 function Apply-NearbySort {
   if ($dgvNearby -and $script:NearbyLastSortColumn) {
