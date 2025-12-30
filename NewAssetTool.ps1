@@ -4169,10 +4169,6 @@ function Log-AssocChange([string]$action,[string]$deviceType,[string]$childAT,[s
   }
   $oldParentTag = Resolve-ParentAssetTag $oldParent
   $newParentTag = Resolve-ParentAssetTag $newParent
-  $roundingUrlOutput = $null
-  if(-not [string]::IsNullOrWhiteSpace($url)){
-    $roundingUrlOutput = "=HYPERLINK(""$url"",""$url"")"
-  }
   $row = [pscustomobject]@{
     Timestamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
     Action    = $action
@@ -5603,7 +5599,7 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
     PeripheralsOK    = if ($chkPeriph.Checked) { 'Yes' } else { 'No' }
     MaintenanceType = $cmbMaintType.Text
     Department       = $deptValue
-    RoundingUrl      = $roundingUrlOutput
+    RoundingUrl      = $url
     Comments         = $txtComments.Text
     Rounded          = if ($script:ManualRoundUsed) { 'Yes' } else { 'No' }
   }
