@@ -5780,9 +5780,6 @@ if (-not (Get-Variable -Scope Script -Name LatestRoundingTimestampByAsset -Error
 if (-not (Get-Variable -Scope Script -Name NearbyIpCache -ErrorAction SilentlyContinue)) {
   $script:NearbyIpCache = New-Object 'System.Collections.Generic.Dictionary[string,string]'
 }
-if (-not (Get-Variable -Scope Script -Name NearbyPingStatusCache -ErrorAction SilentlyContinue)) {
-  $script:NearbyPingStatusCache = New-Object 'System.Collections.Generic.Dictionary[string,string]'
-}
 if (-not (Get-Variable -Scope Script -Name NearbyLastScrollIndex -ErrorAction SilentlyContinue)) {
   $script:NearbyLastScrollIndex = $null
 }
@@ -5810,38 +5807,6 @@ function Set-NearbyCachedIp {
   if (-not $key) { return }
   if ($script:NearbyIpCache.ContainsKey($key)) { $script:NearbyIpCache[$key] = $IpAddress }
   else { $script:NearbyIpCache.Add($key, $IpAddress) }
-}
-function Get-NearbyCachedPingStatus {
-  param([string]$HostName)
-
-  $key = Get-NearbyPingCacheKey $HostName
-  if (-not $key) { return $null }
-  if ($script:NearbyPingStatusCache.ContainsKey($key)) { return '' + $script:NearbyPingStatusCache[$key] }
-  return $null
-}
-function Set-NearbyCachedPingStatus {
-  param(
-    [string]$HostName,
-    [string]$Status
-  )
-
-  $key = Get-NearbyPingCacheKey $HostName
-  if (-not $key) { return }
-  if ($script:NearbyPingStatusCache.ContainsKey($key)) { $script:NearbyPingStatusCache[$key] = $Status }
-  else { $script:NearbyPingStatusCache.Add($key, $Status) }
-}
-function Apply-NearbyPingStyle {
-  param(
-    [System.Windows.Forms.DataGridViewCell]$Cell,
-    [string]$Status
-  )
-
-  if (-not $Cell) { return }
-  if ($Status -eq 'Success') {
-    $Cell.Style.ForeColor = [System.Drawing.Color]::ForestGreen
-  } elseif ($Status -eq 'Fail') {
-    $Cell.Style.ForeColor = [System.Drawing.Color]::Crimson
-  }
 }
 function Ensure-RoundingCommentsColumn([string]$file){
   try {
@@ -6437,7 +6402,6 @@ function Invoke-NearbyPingRows {
       }
 
       Set-NearbyCachedIp -HostName $hostName -IpAddress $ipAddress
-      Set-NearbyCachedPingStatus -HostName $hostName -Status (if ($success) { 'Success' } else { 'Fail' })
 
       $updatedCount++
 
@@ -6861,10 +6825,6 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     }
     if ($isToday) {
       $r.DefaultCellStyle.ForeColor = [System.Drawing.Color]::Gray
-    }
-    $pingStatus = Get-NearbyCachedPingStatus $hostName
-    if ($pingStatus) {
-      Apply-NearbyPingStyle -Cell $r.Cells['Host'] -Status $pingStatus
     }
   }
   # Apply sort and filters
