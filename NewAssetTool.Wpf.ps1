@@ -217,7 +217,7 @@ if ($searchTextBox) {
   })
   $searchTextBox.Add_KeyDown({
     param($sender,$eventArgs)
-    if ($eventArgs.Key -eq [System.Windows.Input.Key]::Enter) {
+    if ($eventArgs.Key -in @([System.Windows.Input.Key]::Enter,[System.Windows.Input.Key]::Return)) {
       $eventArgs.Handled = $true
       try { Do-Lookup } catch {}
     }
