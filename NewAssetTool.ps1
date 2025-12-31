@@ -3499,6 +3499,10 @@ function Get-RoundingUrlForParent($pc){
   }
   return $null
 }
+function Get-RoundingUrlHyperlink([string]$url){
+  if([string]::IsNullOrWhiteSpace($url)){ return '' }
+  return "=HYPERLINK(`"$url`",`"$url`")"
+}
 function Update-ManualRoundButton($parentRec){
   if($parentRec){
     $url = Get-RoundingUrlForParent $parentRec
@@ -5605,6 +5609,7 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
   }
   $cmbDept.Visible = $false  # Hidden until Edit Location is active
   $rowOut = $row | Select-Object $script:RoundingEventColumns
+  $rowOut.RoundingUrl = Get-RoundingUrlHyperlink $row.RoundingUrl
   if(-not $exists){ $rowOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
   else { $rowOut | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
   if (-not ($script:RoundingEvents -is [System.Collections.IList])) {
@@ -7002,6 +7007,7 @@ if ($pc) {
       Rounded          = 'No'
     }
     $evOut = $ev | Select-Object $script:RoundingEventColumns
+    $evOut.RoundingUrl = Get-RoundingUrlHyperlink $ev.RoundingUrl
     if (-not $exists) { $evOut | Export-Csv -Path $file -NoTypeInformation -Encoding UTF8 }
     else { $evOut | Export-Csv -Path $file -NoTypeInformation -Append -Encoding UTF8 }
     # Update in-memory
