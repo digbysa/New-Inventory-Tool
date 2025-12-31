@@ -5407,16 +5407,25 @@ function Focus-ScanInput(){
 }
 function Do-Lookup(){
   Stop-RoundingTimer
-  $raw = Find-RecordRaw $txtScan.Text
+  $scanText = Get-CurrentSearchInputText
+  $raw = Find-RecordRaw $scanText
   if(-not $raw){
     Reset-RoundingTimer
-    $statusLabel.Text=("No match for '" + $txtScan.Text + "'")
+    $statusLabel.Text=("No match for '" + $scanText + "'")
     return
   }
   $parent = Resolve-ParentComputer $raw
   Populate-UI $raw $parent
   Start-RoundingTimer
   $statusLabel.Text=("Found " + $raw.Kind + " / " + $raw.Type)
+}
+function Handle-ScanTextChanged{
+  param([string]$text)
+  if([string]::IsNullOrWhiteSpace($text)){
+    Clear-UI
+  } else {
+    if($script:editing){ Cancel-EditLocation }
+  }
 }
 function Clear-UI(){
   Reset-RoundingTimer
@@ -5471,11 +5480,7 @@ function Clear-UI(){
 # ---- Events ----
 $txtScan.Add_KeyDown({ if($_.KeyCode -eq 'Enter'){ Do-Lookup; $_.SuppressKeyPress=$true } })
 $txtScan.Add_TextChanged({
-  if([string]::IsNullOrWhiteSpace($txtScan.Text)){
-    Clear-UI
-  } else {
-    if($script:editing){ Cancel-EditLocation }
-  }
+  Handle-ScanTextChanged $txtScan.Text
 })
 $btnEditLoc.Add_Click({ Toggle-EditLocation })
 if($btnCancelEditLoc){ $btnCancelEditLoc.Add_Click({ Cancel-EditLocation }) }

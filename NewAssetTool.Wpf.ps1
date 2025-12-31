@@ -193,6 +193,16 @@ if ($window) {
 $searchTextBox = $window.FindName('SearchTextBox')
 if ($searchTextBox) {
   try { Set-ScanSearchControl $searchTextBox } catch {}
+  $scanSyncTimer = New-Object System.Windows.Threading.DispatcherTimer
+  $scanSyncTimer.Interval = [TimeSpan]::FromMilliseconds(60)
+  $scanSyncTimer.Add_Tick({
+    $scanSyncTimer.Stop()
+    if ($txtScan) {
+      if ($txtScan.Text -ne $script:PendingScanText) {
+        $txtScan.Text = $script:PendingScanText
+      }
+    }
+  })
   if ($txtScan) {
     if ($searchTextBox.Text -ne $txtScan.Text) { $searchTextBox.Text = $txtScan.Text }
     $txtScan.Add_TextChanged({
@@ -206,8 +216,11 @@ if ($searchTextBox) {
   }
   $searchTextBox.Add_TextChanged({
     param($sender,$eventArgs)
-    if ($txtScan -and $txtScan.Text -ne $sender.Text) {
-      $txtScan.Text = $sender.Text
+    $script:PendingScanText = $sender.Text
+    $scanSyncTimer.Stop()
+    $scanSyncTimer.Start()
+    if (Get-Command Handle-ScanTextChanged -ErrorAction SilentlyContinue) {
+      Handle-ScanTextChanged $sender.Text
     }
     try {
       if (Get-Command Update-RoundNowButtonState -ErrorAction SilentlyContinue) {
