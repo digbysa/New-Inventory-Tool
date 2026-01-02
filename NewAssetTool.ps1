@@ -5747,6 +5747,9 @@ if (-not (Get-Variable -Scope Script -Name LatestRoundingTimestampByAsset -Error
 if (-not (Get-Variable -Scope Script -Name NearbyIpCache -ErrorAction SilentlyContinue)) {
   $script:NearbyIpCache = New-Object 'System.Collections.Generic.Dictionary[string,string]'
 }
+if (-not (Get-Variable -Scope Script -Name NearbyHostColorCache -ErrorAction SilentlyContinue)) {
+  $script:NearbyHostColorCache = New-Object 'System.Collections.Generic.Dictionary[string,string]'
+}
 if (-not (Get-Variable -Scope Script -Name NearbyLastScrollIndex -ErrorAction SilentlyContinue)) {
   $script:NearbyLastScrollIndex = $null
 }
@@ -5774,6 +5777,32 @@ function Set-NearbyCachedIp {
   if (-not $key) { return }
   if ($script:NearbyIpCache.ContainsKey($key)) { $script:NearbyIpCache[$key] = $IpAddress }
   else { $script:NearbyIpCache.Add($key, $IpAddress) }
+}
+function Get-NearbyCachedHostColor {
+  param([string]$HostName)
+
+  $key = Get-NearbyPingCacheKey $HostName
+  if (-not $key) { return $null }
+  if ($script:NearbyHostColorCache.ContainsKey($key)) { return '' + $script:NearbyHostColorCache[$key] }
+  return $null
+}
+function Set-NearbyCachedHostColor {
+  param(
+    [string]$HostName,
+    [string]$ColorName
+  )
+
+  $key = Get-NearbyPingCacheKey $HostName
+  if (-not $key) { return }
+  if ($script:NearbyHostColorCache.ContainsKey($key)) { $script:NearbyHostColorCache[$key] = $ColorName }
+  else { $script:NearbyHostColorCache.Add($key, $ColorName) }
+}
+function Resolve-NearbyHostColor {
+  param([string]$ColorName)
+
+  if ($ColorName -eq 'Success') { return [System.Drawing.Color]::ForestGreen }
+  if ($ColorName -eq 'Fail') { return [System.Drawing.Color]::Crimson }
+  return $null
 }
 function Ensure-RoundingCommentsColumn([string]$file){
   try {
@@ -6369,6 +6398,7 @@ function Invoke-NearbyPingRows {
       }
 
       Set-NearbyCachedIp -HostName $hostName -IpAddress $ipAddress
+      Set-NearbyCachedHostColor -HostName $hostName -ColorName $(if ($success) { 'Success' } else { 'Fail' })
 
       $updatedCount++
 
@@ -6742,6 +6772,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $r = $dgvNearby.Rows[$rowIdx]
     $hostName = $pc.name
     $cachedIp = Get-NearbyCachedIp $hostName
+    $cachedHostColor = Get-NearbyCachedHostColor $hostName
     $roundingEvent = Get-LatestRoundingEventForAsset $at
     $location = $pc.location
     $building = $pc.u_building
@@ -6766,6 +6797,10 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $r.Cells['Host'].Value      = $hostName
     $r.Cells['IP'].Value        = $cachedIp
     Update-NearbyIpTooltip -Cell $r.Cells['IP'] -IpAddress $cachedIp
+    if ($cachedHostColor) {
+      $resolvedColor = Resolve-NearbyHostColor $cachedHostColor
+      if ($resolvedColor) { $r.Cells['Host'].Style.ForeColor = $resolvedColor }
+    }
     $r.Cells['Asset'].Value     = $pc.asset_tag
     $r.Cells['Location'].Value  = $location
     $r.Cells['Building'].Value  = $building
