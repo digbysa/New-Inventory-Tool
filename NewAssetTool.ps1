@@ -3499,6 +3499,11 @@ function Get-RoundingUrlForParent($pc){
   }
   return $null
 }
+function ConvertTo-RoundingUrlHyperlink([string]$url){
+  if([string]::IsNullOrWhiteSpace($url)){ return $null }
+  $trimmed = $url.Trim()
+  return ('=HYPERLINK("{0}","{0}")' -f $trimmed)
+}
 function Update-ManualRoundButton($parentRec){
   if($parentRec){
     $url = Get-RoundingUrlForParent $parentRec
@@ -5533,6 +5538,7 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
     return
   }
   $url = if($pc){ Get-RoundingUrlForParent $pc } else { $null }
+  $urlForCsv = ConvertTo-RoundingUrlHyperlink $url
   $deptValue = ''
   if($cmbDept -and $cmbDept.Text){ $deptValue = $cmbDept.Text }
   elseif($txtDept -and $txtDept.Text){ $deptValue = $txtDept.Text }
@@ -5561,7 +5567,7 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
     PeripheralsOK    = if ($chkPeriph.Checked) { 'Yes' } else { 'No' }
     MaintenanceType = $cmbMaintType.Text
     Department       = $deptValue
-    RoundingUrl      = $url
+    RoundingUrl      = $urlForCsv
     Comments         = $txtComments.Text
     Rounded          = if ($script:ManualRoundUsed) { 'Yes' } else { 'No' }
   }
@@ -6961,6 +6967,7 @@ $url = $null
 if ($pc) {
   try { $url = Get-RoundingUrlForParent $pc } catch { $url = $null }
 }
+$urlForCsv = ConvertTo-RoundingUrlHyperlink $url
     $mtRaw = ''
     if ($pc) {
       try {
@@ -6994,7 +7001,7 @@ if ($pc) {
       PeripheralsOK    = 'No'
       MaintenanceType  = $mtValue
       Department       = $row.Cells['Department'].Value
-      RoundingUrl      = $url
+      RoundingUrl      = $urlForCsv
       Comments         = ''
       Rounded          = 'No'
     }
