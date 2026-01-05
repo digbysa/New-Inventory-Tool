@@ -10,7 +10,13 @@ WebAutomation.LaunchEdge.LaunchEdge Url: $'''https://devicerounding.nttdatanucle
 LOOP FOREACH Row IN CSVTable
     SET test TO Row['Rounded']
     IF Row['Rounded'] = $'''No''' THEN
-        SET RoundingURL TO Row['RoundingURL']
+        SET RawRoundingURL TO Row['RoundingURL']
+        IF Contains(RawRoundingURL, $'''HYPERLINK(''', False) THEN
+            Text.SplitText.SplitWithDelimiter Text: RawRoundingURL CustomDelimiter: $'''\"''' IsRegEx: False Result=> TextList
+            SET RoundingURL TO TextList[1]
+        ELSE
+            SET RoundingURL TO RawRoundingURL
+        END
         IF IsEmpty(RoundingURL) THEN
             Variables.IncreaseVariable Value: BlankURL IncrementValue: 1
         ELSE
