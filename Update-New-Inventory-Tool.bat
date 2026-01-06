@@ -8,7 +8,7 @@ del /q "%PS1%" 2>nul
 >> "%PS1%" echo
 >> "%PS1%" echo $RepoOwner        = "digbysa"
 >> "%PS1%" echo $RepoName         = "New-Inventory-Tool"
->> "%PS1%" echo $Branch           = "main"
+>> "%PS1%" echo $Branch           = "VGHVersion1.0"
 >> "%PS1%" echo $TargetFolderName = "New-Inventory-Tool"
 >> "%PS1%" echo
 >> "%PS1%" echo try ^{
