@@ -3206,6 +3206,7 @@ $splitter.Panel1.Controls.Add($tlpLeft)
 $splitter.Panel2.Controls.Add($tlpRight)
 # StatusStrip
 $status = New-Object System.Windows.Forms.StatusStrip
+$status.ShowItemToolTips = $true
 $statusPathLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $statusPathLabel.Spring = $true
 $statusPathLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
@@ -5660,6 +5661,44 @@ $btnManualRound.Add_Click({
 })
 $btnFixName.Add_Click({ Fix-DisplayName })
 
+function Set-DataFreshnessStatus {
+  param(
+    [System.Windows.Forms.ToolStripStatusLabel]$Label,
+    [string]$DataFolderPath
+  )
+
+  if (-not $Label -or -not $DataFolderPath) { return }
+
+  $computersPath = Join-Path $DataFolderPath 'Computers.csv'
+  if (-not (Test-Path $computersPath)) { return }
+
+  $fileInfo = Get-Item $computersPath -ErrorAction SilentlyContinue
+  if (-not $fileInfo) { return }
+
+  $age = (Get-Date) - $fileInfo.CreationTime
+  $hours = [Math]::Round($age.TotalHours, 1)
+  $ageLabel = if ($age.TotalDays -ge 1) {
+    $days = [Math]::Floor($age.TotalDays)
+    $remainingHours = [Math]::Round($age.TotalHours - ($days * 24), 1)
+    if ($remainingHours -lt 0) { $remainingHours = 0 }
+    ("{0} day{1}, {2} hour{3}" -f $days, $(if($days -ne 1){'s'}else{''}), $remainingHours, $(if($remainingHours -ne 1){'s'}else{''}))
+  } else {
+    ("{0} hour{1}" -f $hours, $(if($hours -ne 1){'s'}else{''}))
+  }
+
+  $Label.ToolTipText = "Data is $ageLabel old."
+
+  if ($age.TotalHours -lt 24) {
+    $Label.Text = "Data OK"
+    $Label.ForeColor = [System.Drawing.Color]::DarkGreen
+  } elseif ($age.TotalHours -lt 36) {
+    $Label.Text = "Old Data"
+    $Label.ForeColor = [System.Drawing.Color]::DarkOrange
+  } else {
+    $Label.Text = "Very Old Data"
+    $Label.ForeColor = [System.Drawing.Color]::Crimson
+  }
+}
 
 # -------- Hardcode paths and auto-load on startup --------
 try{
@@ -5680,7 +5719,10 @@ Create a 'Data' folder next to the script and add your CSVs."
     $statusPathLabel.Text = "Data: " + $script:DataFolder + "    |    Output: " + $script:OutputFolder
   }
   $lblOutputPath.Text = "Output: " + $script:OutputFolder
-  $statusLabel.Text   = "Data OK"; $statusLabel.ForeColor=[System.Drawing.Color]::DarkGreen
+  $statusLabel.Text   = "Data OK"
+  $statusLabel.ForeColor = [System.Drawing.Color]::DarkGreen
+  $statusLabel.ToolTipText = ''
+  Set-DataFreshnessStatus -Label $statusLabel -DataFolderPath $script:DataFolder
 } catch {
   $lblDataPath.Visible=$false; $lblOutputPath.Visible=$false; $lblDataStatus.Visible=$false; $statusLabel.Text = "Data files missing or error"; $statusLabel.ForeColor=[System.Drawing.Color]::Crimson
   if ($statusPathLabel) {
