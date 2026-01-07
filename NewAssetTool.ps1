@@ -4355,24 +4355,13 @@ function Show-AddPeripheralDialog($parentRec,[string]$defaultSearchText='',[stri
     $lbl.Margin = '0,0,0,4'
     return $lbl
   }
-  $createLinkValue = {
-    $lnk = New-Object System.Windows.Forms.LinkLabel
-    $lnk.AutoSize = $true
-    $lnk.Margin = '0,0,0,4'
-    $lnk.LinkBehavior = [System.Windows.Forms.LinkBehavior]::SystemDefault
-    $lnk.LinkColor = $script:ThemeColors.Accent
-    $lnk.ActiveLinkColor = $script:ThemeColors.AccentHover
-    $lnk.VisitedLinkColor = $script:ThemeColors.Accent
-    $lnk.LinkArea = New-Object System.Windows.Forms.LinkArea(0,0)
-    return $lnk
-  }
 
   $lblTypeVal = & $createValue
   $lblNameCurrentVal = & $createValue
   $lblNameProposedVal = & $createValue
   $lblParentCurrentVal = & $createValue
   $lblParentProposedVal = & $createValue
-  $lblAssetVal = & $createLinkValue
+  $lblAssetVal = & $createValue
   $lblSerialVal = & $createValue
   $lblRITMVal = & $createValue
   $lblRetireVal = & $createValue
@@ -4464,38 +4453,11 @@ function Show-AddPeripheralDialog($parentRec,[string]$defaultSearchText='',[stri
 
   $valueLabels = @($lblTypeVal,$lblNameCurrentVal,$lblNameProposedVal,$lblParentCurrentVal,$lblParentProposedVal,$lblAssetVal,$lblSerialVal,$lblRITMVal,$lblRetireVal)
   $lookupResult = $null
-  $setAssetPreviewLink = {
-    param($cand)
-    try {
-      $lblAssetVal.Tag = $null
-      $lblAssetVal.Links.Clear()
-      $lblAssetVal.LinkArea = New-Object System.Windows.Forms.LinkArea(0,0)
-      $tip.SetToolTip($lblAssetVal, '')
-    } catch {}
-    if(-not $cand){ return }
-    if([string]::IsNullOrWhiteSpace($cand.asset_tag)){ return }
-    $deviceType = Get-DetectedType $cand
-    $cmdbLink = Get-CmdbLink $deviceType $cand.asset_tag
-    if([string]::IsNullOrWhiteSpace($cmdbLink)){ return }
-    try {
-      $lblAssetVal.Tag = $cmdbLink
-      $lblAssetVal.LinkArea = New-Object System.Windows.Forms.LinkArea(0, $lblAssetVal.Text.Length)
-      [void]$lblAssetVal.Links.Add(0, $lblAssetVal.Text.Length, $cmdbLink)
-      $tip.SetToolTip($lblAssetVal, $cmdbLink)
-    } catch {}
-  }
-  $lblAssetVal.Add_LinkClicked({
-    try {
-      if(-not $lblAssetVal.Tag){ return }
-      Start-Process $lblAssetVal.Tag
-    } catch {}
-  })
   $clearPreview = {
     foreach($lbl in $valueLabels){ $lbl.Text = '' }
     $lblNameArrow.Visible = $false
     $lblParentArrow.Visible = $false
     $btnDialogAdd.Enabled = $false
-    & $setAssetPreviewLink $null
   }
   $applyPreview = {
     param($result)
@@ -4514,7 +4476,6 @@ function Show-AddPeripheralDialog($parentRec,[string]$defaultSearchText='',[stri
     $lblRITMVal.Text = $cand.RITM
     $lblRetireVal.Text = Fmt-DateLong $cand.Retire
     $lblParentCurrentVal.Text = Get-ParentDisplayName $cand.u_parent_asset
-    & $setAssetPreviewLink $cand
     $preview = Get-PeripheralLinkPreview $cand $parentRec
     $proposedName = ''
     $proposedParentDisplay = ''
