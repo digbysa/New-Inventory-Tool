@@ -5723,11 +5723,26 @@ function Set-DataFreshnessStatus {
   param(
     [System.Windows.Forms.ToolStripStatusLabel]$Label,
     [string]$DataFolderPath,
-    [string]$ComputersFileName = 'Computers.csv'
+    [string]$ComputersFileName = 'Computers.csv',
+    [string]$MonitorsFileName = 'Monitors.csv'
   )
 
   if (-not $Label -or -not $DataFolderPath) { return }
   if ([string]::IsNullOrWhiteSpace($ComputersFileName)) { $ComputersFileName = 'Computers.csv' }
+  if ([string]::IsNullOrWhiteSpace($MonitorsFileName)) { $MonitorsFileName = 'Monitors.csv' }
+
+  $getAgeLabel = {
+    param([System.IO.FileInfo]$info)
+    $age = (Get-Date) - $info.CreationTime
+    $hours = [Math]::Round($age.TotalHours, 1)
+    if ($age.TotalDays -ge 1) {
+      $days = [Math]::Floor($age.TotalDays)
+      $remainingHours = [Math]::Round($age.TotalHours - ($days * 24), 1)
+      if ($remainingHours -lt 0) { $remainingHours = 0 }
+      return ("{0} day{1}, {2} hour{3}" -f $days, $(if($days -ne 1){'s'}else{''}), $remainingHours, $(if($remainingHours -ne 1){'s'}else{''}))
+    }
+    return ("{0} hour{1}" -f $hours, $(if($hours -ne 1){'s'}else{''}))
+  }
 
   $computersPath = Join-Path $DataFolderPath $ComputersFileName
   if (-not (Test-Path $computersPath)) { return }
@@ -5735,28 +5750,50 @@ function Set-DataFreshnessStatus {
   $fileInfo = Get-Item $computersPath -ErrorAction SilentlyContinue
   if (-not $fileInfo) { return }
 
-  $age = (Get-Date) - $fileInfo.CreationTime
-  $hours = [Math]::Round($age.TotalHours, 1)
-  $ageLabel = if ($age.TotalDays -ge 1) {
-    $days = [Math]::Floor($age.TotalDays)
-    $remainingHours = [Math]::Round($age.TotalHours - ($days * 24), 1)
-    if ($remainingHours -lt 0) { $remainingHours = 0 }
-    ("{0} day{1}, {2} hour{3}" -f $days, $(if($days -ne 1){'s'}else{''}), $remainingHours, $(if($remainingHours -ne 1){'s'}else{''}))
-  } else {
-    ("{0} hour{1}" -f $hours, $(if($hours -ne 1){'s'}else{''}))
+  $ageLabel = & $getAgeLabel $fileInfo
+
+  $loadedFileNames = @(
+    $ComputersFileName,
+    $MonitorsFileName,
+    'Mics.csv',
+    'Scanners.csv',
+    'Carts.csv',
+    'LocationMaster.csv',
+    'LocationMaster-UserAdds.csv',
+    'Rounding.csv',
+    'SiteSubnets.csv',
+    'DepartmentMaster.csv',
+    'DepartmentMaster-UserAdds.csv'
+  )
+  $tooltipLines = New-Object System.Collections.Generic.List[string]
+  foreach ($fileName in $loadedFileNames) {
+    if ([string]::IsNullOrWhiteSpace($fileName)) { continue }
+    $path = Join-Path $DataFolderPath $fileName
+    if (-not (Test-Path $path)) { continue }
+    $info = Get-Item $path -ErrorAction SilentlyContinue
+    if (-not $info) { continue }
+    $fileAgeLabel = & $getAgeLabel $info
+    [void]$tooltipLines.Add("$fileName is $fileAgeLabel old.")
   }
 
-  $Label.ToolTipText = "$ComputersFileName is $ageLabel old."
-
-  if ($age.TotalHours -lt 24) {
-    $Label.Text = "Data OK"
-    $Label.ForeColor = [System.Drawing.Color]::DarkGreen
-  } elseif ($age.TotalHours -lt 36) {
-    $Label.Text = "Old Data"
-    $Label.ForeColor = [System.Drawing.Color]::DarkOrange
+  if ($tooltipLines.Count -gt 0) {
+    $Label.ToolTipText = ($tooltipLines -join "`r`n")
   } else {
-    $Label.Text = "Very Old Data"
-    $Label.ForeColor = [System.Drawing.Color]::Crimson
+    $Label.ToolTipText = ''
+  }
+
+  if ($fileInfo.CreationTime -and $ageLabel) {
+    $age = (Get-Date) - $fileInfo.CreationTime
+    if ($age.TotalHours -lt 24) {
+      $Label.Text = "Data OK"
+      $Label.ForeColor = [System.Drawing.Color]::DarkGreen
+    } elseif ($age.TotalHours -lt 36) {
+      $Label.Text = "Old Data"
+      $Label.ForeColor = [System.Drawing.Color]::DarkOrange
+    } else {
+      $Label.Text = "Very Old Data"
+      $Label.ForeColor = [System.Drawing.Color]::Crimson
+    }
   }
 }
 
@@ -5800,7 +5837,7 @@ Create a 'Data' folder next to the script and add your CSVs."
   $statusLabel.Text   = "Data OK"
   $statusLabel.ForeColor = [System.Drawing.Color]::DarkGreen
   $statusLabel.ToolTipText = ''
-  Set-DataFreshnessStatus -Label $statusLabel -DataFolderPath $script:DataFolder -ComputersFileName $script:SelectedComputersFileName
+  Set-DataFreshnessStatus -Label $statusLabel -DataFolderPath $script:DataFolder -ComputersFileName $script:SelectedComputersFileName -MonitorsFileName $script:SelectedMonitorsFileName
 } catch {
   $lblDataPath.Visible=$false; $lblOutputPath.Visible=$false; $lblDataStatus.Visible=$false; $statusLabel.Text = "Data files missing or error"; $statusLabel.ForeColor=[System.Drawing.Color]::Crimson
   if ($statusPathLabel) {
