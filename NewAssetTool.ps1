@@ -1031,6 +1031,9 @@ if (-not (Test-Path $script:OutputFolder)) { New-Item -ItemType Directory -Path 
 # ------------------ Globals ------------------
 $script:DataFolder   = $null
 $script:OutputFolder = $null
+$script:LocationDataFolder = $null
+$script:LocationMasterFileName = $null
+$script:LocationUserAddsFileName = $null
 $script:Computers = @()
 $script:Monitors  = @()
 $script:Mics      = @()
@@ -1924,12 +1927,14 @@ function Rebuild-RoomCaches(){
   $script:RoomCodes = ($codes | Select-Object -Unique)
 }
 # ------------------ Load & Save ------------------
-function Load-LocationMaster($folder){
+function Load-LocationMaster($folder, [string]$LocationMasterFileName = 'LocationMaster.csv', [string]$LocationUserAddsFileName = 'LocationMaster-UserAdds.csv'){
   $script:LocationMasterRows = @()
   $script:UserAddedLocationRows = @()
-  $lm = Join-Path $folder 'LocationMaster.csv'
+  if ([string]::IsNullOrWhiteSpace($LocationMasterFileName)) { $LocationMasterFileName = 'LocationMaster.csv' }
+  if ([string]::IsNullOrWhiteSpace($LocationUserAddsFileName)) { $LocationUserAddsFileName = 'LocationMaster-UserAdds.csv' }
+  $lm = Join-Path $folder $LocationMasterFileName
   if(Test-Path $lm){ $script:LocationMasterRows += Import-Csv $lm }
-  $lm2 = Join-Path $folder 'LocationMaster-UserAdds.csv'
+  $lm2 = Join-Path $folder $LocationUserAddsFileName
   if(Test-Path $lm2){ $script:UserAddedLocationRows += Import-Csv $lm2 }
   $script:LocCols = @{}
   Rebuild-RoomCaches
@@ -1940,7 +1945,12 @@ function Save-LocationUserAdd([string]$city,[string]$loc,[string]$b,[string]$f,[
   try{
     $file = $null
     try {
-      if($script:DataFolder){ $file = Join-Path $script:DataFolder 'LocationMaster-UserAdds.csv' }
+      if($script:LocationDataFolder){
+        $fileName = if($script:LocationUserAddsFileName){ $script:LocationUserAddsFileName } else { 'LocationMaster-UserAdds.csv' }
+        $file = Join-Path $script:LocationDataFolder $fileName
+      } elseif($script:DataFolder){
+        $file = Join-Path $script:DataFolder 'LocationMaster-UserAdds.csv'
+      }
     } catch {}
     if(-not $file){
       try {
@@ -2126,26 +2136,32 @@ function Select-NewAssetToolSite {
 }
 function Load-DataFolder {
   param(
-    [string]$folder,
+    [string]$BaseFolder,
+    [string]$LocationFolder,
     [string]$ComputersFileName = 'Computers.csv',
-    [string]$MonitorsFileName = 'Monitors.csv'
+    [string]$MonitorsFileName = 'Monitors.csv',
+    [string]$LocationMasterFileName = 'LocationMaster.csv',
+    [string]$LocationUserAddsFileName = 'LocationMaster-UserAdds.csv'
   )
 
-  $script:DataFolder = $folder
-  if(-not $script:OutputFolder){ $script:OutputFolder = $folder }
-  Load-SiteSubnets $folder
-  Load-LocationMaster $folder
-  Load-RoundingMapping $folder
+  $script:DataFolder = $BaseFolder
+  $script:LocationDataFolder = if($LocationFolder){ $LocationFolder } else { $BaseFolder }
+  $script:LocationMasterFileName = $LocationMasterFileName
+  $script:LocationUserAddsFileName = $LocationUserAddsFileName
+  if(-not $script:OutputFolder){ $script:OutputFolder = $BaseFolder }
+  Load-SiteSubnets $BaseFolder
+  Load-LocationMaster $script:LocationDataFolder $LocationMasterFileName $LocationUserAddsFileName
+  Load-RoundingMapping $BaseFolder
   try { Load-DepartmentMaster } catch {}
   if ([string]::IsNullOrWhiteSpace($ComputersFileName)) { $ComputersFileName = 'Computers.csv' }
   if ([string]::IsNullOrWhiteSpace($MonitorsFileName)) { $MonitorsFileName = 'Monitors.csv' }
-  $cfile   = Join-Path $folder $ComputersFileName
-  $mfile   = Join-Path $folder $MonitorsFileName
-  $micfile = Join-Path $folder 'Mics.csv'
-  $sfile   = Join-Path $folder 'Scanners.csv'
+  $cfile   = Join-Path $script:LocationDataFolder $ComputersFileName
+  $mfile   = Join-Path $script:LocationDataFolder $MonitorsFileName
+  $micfile = Join-Path $BaseFolder 'Mics.csv'
+  $sfile   = Join-Path $BaseFolder 'Scanners.csv'
   $script:Computers = @(); $script:Monitors = @(); $script:Mics = @(); $script:Scanners = @()
   
-  $cartfile = Join-Path $folder 'Carts.csv'
+  $cartfile = Join-Path $BaseFolder 'Carts.csv'
   $script:Carts = @()
 if(Test-Path $cfile){
     $raw = Import-Csv $cfile
@@ -5726,13 +5742,19 @@ function Set-DataFreshnessStatus {
   param(
     [System.Windows.Forms.ToolStripStatusLabel]$Label,
     [string]$DataFolderPath,
+    [string]$LocationFolderPath,
     [string]$ComputersFileName = 'Computers.csv',
-    [string]$MonitorsFileName = 'Monitors.csv'
+    [string]$MonitorsFileName = 'Monitors.csv',
+    [string]$LocationMasterFileName = 'LocationMaster.csv',
+    [string]$LocationUserAddsFileName = 'LocationMaster-UserAdds.csv'
   )
 
   if (-not $Label -or -not $DataFolderPath) { return }
   if ([string]::IsNullOrWhiteSpace($ComputersFileName)) { $ComputersFileName = 'Computers.csv' }
   if ([string]::IsNullOrWhiteSpace($MonitorsFileName)) { $MonitorsFileName = 'Monitors.csv' }
+  if ([string]::IsNullOrWhiteSpace($LocationMasterFileName)) { $LocationMasterFileName = 'LocationMaster.csv' }
+  if ([string]::IsNullOrWhiteSpace($LocationUserAddsFileName)) { $LocationUserAddsFileName = 'LocationMaster-UserAdds.csv' }
+  $locationPath = if ($LocationFolderPath) { $LocationFolderPath } else { $DataFolderPath }
 
   $getAgeLabel = {
     param([System.IO.FileInfo]$info)
@@ -5747,7 +5769,7 @@ function Set-DataFreshnessStatus {
     return ("{0} hour{1}" -f $hours, $(if($hours -ne 1){'s'}else{''}))
   }
 
-  $computersPath = Join-Path $DataFolderPath $ComputersFileName
+  $computersPath = Join-Path $locationPath $ComputersFileName
   if (-not (Test-Path $computersPath)) { return }
 
   $fileInfo = Get-Item $computersPath -ErrorAction SilentlyContinue
@@ -5755,19 +5777,30 @@ function Set-DataFreshnessStatus {
 
   $ageLabel = & $getAgeLabel $fileInfo
 
-  $loadedFileNames = @(
+  $locationFileNames = @(
     $ComputersFileName,
     $MonitorsFileName,
+    $LocationMasterFileName,
+    $LocationUserAddsFileName
+  )
+  $baseFileNames = @(
     'Mics.csv',
     'Scanners.csv',
     'Carts.csv',
-    'LocationMaster.csv',
-    'LocationMaster-UserAdds.csv',
     'Rounding.csv',
     'SiteSubnets.csv'
   )
   $tooltipLines = New-Object System.Collections.Generic.List[string]
-  foreach ($fileName in $loadedFileNames) {
+  foreach ($fileName in $locationFileNames) {
+    if ([string]::IsNullOrWhiteSpace($fileName)) { continue }
+    $path = Join-Path $locationPath $fileName
+    if (-not (Test-Path $path)) { continue }
+    $info = Get-Item $path -ErrorAction SilentlyContinue
+    if (-not $info) { continue }
+    $fileAgeLabel = & $getAgeLabel $info
+    [void]$tooltipLines.Add("$fileName is $fileAgeLabel old.")
+  }
+  foreach ($fileName in $baseFileNames) {
     if ([string]::IsNullOrWhiteSpace($fileName)) { continue }
     $path = Join-Path $DataFolderPath $fileName
     if (-not (Test-Path $path)) { continue }
@@ -5800,14 +5833,14 @@ function Set-DataFreshnessStatus {
 
 # -------- Hardcode paths and auto-load on startup --------
 $script:SiteSelections = @(
-  [pscustomobject]@{ Name = 'Campbell River'; ComputersFile = 'Computers - CampbellRiver.csv'; MonitorsFile = 'Monitors - CampbellRiver.csv' }
-  [pscustomobject]@{ Name = 'Cowichan'; ComputersFile = 'Computers - Cowichan.csv'; MonitorsFile = 'Monitors - Cowichan.csv' }
-  [pscustomobject]@{ Name = 'Nanaimo'; ComputersFile = 'Computers - Nanaimo.csv'; MonitorsFile = 'Monitors - Nanaimo.csv' }
-  [pscustomobject]@{ Name = 'North Island'; ComputersFile = 'Computers - NorthIsland.csv'; MonitorsFile = 'Monitors - NorthIsland.csv' }
-  [pscustomobject]@{ Name = 'Port Hardy'; ComputersFile = 'Computers - PortHardy.csv'; MonitorsFile = 'Monitors - PortHardy.csv' }
-  [pscustomobject]@{ Name = 'Royal Jubilee'; ComputersFile = 'Computers - RoyalJubilee.csv'; MonitorsFile = 'Monitors - RoyalJubilee.csv' }
-  [pscustomobject]@{ Name = 'Victoria General'; ComputersFile = 'Computers - VictoriaGeneral.csv'; MonitorsFile = 'Monitors - VictoriaGeneral.csv' }
-  [pscustomobject]@{ Name = 'West Coast'; ComputersFile = 'Computers - West Coast.csv'; MonitorsFile = 'Monitors - West Coast.csv' }
+  [pscustomobject]@{ Name = 'Campbell River'; FolderName = 'Campbell River' }
+  [pscustomobject]@{ Name = 'Cowichan'; FolderName = 'Cowichan' }
+  [pscustomobject]@{ Name = 'Nanaimo'; FolderName = 'Nanaimo' }
+  [pscustomobject]@{ Name = 'North Island'; FolderName = 'North Island' }
+  [pscustomobject]@{ Name = 'Port Hardy'; FolderName = 'Port Hardy' }
+  [pscustomobject]@{ Name = 'Royal Jubilee'; FolderName = 'Royal Jubilee' }
+  [pscustomobject]@{ Name = 'Victoria General'; FolderName = 'Victoria General' }
+  [pscustomobject]@{ Name = 'West Coast'; FolderName = 'West Coast' }
 )
 
 try{
@@ -5822,12 +5855,21 @@ Create a 'Data' folder next to the script and add your CSVs."
   }
   $selectedSite = Select-NewAssetToolSite -Sites $script:SiteSelections
   $script:SelectedSiteName = $selectedSite.Name
-  $script:SelectedComputersFileName = $selectedSite.ComputersFile
-  $script:SelectedMonitorsFileName = $selectedSite.MonitorsFile
+  $script:SelectedLocationFolderName = if($selectedSite.FolderName){ $selectedSite.FolderName } else { $selectedSite.Name }
+  $script:LocationDataFolder = Join-Path $script:DataFolder $script:SelectedLocationFolderName
+  $script:SelectedComputersFileName = ('Computers - ' + $script:SelectedSiteName + '.csv')
+  $script:SelectedMonitorsFileName = ('Monitors - ' + $script:SelectedSiteName + '.csv')
+  $script:SelectedLocationMasterFileName = ('LocationMaster - ' + $script:SelectedSiteName + '.csv')
+  $script:SelectedLocationUserAddsFileName = ('LocationMaster-UserAdds - ' + $script:SelectedSiteName + '.csv')
   if (-not [string]::IsNullOrWhiteSpace($script:SelectedSiteName)) {
     $form.Text = "New Inventory Tool - $($script:SelectedSiteName)"
   }
-  Load-DataFolder $script:DataFolder -ComputersFileName $script:SelectedComputersFileName -MonitorsFileName $script:SelectedMonitorsFileName
+  if (-not (Test-Path $script:LocationDataFolder)) {
+    throw "Location data folder not found:`r
+$script:LocationDataFolder`r
+Create a location folder in Data and add your CSVs."
+  }
+  Load-DataFolder -BaseFolder $script:DataFolder -LocationFolder $script:LocationDataFolder -ComputersFileName $script:SelectedComputersFileName -MonitorsFileName $script:SelectedMonitorsFileName -LocationMasterFileName $script:SelectedLocationMasterFileName -LocationUserAddsFileName $script:SelectedLocationUserAddsFileName
   Update-Counters
   try { Populate-Department-Combo ($txtDept.Text) } catch {}
   $lblDataPath.Visible=$false; $lblOutputPath.Visible=$false; $lblDataStatus.Visible=$false; $statusLabel.Text = ("Data: " + $script:DataFolder + " | Output: " + $script:OutputFolder); $statusLabel.ForeColor=[System.Drawing.Color]::DarkGreen
@@ -5838,7 +5880,7 @@ Create a 'Data' folder next to the script and add your CSVs."
   $statusLabel.Text   = "Data OK"
   $statusLabel.ForeColor = [System.Drawing.Color]::DarkGreen
   $statusLabel.ToolTipText = ''
-  Set-DataFreshnessStatus -Label $statusLabel -DataFolderPath $script:DataFolder -ComputersFileName $script:SelectedComputersFileName -MonitorsFileName $script:SelectedMonitorsFileName
+  Set-DataFreshnessStatus -Label $statusLabel -DataFolderPath $script:DataFolder -LocationFolderPath $script:LocationDataFolder -ComputersFileName $script:SelectedComputersFileName -MonitorsFileName $script:SelectedMonitorsFileName -LocationMasterFileName $script:SelectedLocationMasterFileName -LocationUserAddsFileName $script:SelectedLocationUserAddsFileName
 } catch {
   $lblDataPath.Visible=$false; $lblOutputPath.Visible=$false; $lblDataStatus.Visible=$false; $statusLabel.Text = "Data files missing or error"; $statusLabel.ForeColor=[System.Drawing.Color]::Crimson
   if ($statusPathLabel) {
