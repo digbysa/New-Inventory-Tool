@@ -2345,7 +2345,7 @@ function Adjust-NewAssetToolUiScale {
   $target = $script:UiZoomFactor + [double]$Delta
   return Set-NewAssetToolUiScale -Scale $target -Source $Source
 }
-$form.Text = "Inventory Assoc Finder - OMI"
+$form.Text = "New Inventory Tool"
 $statusPathLabelDefault = "Data: (not set)    |    Output: (not set)"
 $form.StartPosition="CenterScreen"
 $form.WindowState='Maximized'
@@ -5786,6 +5786,9 @@ Create a 'Data' folder next to the script and add your CSVs."
   $script:SelectedSiteName = $selectedSite.Name
   $script:SelectedComputersFileName = $selectedSite.ComputersFile
   $script:SelectedMonitorsFileName = $selectedSite.MonitorsFile
+  if (-not [string]::IsNullOrWhiteSpace($script:SelectedSiteName)) {
+    $form.Text = "New Inventory Tool - $($script:SelectedSiteName)"
+  }
   Load-DataFolder $script:DataFolder -ComputersFileName $script:SelectedComputersFileName -MonitorsFileName $script:SelectedMonitorsFileName
   Update-Counters
   try { Populate-Department-Combo ($txtDept.Text) } catch {}
