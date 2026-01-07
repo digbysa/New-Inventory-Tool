@@ -2061,15 +2061,73 @@ function Load-RoundingMapping([string]$folder){
     } catch {}
   }
 }
-function Load-DataFolder([string]$folder){
+function Select-NewAssetToolSite {
+  param(
+    [Parameter(Mandatory)][object[]]$Sites
+  )
+
+  $dialog = New-Object System.Windows.Forms.Form
+  $dialog.Text = 'Choose your site'
+  $dialog.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+  $dialog.StartPosition = 'CenterScreen'
+  $dialog.Width = 440
+  $dialog.Height = 170
+  $dialog.ControlBox = $false
+  $dialog.MaximizeBox = $false
+  $dialog.MinimizeBox = $false
+  $dialog.TopMost = $true
+
+  $label = New-Object System.Windows.Forms.Label
+  $label.Text = 'Choose your site:'
+  $label.AutoSize = $true
+  $label.Location = New-Object System.Drawing.Point(20, 20)
+
+  $combo = New-Object System.Windows.Forms.ComboBox
+  $combo.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
+  $combo.Location = New-Object System.Drawing.Point(20, 50)
+  $combo.Width = 380
+  $combo.Items.AddRange(@($Sites.Name))
+  $combo.SelectedIndex = 0
+
+  $btnOk = New-Object System.Windows.Forms.Button
+  $btnOk.Text = 'OK'
+  $btnOk.Width = 80
+  $btnOk.Height = 28
+  $btnOk.Location = New-Object System.Drawing.Point(320, 90)
+  $btnOk.Add_Click({
+    $dialog.Tag = $combo.SelectedIndex
+    $dialog.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $dialog.Close()
+  })
+
+  $dialog.AcceptButton = $btnOk
+  $dialog.Controls.AddRange(@($label, $combo, $btnOk))
+
+  [void]$dialog.ShowDialog()
+  $selectedIndex = $dialog.Tag
+  $dialog.Dispose()
+
+  if ($null -eq $selectedIndex) { $selectedIndex = 0 }
+
+  return $Sites[$selectedIndex]
+}
+function Load-DataFolder {
+  param(
+    [string]$folder,
+    [string]$ComputersFileName = 'Computers.csv',
+    [string]$MonitorsFileName = 'Monitors.csv'
+  )
+
   $script:DataFolder = $folder
   if(-not $script:OutputFolder){ $script:OutputFolder = $folder }
   Load-SiteSubnets $folder
   Load-LocationMaster $folder
   Load-RoundingMapping $folder
   try { Load-DepartmentMaster } catch {}
-  $cfile   = Join-Path $folder 'Computers.csv'
-  $mfile   = Join-Path $folder 'Monitors.csv'
+  if ([string]::IsNullOrWhiteSpace($ComputersFileName)) { $ComputersFileName = 'Computers.csv' }
+  if ([string]::IsNullOrWhiteSpace($MonitorsFileName)) { $MonitorsFileName = 'Monitors.csv' }
+  $cfile   = Join-Path $folder $ComputersFileName
+  $mfile   = Join-Path $folder $MonitorsFileName
   $micfile = Join-Path $folder 'Mics.csv'
   $sfile   = Join-Path $folder 'Scanners.csv'
   $script:Computers = @(); $script:Monitors = @(); $script:Mics = @(); $script:Scanners = @()
@@ -5664,12 +5722,14 @@ $btnFixName.Add_Click({ Fix-DisplayName })
 function Set-DataFreshnessStatus {
   param(
     [System.Windows.Forms.ToolStripStatusLabel]$Label,
-    [string]$DataFolderPath
+    [string]$DataFolderPath,
+    [string]$ComputersFileName = 'Computers.csv'
   )
 
   if (-not $Label -or -not $DataFolderPath) { return }
+  if ([string]::IsNullOrWhiteSpace($ComputersFileName)) { $ComputersFileName = 'Computers.csv' }
 
-  $computersPath = Join-Path $DataFolderPath 'Computers.csv'
+  $computersPath = Join-Path $DataFolderPath $ComputersFileName
   if (-not (Test-Path $computersPath)) { return }
 
   $fileInfo = Get-Item $computersPath -ErrorAction SilentlyContinue
@@ -5686,7 +5746,7 @@ function Set-DataFreshnessStatus {
     ("{0} hour{1}" -f $hours, $(if($hours -ne 1){'s'}else{''}))
   }
 
-  $Label.ToolTipText = "Computers.csv is $ageLabel old."
+  $Label.ToolTipText = "$ComputersFileName is $ageLabel old."
 
   if ($age.TotalHours -lt 24) {
     $Label.Text = "Data OK"
@@ -5701,6 +5761,17 @@ function Set-DataFreshnessStatus {
 }
 
 # -------- Hardcode paths and auto-load on startup --------
+$script:SiteSelections = @(
+  [pscustomobject]@{ Name = 'Campbell River'; ComputersFile = 'Computers - CampbellRiver.csv'; MonitorsFile = 'Monitors - CampbellRiver.csv' }
+  [pscustomobject]@{ Name = 'Cowichan'; ComputersFile = 'Computers - Cowichan.csv'; MonitorsFile = 'Monitors - Cowichan.csv' }
+  [pscustomobject]@{ Name = 'Nanaimo'; ComputersFile = 'Computers - Nanaimo.csv'; MonitorsFile = 'Monitors - Nanaimo.csv' }
+  [pscustomobject]@{ Name = 'North Island'; ComputersFile = 'Computers - NorthIsland.csv'; MonitorsFile = 'Monitors - NorthIsland.csv' }
+  [pscustomobject]@{ Name = 'Port Hardy'; ComputersFile = 'Computers - PortHardy.csv'; MonitorsFile = 'Monitors - PortHardy.csv' }
+  [pscustomobject]@{ Name = 'Royal Jubilee'; ComputersFile = 'Computers - RoyalJubilee.csv'; MonitorsFile = 'Monitors - RoyalJubilee.csv' }
+  [pscustomobject]@{ Name = 'Victoria General'; ComputersFile = 'Computers - VictoriaGeneral.csv'; MonitorsFile = 'Monitors - VictoriaGeneral.csv' }
+  [pscustomobject]@{ Name = 'West Coast'; ComputersFile = 'Computers - West Coast.csv'; MonitorsFile = 'Monitors - West Coast.csv' }
+)
+
 try{
   $__ownDir = Get-OwnScriptDir
   $script:DataFolder   = Join-Path $__ownDir 'Data'
@@ -5711,7 +5782,11 @@ try{
 $script:DataFolder`r
 Create a 'Data' folder next to the script and add your CSVs."
   }
-  Load-DataFolder $script:DataFolder
+  $selectedSite = Select-NewAssetToolSite -Sites $script:SiteSelections
+  $script:SelectedSiteName = $selectedSite.Name
+  $script:SelectedComputersFileName = $selectedSite.ComputersFile
+  $script:SelectedMonitorsFileName = $selectedSite.MonitorsFile
+  Load-DataFolder $script:DataFolder -ComputersFileName $script:SelectedComputersFileName -MonitorsFileName $script:SelectedMonitorsFileName
   Update-Counters
   try { Populate-Department-Combo ($txtDept.Text) } catch {}
   $lblDataPath.Visible=$false; $lblOutputPath.Visible=$false; $lblDataStatus.Visible=$false; $statusLabel.Text = ("Data: " + $script:DataFolder + " | Output: " + $script:OutputFolder); $statusLabel.ForeColor=[System.Drawing.Color]::DarkGreen
@@ -5722,7 +5797,7 @@ Create a 'Data' folder next to the script and add your CSVs."
   $statusLabel.Text   = "Data OK"
   $statusLabel.ForeColor = [System.Drawing.Color]::DarkGreen
   $statusLabel.ToolTipText = ''
-  Set-DataFreshnessStatus -Label $statusLabel -DataFolderPath $script:DataFolder
+  Set-DataFreshnessStatus -Label $statusLabel -DataFolderPath $script:DataFolder -ComputersFileName $script:SelectedComputersFileName
 } catch {
   $lblDataPath.Visible=$false; $lblOutputPath.Visible=$false; $lblDataStatus.Visible=$false; $statusLabel.Text = "Data files missing or error"; $statusLabel.ForeColor=[System.Drawing.Color]::Crimson
   if ($statusPathLabel) {
