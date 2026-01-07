@@ -1748,6 +1748,34 @@ function Get-LocVal($row, [string]$wanted){
   if($prop2){ return $prop2.Value }
   return $null
 }
+function Get-LocationMasterVal($row, [string]$wanted){
+  if(-not $row){ return $null }
+  $prop = $row.PSObject.Properties[$wanted]
+  if($prop){ return $prop.Value }
+  $bom = ([char]0xFEFF) + $wanted
+  $prop2 = $row.PSObject.Properties[$bom]
+  if($prop2){ return $prop2.Value }
+  $wantKey = Normalize-Header $wanted
+  foreach($p in $row.PSObject.Properties){
+    if((Normalize-Header $p.Name) -eq $wantKey){ return $p.Value }
+  }
+  return $null
+}
+function Test-LocationValueInColumn([string]$value,[string]$column){
+  if([string]::IsNullOrWhiteSpace($value)){ return $false }
+  $nValue = Normalize-Field $value
+  $rows = @()
+  if($script:LocationMasterRows){ $rows += $script:LocationMasterRows }
+  if($script:UserAddedLocationRows){ $rows += $script:UserAddedLocationRows }
+  foreach($row in $rows){
+    if(-not $row){ continue }
+    $raw = $null
+    try { $raw = Get-LocationMasterVal $row $column } catch {}
+    if([string]::IsNullOrWhiteSpace($raw)){ continue }
+    if((Normalize-Field $raw) -eq $nValue){ return $true }
+  }
+  return $false
+}
 # ---- Room caches ----
 function Extract-RoomCode([string]$s){
   if([string]::IsNullOrWhiteSpace($s)){ return '' }
@@ -1818,65 +1846,33 @@ function Add-DepartmentValue([string]$dept){
     [void]$script:DepartmentListNorm.Add($norm)
   }
 }
+function Rebuild-DepartmentListFromLocations(){
+  $script:DepartmentMaster = @()
+  $script:DepartmentUserAdds = @()
+  $script:DepartmentList = New-Object System.Collections.Generic.List[string]
+  $script:DepartmentListNorm = New-Object System.Collections.Generic.HashSet[string]
+  $rows = @()
+  if($script:LocationMasterRows){ $rows += $script:LocationMasterRows }
+  if($script:UserAddedLocationRows){ $rows += $script:UserAddedLocationRows }
+  foreach($row in $rows){
+    if(-not $row){ continue }
+    $dept = $null
+    try { $dept = Get-LocationMasterVal $row 'Department' } catch {}
+    if($dept){ Add-DepartmentValue $dept }
+  }
+  $sorted = @($script:DepartmentList | Sort-Object -Unique)
+  $script:DepartmentList = New-Object System.Collections.Generic.List[string]
+  foreach($item in $sorted){ [void]$script:DepartmentList.Add($item) }
+}
 function Load-DepartmentMaster(){
-  try{
-    $script:DepartmentMaster = @()
-    $script:DepartmentUserAdds = @()
-    $script:DepartmentList = New-Object System.Collections.Generic.List[string]
-    $script:DepartmentListNorm = New-Object System.Collections.Generic.HashSet[string]
-    $fileD = Get-DepartmentFile 'DepartmentMaster.csv'
-    if($fileD){
-      $script:DepartmentMaster = Import-DepartmentRows $fileD
-      foreach($row in $script:DepartmentMaster){
-        if($row -and $row.PSObject.Properties['Department']){ Add-DepartmentValue $row.Department }
-      }
-    }
-    $fileDU = Get-DepartmentFile 'DepartmentMaster-UserAdds.csv'
-    if($fileDU){
-      $script:DepartmentUserAdds = Import-DepartmentRows $fileDU
-      foreach($row in $script:DepartmentUserAdds){
-        if($row -and $row.PSObject.Properties['Department']){ Add-DepartmentValue $row.Department }
-      }
-    }
-    $sorted = @($script:DepartmentList | Sort-Object -Unique)
-    $script:DepartmentList = New-Object System.Collections.Generic.List[string]
-    foreach($item in $sorted){ [void]$script:DepartmentList.Add($item) }
-  } catch {}
+  try{ Rebuild-DepartmentListFromLocations } catch {}
 }
 function Save-DepartmentUserAdd([string]$dept){
   try{
     if([string]::IsNullOrWhiteSpace($dept)){ return }
     $n = Normalize-Field $dept
     if($script:DepartmentListNorm.Contains($n)){ return }
-    $fileDU = $null
-    try {
-      if($script:DataFolder){ $fileDU = Join-Path $script:DataFolder 'DepartmentMaster-UserAdds.csv' }
-    } catch {}
-    if(-not $fileDU){
-      try {
-        $dataFolder = Join-Path $PSScriptRoot 'Data'
-        if(-not (Test-Path $dataFolder)){
-          try { New-Item -Path $dataFolder -ItemType Directory -Force | Out-Null } catch {}
-        }
-        $fileDU = Join-Path $dataFolder 'DepartmentMaster-UserAdds.csv'
-      } catch {}
-    }
-    if(-not $fileDU){
-      try { $fileDU = 'DepartmentMaster-UserAdds.csv' } catch {}
-    }
-    if($fileDU){
-      try {
-        $dir = Split-Path -Path $fileDU -Parent
-        if($dir -and -not (Test-Path $dir)){
-          try { New-Item -Path $dir -ItemType Directory -Force | Out-Null } catch {}
-        }
-      } catch {}
-    }
-    $exists = Test-Path $fileDU
-    $row = [pscustomobject]@{ Department = $dept }
-    if(-not $exists){ $row | Export-Csv -Path $fileDU -NoTypeInformation -Encoding UTF8 }
-    else { $row | Export-Csv -Path $fileDU -NoTypeInformation -Append -Encoding UTF8 }
-    Load-DepartmentMaster
+    Save-LocationUserAdd '' '' '' '' '' $dept
   } catch { }
 }
 function Populate-Department-Combo([string]$current){
@@ -1909,14 +1905,14 @@ function Populate-Department-Combo([string]$current){
 function Rebuild-RoomCaches(){
   $rooms = New-Object System.Collections.Generic.List[string]
   $codes = New-Object System.Collections.Generic.List[string]
-  foreach($row in $script:LocationMasterRows){
+  $rows = @()
+  if($script:LocationMasterRows){ $rows += $script:LocationMasterRows }
+  if($script:UserAddedLocationRows){ $rows += $script:UserAddedLocationRows }
+  foreach($row in $rows){
     if(-not $row){ continue }
     $raw = $null
     try {
-      $raw = $row.Room
-      if(-not $raw -and $row.PSObject -and $row.PSObject.Properties['Room']){
-        $raw = $row.PSObject.Properties['Room'].Value
-      }
+      $raw = Get-LocationMasterVal $row 'Room'
     } catch {}
     if([string]::IsNullOrWhiteSpace($raw)){ continue }
     $n = Normalize-Field $raw
@@ -1938,8 +1934,9 @@ function Load-LocationMaster($folder){
   $script:LocCols = @{}
   Rebuild-RoomCaches
   Rebuild-LocationDropdownRows
+  Rebuild-DepartmentListFromLocations
 }
-function Save-LocationUserAdd([string]$city,[string]$loc,[string]$b,[string]$f,[string]$r){
+function Save-LocationUserAdd([string]$city,[string]$loc,[string]$b,[string]$f,[string]$r,[string]$dept){
   try{
     $file = $null
     try {
@@ -1965,16 +1962,18 @@ function Save-LocationUserAdd([string]$city,[string]$loc,[string]$b,[string]$f,[
         }
       } catch {}
       if(-not (Test-Path $file)){
-        'City,Location,Building,Floor,Room' | Out-File -FilePath $file -Encoding UTF8
+        'City,Location,Building,Floor,Room,Department' | Out-File -FilePath $file -Encoding UTF8
       }
-      ('"{0}","{1}","{2}","{3}","{4}"' -f $city,$loc,$b,$f,$r) | Add-Content -Path $file -Encoding UTF8
+      ('"{0}","{1}","{2}","{3}","{4}","{5}"' -f $city,$loc,$b,$f,$r,$dept) | Add-Content -Path $file -Encoding UTF8
     }
   } catch {}
   try {
-    $newRow = [pscustomobject]@{ City=$city; Location=$loc; Building=$b; Floor=$f; Room=$r }
+    $newRow = [pscustomobject]@{ City=$city; Location=$loc; Building=$b; Floor=$f; Room=$r; Department=$dept }
     $script:UserAddedLocationRows += $newRow
   } catch {}
+  Rebuild-RoomCaches
   Rebuild-LocationDropdownRows
+  Rebuild-DepartmentListFromLocations
 }
 
 function Rebuild-LocationDropdownRows(){
@@ -1983,7 +1982,6 @@ function Rebuild-LocationDropdownRows(){
   $addRow = {
     param($city,$location,$building,$floor,$room)
     $locVal = if($location){ ([string]$location).Trim() } else { '' }
-    if([string]::IsNullOrWhiteSpace($locVal)){ return }
     $cityVal = if($city){ ([string]$city).Trim() } else { '' }
     $bldVal = if($building){ ([string]$building).Trim() } else { '' }
     $floorVal = if($floor){ ([string]$floor).Trim() } else { '' }
@@ -2018,6 +2016,21 @@ function Rebuild-LocationDropdownRows(){
     try { $bldVal = $row.Building } catch {}
     try { $floorVal = $row.Floor } catch {}
     try { $roomVal = $row.Room } catch {}
+    & $addRow $cityVal $locVal $bldVal $floorVal $roomVal
+  }
+
+  foreach($row in $script:LocationMasterRows){
+    if(-not $row){ continue }
+    $cityVal = $null
+    $locVal = $null
+    $bldVal = $null
+    $floorVal = $null
+    $roomVal = $null
+    try { $cityVal = Get-LocationMasterVal $row 'City' } catch {}
+    try { $locVal = Get-LocationMasterVal $row 'Location' } catch {}
+    try { $bldVal = Get-LocationMasterVal $row 'Building' } catch {}
+    try { $floorVal = Get-LocationMasterVal $row 'Floor' } catch {}
+    try { $roomVal = Get-LocationMasterVal $row 'Room' } catch {}
     & $addRow $cityVal $locVal $bldVal $floorVal $roomVal
   }
 
@@ -3615,46 +3628,23 @@ function Validate-Location($rec){
   try{ $cmbDept.Text = $deptVal } catch {}
 
   $tip.SetToolTip($txtRoom, "")
-  $okC=$false; $okL=$false; $okB=$false; $okF=$false; $okR=$false
-  $nLoc  = Normalize-Field $rec.location
-  $nBld  = Normalize-Field $rec.u_building
-  $nFlr  = Normalize-Field ([string]$rec.u_floor)
-  $nRoom = Normalize-Field $rec.u_room
-  if($script:LocationMasterRows.Count -gt 0){
-    $rowsL = $script:LocationMasterRows | Where-Object { (Normalize-Field ([string]$_.'Location')) -eq $nLoc }
-    $okL   = ($rowsL.Count -gt 0)
-    if($okL){
-      $okC = $true
-      $masterCity = ''
-      try {
-        $masterCity = '' + ($rowsL | Select-Object -First 1).City
-      } catch {}
-      if(-not [string]::IsNullOrWhiteSpace($masterCity) -and [string]::IsNullOrWhiteSpace($txtCity.Text)){
-        $txtCity.Text = $masterCity
+  $okC = Test-LocationValueInColumn $txtCity.Text 'City'
+  $okL = Test-LocationValueInColumn $txtLocation.Text 'Location'
+  $okB = Test-LocationValueInColumn $txtBldg.Text 'Building'
+  $okF = Test-LocationValueInColumn $txtFloor.Text 'Floor'
+  $okR = $false
+  if(-not [string]::IsNullOrWhiteSpace($txtRoom.Text)){
+    $nRoom = Normalize-Field $txtRoom.Text
+    $okR = ($script:RoomsNorm -contains $nRoom)
+    if(-not $okR){
+      $code = Extract-RoomCode $txtRoom.Text
+      if($code -and ($script:RoomCodes -contains $code)){
+        $okR = $true
+        $tip.SetToolTip($txtRoom, "Matched by room code " + $code + " (exact text differs in LocationMaster).")
+      } else {
+        $tip.SetToolTip($txtRoom, "Room not found in LocationMaster Room column.")
       }
     }
-    $rowsB = @()
-    if($okL -and $nBld){
-      $rowsB = $rowsL | Where-Object { (Normalize-Field ([string]$_.'Building')) -eq $nBld }
-      $okB   = ($rowsB.Count -gt 0)
-    }
-    $rowsF = @()
-    if($okB -and $nFlr){
-      $rowsF = $rowsB | Where-Object { (Normalize-Field ([string]$_.'Floor')) -eq $nFlr }
-      $okF   = ($rowsF.Count -gt 0)
-    }
-    if($nRoom){
-      $okR = ($script:RoomsNorm -contains $nRoom)
-      if(-not $okR){
-        $code = Extract-RoomCode $rec.u_room
-        if($code -and ($script:RoomCodes -contains $code)){
-          $okR = $true
-          $tip.SetToolTip($txtRoom, "Matched by room code " + $code + " (exact text differs in LocationMaster).")
-        } else {
-          $tip.SetToolTip($txtRoom, "Room not found in LocationMaster Room column.")
-        }
-      }
-    } else { $okR = $false }
   }
   $txtCity.BackColor     = if($okC){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
   $txtLocation.BackColor = if($okL){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
@@ -5307,15 +5297,28 @@ function Toggle-EditLocation(){
     $dept = ''
     if($cmbDept -and $cmbDept.Text){ $dept = $cmbDept.Text }
     elseif($txtDept -and $txtDept.Text){ $dept = $txtDept.Text }
-    $hasCityAndLocation = (-not [string]::IsNullOrWhiteSpace($city)) -and (-not [string]::IsNullOrWhiteSpace($loc))
-    $exists = $script:LocationRows | Where-Object { (Normalize-Field (Get-LocVal $_ 'City')) -eq (Normalize-Field $city) -and (Normalize-Field (Get-LocVal $_ 'Location')) -eq (Normalize-Field $loc) -and (Normalize-Field (Get-LocVal $_ 'Building')) -eq (Normalize-Field $b) -and (Normalize-Field (Get-LocVal $_ 'Floor')) -eq (Normalize-Field $f) -and (Normalize-Field (Get-LocVal $_ 'Room')) -eq (Normalize-Field $r) }
-    if($exists.Count -eq 0 -and $hasCityAndLocation){
-      Save-LocationUserAdd $city $loc $b $f $r
+    $needsUserAdd = $false
+    if($city -and -not (Test-LocationValueInColumn $city 'City')){ $needsUserAdd = $true }
+    if($loc -and -not (Test-LocationValueInColumn $loc 'Location')){ $needsUserAdd = $true }
+    if($b -and -not (Test-LocationValueInColumn $b 'Building')){ $needsUserAdd = $true }
+    if($f -and -not (Test-LocationValueInColumn $f 'Floor')){ $needsUserAdd = $true }
+    if($dept -and -not (Test-LocationValueInColumn $dept 'Department')){ $needsUserAdd = $true }
+    if($r){
+      $nRoom = Normalize-Field $r
+      $roomOk = $false
+      if($nRoom -and ($script:RoomsNorm -contains $nRoom)){ $roomOk = $true }
+      if(-not $roomOk){
+        $code = Extract-RoomCode $r
+        if($code -and ($script:RoomCodes -contains $code)){ $roomOk = $true }
+      }
+      if(-not $roomOk){ $needsUserAdd = $true }
+    }
+    if($needsUserAdd){
+      Save-LocationUserAdd $city $loc $b $f $r $dept
     }
     $txtCity.Text=$city; $txtLocation.Text=$loc; $txtBldg.Text=$b; $txtFloor.Text=$f; $txtRoom.Text=$r
     Update-LastLocationSelections $city $loc $b $f $r
     if($dept){
-      try { Save-DepartmentUserAdd $dept } catch {}
       try { Populate-Department-Combo $dept } catch {}
     }
     if($txtDept){ $txtDept.Text = $dept }
@@ -5761,9 +5764,7 @@ function Set-DataFreshnessStatus {
     'LocationMaster.csv',
     'LocationMaster-UserAdds.csv',
     'Rounding.csv',
-    'SiteSubnets.csv',
-    'DepartmentMaster.csv',
-    'DepartmentMaster-UserAdds.csv'
+    'SiteSubnets.csv'
   )
   $tooltipLines = New-Object System.Collections.Generic.List[string]
   foreach ($fileName in $loadedFileNames) {
