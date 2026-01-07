@@ -78,6 +78,17 @@ try {
   $reader.Close()
 }
 
+$selectedSiteName = $null
+try { $selectedSiteName = $script:SelectedSiteName } catch {}
+if ([string]::IsNullOrWhiteSpace($selectedSiteName) -and $form -and $form.Text) {
+  $selectedSiteName = ($form.Text -replace '^New Inventory Tool\s*-\s*', '').Trim()
+}
+if ($window) {
+  $window.DataContext = [pscustomobject]@{
+    SelectedSiteName = $selectedSiteName
+  }
+}
+
 $windowsFormsHost = $window.FindName('WinFormsHost')
 if (-not $windowsFormsHost) {
   throw "Could not locate the WindowsFormsHost named 'WinFormsHost' in XAML."
