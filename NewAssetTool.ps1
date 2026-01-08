@@ -2280,6 +2280,13 @@ $LEFT_COL_PERCENT   = 46
 $RIGHT_COL_PERCENT  = 54
 $GAP                = 6
 $form = New-Object System.Windows.Forms.Form
+try {
+  $script:AppIconPath = Join-Path $PSScriptRoot 'icon.ico'
+  if (Test-Path $script:AppIconPath) {
+    $script:AppIcon = New-Object System.Drawing.Icon($script:AppIconPath)
+    $form.Icon = $script:AppIcon
+  }
+} catch {}
 $script:NewAssetToolManualScaleFactor = 1.0
 $applyWinFormsManualScale = {
   param([string]$Source = 'unspecified', [switch]$Force)
@@ -6486,7 +6493,11 @@ if (-not $menuStatus) { $menuStatus = New-Object System.Windows.Forms.ContextMen
 if (-not $script:ToastNotifier) {
   try {
     $script:ToastNotifier = New-Object System.Windows.Forms.NotifyIcon
-    $script:ToastNotifier.Icon = [System.Drawing.SystemIcons]::Information
+    if ($script:AppIcon) {
+      $script:ToastNotifier.Icon = $script:AppIcon
+    } else {
+      $script:ToastNotifier.Icon = [System.Drawing.SystemIcons]::Information
+    }
     $script:ToastNotifier.Visible = $true
   } catch {}
 }
