@@ -51,6 +51,22 @@ function Register-NewAssetToolExceptionHandlers {
 
 Register-NewAssetToolExceptionHandlers
 
+if (-not (Get-Variable -Name NewAssetToolAppIcon -Scope Script -ErrorAction SilentlyContinue)) {
+  $script:NewAssetToolAppIcon = $null
+}
+
+function Get-NewAssetToolAppIcon {
+  if ($script:NewAssetToolAppIcon) { return $script:NewAssetToolAppIcon }
+  $iconPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'icon.ico'
+  if (-not (Test-Path $iconPath)) { return $null }
+  try {
+    $script:NewAssetToolAppIcon = New-Object System.Drawing.Icon($iconPath)
+  } catch {
+    $script:NewAssetToolAppIcon = $null
+  }
+  return $script:NewAssetToolAppIcon
+}
+
 if (-not ('NewAssetTool.NativeMethods.Dpi' -as [Type])) {
   try {
     Add-Type -Namespace NewAssetTool.NativeMethods -Name Dpi -MemberDefinition @"
@@ -2280,6 +2296,10 @@ $LEFT_COL_PERCENT   = 46
 $RIGHT_COL_PERCENT  = 54
 $GAP                = 6
 $form = New-Object System.Windows.Forms.Form
+$appIcon = Get-NewAssetToolAppIcon
+if ($appIcon) {
+  $form.Icon = $appIcon
+}
 $script:NewAssetToolManualScaleFactor = 1.0
 $applyWinFormsManualScale = {
   param([string]$Source = 'unspecified', [switch]$Force)
@@ -6486,7 +6506,12 @@ if (-not $menuStatus) { $menuStatus = New-Object System.Windows.Forms.ContextMen
 if (-not $script:ToastNotifier) {
   try {
     $script:ToastNotifier = New-Object System.Windows.Forms.NotifyIcon
-    $script:ToastNotifier.Icon = [System.Drawing.SystemIcons]::Information
+    $toastIcon = Get-NewAssetToolAppIcon
+    if ($toastIcon) {
+      $script:ToastNotifier.Icon = $toastIcon
+    } else {
+      $script:ToastNotifier.Icon = [System.Drawing.SystemIcons]::Information
+    }
     $script:ToastNotifier.Visible = $true
   } catch {}
 }
