@@ -78,6 +78,18 @@ try {
   $reader.Close()
 }
 
+try {
+  $iconPath = Join-Path $scriptDir 'icon.ico'
+  if (Test-Path $iconPath) {
+    $iconImage = New-Object System.Windows.Media.Imaging.BitmapImage
+    $iconImage.BeginInit()
+    $iconImage.UriSource = New-Object System.Uri($iconPath)
+    $iconImage.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
+    $iconImage.EndInit()
+    $window.Icon = $iconImage
+  }
+} catch {}
+
 $selectedSiteName = $null
 try { $selectedSiteName = $script:SelectedSiteName } catch {}
 if ([string]::IsNullOrWhiteSpace($selectedSiteName) -and $form -and $form.Text) {
