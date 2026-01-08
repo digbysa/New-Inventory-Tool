@@ -1,9 +1,9 @@
-City,Location,Building,1,Room,Department
-Chemainus,VIHA-CDH-Cowichan District Hospital-Main Building-1st Floor,1st Admin Trailer,2,'-,(TBD)
-Duncan,VIHA-CDH-Cowichan District Hospital-Main Building-2nd Floor,Annex Building,3,#203,ACC Clinical Ops
-Ladysmith,VIHA-CDH-Cowichan District Hospital-Main Building-3rd Floor,B-Wing,4,(Old Library),ACSS
-Lake Cowichan,VIHA-CDH-Cowichan District Hospital-Main Building-4th Floor,C-Wing,G,(TBD),ACT Team
-Mayne Island,VIHA-CDH-Cowichan District Hospital-Main Building-Basement 1,D-Wing,,.Reception,Activities
+City,Location,Building,Floor,Room,Department
+Chemainus,VIHA-CDH-Cowichan District Hospital-Main Building-1st Floor,1st Admin Trailer,1,'-,(TBD)
+Duncan,VIHA-CDH-Cowichan District Hospital-Main Building-2nd Floor,Annex Building,2,#203,ACC Clinical Ops
+Ladysmith,VIHA-CDH-Cowichan District Hospital-Main Building-3rd Floor,B-Wing,3,(Old Library),ACSS
+Lake Cowichan,VIHA-CDH-Cowichan District Hospital-Main Building-4th Floor,C-Wing,4,(TBD),ACT Team
+Mayne Island,VIHA-CDH-Cowichan District Hospital-Main Building-Basement 1,D-Wing,G,.Reception,Activities
 Mill Bay,VIHA-CHCC-Chemainus Health Care Centre-Main Building-1st Floor,Lancer Building,,.Reception - Back LH,Acute Care
 Salt Spring Island,VIHA-CHCC-Chemainus Health Care Centre-Main Building-Basement 1,Main Building,,.Reception - Back RH,Admin
 ,VIHA-CLRC-Cowichan Lodge-Main Building-1st Floor,Mobile MRI (Outside),,.Reception - Main LH,Admin Assistant Cowichan Valley
