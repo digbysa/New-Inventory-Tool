@@ -5,40 +5,39 @@ Ladysmith,VIHA-CDH-Cowichan District Hospital-Main Building-3rd Floor,B-Wing,3,(
 Lake Cowichan,VIHA-CDH-Cowichan District Hospital-Main Building-4th Floor,C-Wing,4,(TBD),ACT Team
 Mayne Island,VIHA-CDH-Cowichan District Hospital-Main Building-Basement 1,D-Wing,G,.Reception,Activities
 Mill Bay,VIHA-CHCC-Chemainus Health Care Centre-Main Building-1st Floor,Lancer Building,,.Reception - Back LH,Acute Care
-Salt Spring Island,VIHA-CHCC-Chemainus Health Care Centre-Main Building-Basement 1,Main Building,,.Reception - Back RH,Admin
-,VIHA-CLRC-Cowichan Lodge-Main Building-1st Floor,Mobile MRI (Outside),,.Reception - Main LH,Admin Assistant Cowichan Valley
-,VIHA-CPRC-Cairnsmore Place (CDH)-Main Building-1st Floor,Trailer,,.Reception - Main RH,Admin Support
-,VIHA-CPRF-Caulfield Place Residential Facility-Main Building-1st Floor,,,.Reception(TBD),Admin Supp-Prevention Svc
-,VIHA-CQSS-Cowichan Quw'utsun Secondary School-Main Building-1st Floor,,,?,Admin Team Lead
-,VIHA-CUPCC-Cowichan Urgent Primary Care Centre-Main Building-1st Floor,,,? (Laundry),Administration
-,VIHA-CUPCC-Cowichan Urgent Primary Care Centre-Main Building-2nd Floor,,,? (Swing Office),Admitting
-,VIHA-DCDF-Duncan Community Dialysis Facility-Main Building-1st Floor,,,?? Not Found - Janet Preston,Adult Day Program
-,VIHA-DGSHC-Duncan Government Street Health Centre-Main Building-1st Floor,,,?? WFH (Not found),Adult Rehab Open Door
-,VIHA-DJS-Duncan Jubilee Street-Main Building-1st Floor,,,??? (Shawna Cadieux),Ambulatory Care Unit (ACU)
-,VIHA-DMHC-Duncan Mental Health Centre-Main Building-1st Floor,,,002 (Support Services Manager),AMSU - Addiction Medicne & Substance Use
-,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-1st Floor,,,004 (Social Worker - Cesca Zamboni),Anesthetic Clinic
-,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-2nd Floor,,,006 (Ultrasound Reception),Assisted Living Admin
-,VIHA-DSS-Duncan Station Street-Main Building-2nd Floor,,,009 (Dietician),Biomed
-,VIHA-DWH-Duncan Waldon House-Main Building-1st Floor,,,01 (Clinic Room),Biomedical Engineering
-,VIHA-DWRC-Duncan Wellness and Recovery Centre-Main Building-1st Floor,,,2,Bio-Medical Engineering
-,VIHA-FHMH-Floral House Mental Health-Main Building-1st Floor,,,02 (),Breast Health
-,VIHA-LCHC-Ladysmith Community Health Centre-Main Building-1st Floor,,,028 (FMO Workshop Area),Campbell River ACT
-,VIHA-LCHC-Ladysmith Community Health Centre-Main Building-Basement 1,,,029 (FMO Office M. Casey),Cancer Care
-,VIHA-LCHU-Lake Cowichan Health Unit-Main Building-1st Floor,,,03 (Clinic Room),Capital Projects
-,VIHA-LMH-Lady Minto Hospital-Lionel Beach Annex-1st Floor,,,03 (Nicole),Case Management
-,VIHA-LMH-Lady Minto Hospital-Lionel Beach Annex-2nd Floor,,,032 (Support Services),Case Managers Ladysmith
-,VIHA-LMH-Lady Minto Hospital-Main Building-1st Floor,,,038 (Patricia Byron),CDH 2nd Floor Central
-,VIHA-LMH-Lady Minto Hospital-Main Building-Basement 1,,,039 (Pharmacy Area),CDH 2nd Floor East
-,VIHA-MBRC-Mill Bay Radiology Centre-Main Building-1st Floor,,,04 (Diane),CDH 2nd Floor South
-,VIHA-MIHU-Mayne Island Health Unit-Main Building-1st Floor,,,04 (Nicole Watters),CDH 2nd Floor West
-,VIHA-MMHU-Margaret Moss Building-Main Building-1st Floor,,,045 (Pharmacy Office),CDH 3rd Floor East
-,VIHA-MMHU-Margaret Moss Building-Main Building-Basement 1,,,05 (Amber),CDH 3rd Floor South
-,VIHA-SSCHC-Salt Spring Island Creek House-Main Building-1st Floor,,,05 (Shelley),CDH 3rd Floor West
-,VIHA-SSMHSU-Salt Spring Mental Health Substance Use Services-Main Building-1st Floor,,,06 (),CDH Implementation Admin
-,VIHA-WHMH-Wisteria House Mental Health-Main Building-1st Floor,,,06 (Hillary),CDH Perioperative.
-,VIHA-WRMH-Wicks Road Mental Health-Main Building-1st Floor,,,07 (),CDH RP
-,VIHA-WRMH-Wicks Road Mental Health-Main Building-2nd Floor,,,07 (Shylo Miller  - L6),CDH/Quality Medical Imaging
-,,,,08 (Dr. Nick Hargrove),CDHRP
+Salt Spring Island,VIHA-CHCC-Chemainus Health Care Centre-Main Building-Basement 1,Main Building,,.Reception - Back RH,Admin Assistant Cowichan Valley
+,VIHA-CLRC-Cowichan Lodge-Main Building-1st Floor,Mobile MRI (Outside),,.Reception - Main LH,Admin Support
+,VIHA-CPRC-Cairnsmore Place (CDH)-Main Building-1st Floor,Trailer,,.Reception - Main RH,Admin Supp-Prevention Svc
+,VIHA-CPRF-Caulfield Place Residential Facility-Main Building-1st Floor,,,.Reception(TBD),Admin Team Lead
+,VIHA-CQSS-Cowichan Quw'utsun Secondary School-Main Building-1st Floor,,,?,Administration
+,VIHA-CUPCC-Cowichan Urgent Primary Care Centre-Main Building-1st Floor,,,? (Laundry),Admitting
+,VIHA-CUPCC-Cowichan Urgent Primary Care Centre-Main Building-2nd Floor,,,? (Swing Office),Adult Day Program
+,VIHA-DCDF-Duncan Community Dialysis Facility-Main Building-1st Floor,,,?? Not Found - Janet Preston,Adult Rehab Open Door
+,VIHA-DGSHC-Duncan Government Street Health Centre-Main Building-1st Floor,,,?? WFH (Not found),Ambulatory Care Unit (ACU)
+,VIHA-DJS-Duncan Jubilee Street-Main Building-1st Floor,,,??? (Shawna Cadieux),AMSU - Addiction Medicne & Substance Use
+,VIHA-DMHC-Duncan Mental Health Centre-Main Building-1st Floor,,,002 (Support Services Manager),Anesthetic Clinic
+,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-1st Floor,,,004 (Social Worker - Cesca Zamboni),Assisted Living Admin
+,VIHA-DNDR-Duncan Norcross & Drinkwater Road-Main Building-2nd Floor,,,006 (Ultrasound Reception),Biomed
+,VIHA-DSS-Duncan Station Street-Main Building-2nd Floor,,,009 (Dietician),Biomedical Engineering
+,VIHA-DWH-Duncan Waldon House-Main Building-1st Floor,,,01 (Clinic Room),Bio-Medical Engineering
+,VIHA-DWRC-Duncan Wellness and Recovery Centre-Main Building-1st Floor,,,02 (),Breast Health
+,VIHA-FHMH-Floral House Mental Health-Main Building-1st Floor,,,028 (FMO Workshop Area),Campbell River ACT
+,VIHA-LCHC-Ladysmith Community Health Centre-Main Building-1st Floor,,,029 (FMO Office M. Casey),Cancer Care
+,VIHA-LCHC-Ladysmith Community Health Centre-Main Building-Basement 1,,,03 (Clinic Room),Capital Projects
+,VIHA-LCHU-Lake Cowichan Health Unit-Main Building-1st Floor,,,03 (Nicole),Case Management
+,VIHA-LMH-Lady Minto Hospital-Lionel Beach Annex-1st Floor,,,032 (Support Services),Case Managers Ladysmith
+,VIHA-LMH-Lady Minto Hospital-Lionel Beach Annex-2nd Floor,,,038 (Patricia Byron),CDH 2nd Floor Central
+,VIHA-LMH-Lady Minto Hospital-Main Building-1st Floor,,,039 (Pharmacy Area),CDH 2nd Floor East
+,VIHA-LMH-Lady Minto Hospital-Main Building-Basement 1,,,04 (Diane),CDH 2nd Floor South
+,VIHA-MBRC-Mill Bay Radiology Centre-Main Building-1st Floor,,,04 (Nicole Watters),CDH 2nd Floor West
+,VIHA-MIHU-Mayne Island Health Unit-Main Building-1st Floor,,,045 (Pharmacy Office),CDH 3rd Floor East
+,VIHA-MMHU-Margaret Moss Building-Main Building-1st Floor,,,05 (Amber),CDH 3rd Floor South
+,VIHA-MMHU-Margaret Moss Building-Main Building-Basement 1,,,05 (Shelley),CDH 3rd Floor West
+,VIHA-SSCHC-Salt Spring Island Creek House-Main Building-1st Floor,,,06 (),CDH Implementation Admin
+,VIHA-SSMHSU-Salt Spring Mental Health Substance Use Services-Main Building-1st Floor,,,06 (Hillary),CDH Perioperative.
+,VIHA-WHMH-Wisteria House Mental Health-Main Building-1st Floor,,,07 (),CDH RP
+,VIHA-WRMH-Wicks Road Mental Health-Main Building-1st Floor,,,07 (Shylo Miller  - L6),CDH/Quality Medical Imaging
+,VIHA-WRMH-Wicks Road Mental Health-Main Building-2nd Floor,,,08 (Dr. Nick Hargrove),CDHRP
 ,,,,08 (Leah Soer),CDHRP (Replacement Project)
 ,,,,09 - Benjamin Rhames,Charting
 ,,,,09 (),CHCP - Cowichan Health & Care Plan
