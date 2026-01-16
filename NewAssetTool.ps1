@@ -5850,6 +5850,48 @@ $script:SiteSelections = @(
   [pscustomobject]@{ Name = 'West Coast'; FolderName = 'West Coast' }
 )
 
+function Resolve-LocationFolderName {
+  param(
+    [Parameter(Mandatory)][string]$BaseFolder,
+    [Parameter(Mandatory)][string]$FolderName
+  )
+
+  if ([string]::IsNullOrWhiteSpace($FolderName)) { return $FolderName }
+  $defaultPath = Join-Path $BaseFolder $FolderName
+  if (Test-Path $defaultPath) { return $FolderName }
+
+  $altName = ($FolderName -replace '\s+', '')
+  if ($altName -ne $FolderName) {
+    $altPath = Join-Path $BaseFolder $altName
+    if (Test-Path $altPath) { return $altName }
+  }
+
+  return $FolderName
+}
+
+function Resolve-LocationFileName {
+  param(
+    [Parameter(Mandatory)][string]$FolderPath,
+    [Parameter(Mandatory)][string]$FileName,
+    [Parameter(Mandatory)][string]$SiteName
+  )
+
+  if ([string]::IsNullOrWhiteSpace($FileName)) { return $FileName }
+  $defaultPath = Join-Path $FolderPath $FileName
+  if (Test-Path $defaultPath) { return $FileName }
+
+  $altSiteName = ($SiteName -replace '\s+', '')
+  if (-not [string]::IsNullOrWhiteSpace($altSiteName) -and $altSiteName -ne $SiteName) {
+    $altFileName = $FileName -replace [regex]::Escape($SiteName), $altSiteName
+    if ($altFileName -ne $FileName) {
+      $altPath = Join-Path $FolderPath $altFileName
+      if (Test-Path $altPath) { return $altFileName }
+    }
+  }
+
+  return $FileName
+}
+
 try{
   $__ownDir = Get-OwnScriptDir
   $script:DataFolder   = Join-Path $__ownDir 'Data'
@@ -5863,11 +5905,12 @@ Create a 'Data' folder next to the script and add your CSVs."
   $selectedSite = Select-NewAssetToolSite -Sites $script:SiteSelections
   $script:SelectedSiteName = $selectedSite.Name
   $script:SelectedLocationFolderName = if($selectedSite.FolderName){ $selectedSite.FolderName } else { $selectedSite.Name }
+  $script:SelectedLocationFolderName = Resolve-LocationFolderName -BaseFolder $script:DataFolder -FolderName $script:SelectedLocationFolderName
   $script:LocationDataFolder = Join-Path $script:DataFolder $script:SelectedLocationFolderName
-  $script:SelectedComputersFileName = ('Computers - ' + $script:SelectedSiteName + '.csv')
-  $script:SelectedMonitorsFileName = ('Monitors - ' + $script:SelectedSiteName + '.csv')
-  $script:SelectedLocationMasterFileName = ('LocationMaster - ' + $script:SelectedSiteName + '.csv')
-  $script:SelectedLocationUserAddsFileName = ('LocationMaster-UserAdds - ' + $script:SelectedSiteName + '.csv')
+  $script:SelectedComputersFileName = Resolve-LocationFileName -FolderPath $script:LocationDataFolder -FileName ('Computers - ' + $script:SelectedSiteName + '.csv') -SiteName $script:SelectedSiteName
+  $script:SelectedMonitorsFileName = Resolve-LocationFileName -FolderPath $script:LocationDataFolder -FileName ('Monitors - ' + $script:SelectedSiteName + '.csv') -SiteName $script:SelectedSiteName
+  $script:SelectedLocationMasterFileName = Resolve-LocationFileName -FolderPath $script:LocationDataFolder -FileName ('LocationMaster - ' + $script:SelectedSiteName + '.csv') -SiteName $script:SelectedSiteName
+  $script:SelectedLocationUserAddsFileName = Resolve-LocationFileName -FolderPath $script:LocationDataFolder -FileName ('LocationMaster-UserAdds - ' + $script:SelectedSiteName + '.csv') -SiteName $script:SelectedSiteName
   if (-not [string]::IsNullOrWhiteSpace($script:SelectedSiteName)) {
     $form.Text = "New Inventory Tool - $($script:SelectedSiteName)"
   }
