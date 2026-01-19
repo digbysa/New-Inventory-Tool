@@ -5729,7 +5729,8 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
       Add-NearbyScope $null $row.Location $null $null
       Update-ScopeLabel
       Rebuild-Nearby
-      Write-Host ("Main Save: Added Location scope '" + $row.Location + "' -> Count=" + $script:ActiveNearbyScopes.Count)
+      $scopeCount = if ($script:ActiveNearbyScopes) { $script:ActiveNearbyScopes.Count } else { 0 }
+      Write-Host ("Main Save: Added Location scope '" + $row.Location + "' -> Count=" + $scopeCount)
     } else {
       Write-Host "Main Save: Row.Location missing; not adding scope."
     }
@@ -6982,6 +6983,11 @@ function Rebuild-Nearby {
   )
 try { $dgvNearby.SuspendLayout() } catch {}
 try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
+  if (-not $dgvNearby) {
+    Write-Host "Rebuild-Nearby: dgvNearby not initialized."
+    try { $form.Cursor = [System.Windows.Forms.Cursors]::Default; $form.UseWaitCursor = $false } catch {}
+    return
+  }
     $scrollIndex = $null
   if ($dgvNearby) {
     try { $scrollIndex = $dgvNearby.FirstDisplayedScrollingRowIndex } catch { $scrollIndex = $null }
@@ -6996,6 +7002,9 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   $todayCount = 0
   $excludedCount = 0
   $recentCount = 0
+  $filterToday = if ($chkTodayRounded) { $chkTodayRounded.Checked } else { $false }
+  $filterExcluded = if ($chkShowExcluded) { $chkShowExcluded.Checked } else { $false }
+  $filterRecent = if ($chkRecentlyRounded) { $chkRecentlyRounded.Checked } else { $false }
   $dgvNearby.Rows.Clear()
   $seen = New-Object System.Collections.Generic.HashSet[string]
   foreach ($pc in $script:Computers) {
@@ -7025,9 +7034,9 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     if ($isToday) { $todayCount++ }
     if ($isExcluded) { $excludedCount++ }
     if ($isRecent) { $recentCount++ }
-    if (-not $chkTodayRounded.Checked -and $isToday) { continue }
-    if (-not $chkShowExcluded.Checked -and $isExcluded) { continue }
-    if (-not $chkRecentlyRounded.Checked -and $isRecent) { continue }
+    if (-not $filterToday -and $isToday) { continue }
+    if (-not $filterExcluded -and $isExcluded) { continue }
+    if (-not $filterRecent -and $isRecent) { continue }
     $rowIdx = $dgvNearby.Rows.Add()
     $r = $dgvNearby.Rows[$rowIdx]
     $hostName = $pc.name
