@@ -5729,8 +5729,7 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
       Add-NearbyScope $null $row.Location $null $null
       Update-ScopeLabel
       Rebuild-Nearby
-      $scopeCount = if ($script:ActiveNearbyScopes) { $script:ActiveNearbyScopes.Count } else { 0 }
-      Write-Host ("Main Save: Added Location scope '" + $row.Location + "' -> Count=" + $scopeCount)
+      Write-Host ("Main Save: Added Location scope '" + $row.Location + "' -> Count=" + $script:ActiveNearbyScopes.Count)
     } else {
       Write-Host "Main Save: Row.Location missing; not adding scope."
     }
@@ -5839,6 +5838,63 @@ function Set-DataFreshnessStatus {
   }
 }
 
+function Get-NewAssetToolLocationNameVariants {
+  param([string]$Name)
+
+  $variants = New-Object System.Collections.Generic.List[string]
+  if (-not [string]::IsNullOrWhiteSpace($Name)) {
+    $trimmed = $Name.Trim()
+    if (-not [string]::IsNullOrWhiteSpace($trimmed)) {
+      [void]$variants.Add($trimmed)
+      $collapsed = ($trimmed -replace '\s+', '')
+      if ($collapsed -and $collapsed -ne $trimmed) {
+        [void]$variants.Add($collapsed)
+      }
+    }
+  }
+
+  return $variants
+}
+
+function Resolve-NewAssetToolLocationFolder {
+  param(
+    [string]$DataFolder,
+    [string]$FolderName
+  )
+
+  foreach ($variant in (Get-NewAssetToolLocationNameVariants $FolderName)) {
+    $candidate = Join-Path $DataFolder $variant
+    if (Test-Path $candidate) {
+      return [pscustomobject]@{
+        Name = $variant
+        Path = $candidate
+      }
+    }
+  }
+
+  return [pscustomobject]@{
+    Name = $FolderName
+    Path = Join-Path $DataFolder $FolderName
+  }
+}
+
+function Resolve-NewAssetToolLocationFileName {
+  param(
+    [string]$FolderPath,
+    [string]$Prefix,
+    [string]$SiteName
+  )
+
+  foreach ($variant in (Get-NewAssetToolLocationNameVariants $SiteName)) {
+    $fileName = "$Prefix - $variant.csv"
+    if (Test-Path (Join-Path $FolderPath $fileName)) {
+      return $fileName
+    }
+  }
+
+  return "$Prefix - $SiteName.csv"
+}
+
 # -------- Hardcode paths and auto-load on startup --------
 $script:SiteSelections = @(
   [pscustomobject]@{ Name = 'Campbell River'; FolderName = 'Campbell River' }
@@ -5850,48 +5906,6 @@ $script:SiteSelections = @(
   [pscustomobject]@{ Name = 'Victoria General'; FolderName = 'Victoria General' }
   [pscustomobject]@{ Name = 'West Coast'; FolderName = 'West Coast' }
 )
-
-function Resolve-LocationFolderName {
-  param(
-    [Parameter(Mandatory)][string]$BaseFolder,
-    [Parameter(Mandatory)][string]$FolderName
-  )
-
-  if ([string]::IsNullOrWhiteSpace($FolderName)) { return $FolderName }
-  $defaultPath = Join-Path $BaseFolder $FolderName
-  if (Test-Path $defaultPath) { return $FolderName }
-
-  $altName = ($FolderName -replace '\s+', '')
-  if ($altName -ne $FolderName) {
-    $altPath = Join-Path $BaseFolder $altName
-    if (Test-Path $altPath) { return $altName }
-  }
-
-  return $FolderName
-}
-
-function Resolve-LocationFileName {
-  param(
-    [Parameter(Mandatory)][string]$FolderPath,
-    [Parameter(Mandatory)][string]$FileName,
-    [Parameter(Mandatory)][string]$SiteName
-  )
-
-  if ([string]::IsNullOrWhiteSpace($FileName)) { return $FileName }
-  $defaultPath = Join-Path $FolderPath $FileName
-  if (Test-Path $defaultPath) { return $FileName }
-
-  $altSiteName = ($SiteName -replace '\s+', '')
-  if (-not [string]::IsNullOrWhiteSpace($altSiteName) -and $altSiteName -ne $SiteName) {
-    $altFileName = $FileName -replace [regex]::Escape($SiteName), $altSiteName
-    if ($altFileName -ne $FileName) {
-      $altPath = Join-Path $FolderPath $altFileName
-      if (Test-Path $altPath) { return $altFileName }
-    }
-  }
-
-  return $FileName
-}
 
 try{
   $__ownDir = Get-OwnScriptDir
@@ -5906,12 +5920,13 @@ Create a 'Data' folder next to the script and add your CSVs."
   $selectedSite = Select-NewAssetToolSite -Sites $script:SiteSelections
   $script:SelectedSiteName = $selectedSite.Name
   $script:SelectedLocationFolderName = if($selectedSite.FolderName){ $selectedSite.FolderName } else { $selectedSite.Name }
-  $script:SelectedLocationFolderName = Resolve-LocationFolderName -BaseFolder $script:DataFolder -FolderName $script:SelectedLocationFolderName
-  $script:LocationDataFolder = Join-Path $script:DataFolder $script:SelectedLocationFolderName
-  $script:SelectedComputersFileName = Resolve-LocationFileName -FolderPath $script:LocationDataFolder -FileName ('Computers - ' + $script:SelectedSiteName + '.csv') -SiteName $script:SelectedSiteName
-  $script:SelectedMonitorsFileName = Resolve-LocationFileName -FolderPath $script:LocationDataFolder -FileName ('Monitors - ' + $script:SelectedSiteName + '.csv') -SiteName $script:SelectedSiteName
-  $script:SelectedLocationMasterFileName = Resolve-LocationFileName -FolderPath $script:LocationDataFolder -FileName ('LocationMaster - ' + $script:SelectedSiteName + '.csv') -SiteName $script:SelectedSiteName
-  $script:SelectedLocationUserAddsFileName = Resolve-LocationFileName -FolderPath $script:LocationDataFolder -FileName ('LocationMaster-UserAdds - ' + $script:SelectedSiteName + '.csv') -SiteName $script:SelectedSiteName
+  $resolvedLocation = Resolve-NewAssetToolLocationFolder -DataFolder $script:DataFolder -FolderName $script:SelectedLocationFolderName
+  $script:SelectedLocationFolderName = $resolvedLocation.Name
+  $script:LocationDataFolder = $resolvedLocation.Path
+  $script:SelectedComputersFileName = Resolve-NewAssetToolLocationFileName -FolderPath $script:LocationDataFolder -Prefix 'Computers' -SiteName $script:SelectedSiteName
+  $script:SelectedMonitorsFileName = Resolve-NewAssetToolLocationFileName -FolderPath $script:LocationDataFolder -Prefix 'Monitors' -SiteName $script:SelectedSiteName
+  $script:SelectedLocationMasterFileName = Resolve-NewAssetToolLocationFileName -FolderPath $script:LocationDataFolder -Prefix 'LocationMaster' -SiteName $script:SelectedSiteName
+  $script:SelectedLocationUserAddsFileName = Resolve-NewAssetToolLocationFileName -FolderPath $script:LocationDataFolder -Prefix 'LocationMaster-UserAdds' -SiteName $script:SelectedSiteName
   if (-not [string]::IsNullOrWhiteSpace($script:SelectedSiteName)) {
     $form.Text = "New Inventory Tool - $($script:SelectedSiteName)"
   }
@@ -6983,11 +6998,6 @@ function Rebuild-Nearby {
   )
 try { $dgvNearby.SuspendLayout() } catch {}
 try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
-  if (-not $dgvNearby) {
-    Write-Host "Rebuild-Nearby: dgvNearby not initialized."
-    try { $form.Cursor = [System.Windows.Forms.Cursors]::Default; $form.UseWaitCursor = $false } catch {}
-    return
-  }
     $scrollIndex = $null
   if ($dgvNearby) {
     try { $scrollIndex = $dgvNearby.FirstDisplayedScrollingRowIndex } catch { $scrollIndex = $null }
@@ -7002,9 +7012,6 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   $todayCount = 0
   $excludedCount = 0
   $recentCount = 0
-  $filterToday = if ($chkTodayRounded) { $chkTodayRounded.Checked } else { $false }
-  $filterExcluded = if ($chkShowExcluded) { $chkShowExcluded.Checked } else { $false }
-  $filterRecent = if ($chkRecentlyRounded) { $chkRecentlyRounded.Checked } else { $false }
   $dgvNearby.Rows.Clear()
   $seen = New-Object System.Collections.Generic.HashSet[string]
   foreach ($pc in $script:Computers) {
@@ -7034,9 +7041,9 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     if ($isToday) { $todayCount++ }
     if ($isExcluded) { $excludedCount++ }
     if ($isRecent) { $recentCount++ }
-    if (-not $filterToday -and $isToday) { continue }
-    if (-not $filterExcluded -and $isExcluded) { continue }
-    if (-not $filterRecent -and $isRecent) { continue }
+    if (-not $chkTodayRounded.Checked -and $isToday) { continue }
+    if (-not $chkShowExcluded.Checked -and $isExcluded) { continue }
+    if (-not $chkRecentlyRounded.Checked -and $isRecent) { continue }
     $rowIdx = $dgvNearby.Rows.Add()
     $r = $dgvNearby.Rows[$rowIdx]
     $hostName = $pc.name
