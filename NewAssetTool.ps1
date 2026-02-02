@@ -6433,7 +6433,7 @@ $chkRecentlyRounded.Checked = $true
 $chkShowCriticalClinical = New-Object System.Windows.Forms.CheckBox
 $chkShowCriticalClinical.Text = "Critical Clinical"
 $chkShowCriticalClinical.AutoSize = $true
-$chkShowCriticalClinical.Location = '570,32'
+$chkShowCriticalClinical.Location = '590,32'
 $chkShowCriticalClinical.Checked = $false
 $chkShowExcluded.Add_CheckedChanged({ Rebuild-Nearby })
 $chkTodayRounded.Add_CheckedChanged({ Rebuild-Nearby })
