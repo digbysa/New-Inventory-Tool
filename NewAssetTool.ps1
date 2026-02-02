@@ -6273,10 +6273,26 @@ function Get-ExcludedDevices-Set {
   }
   return $set
 }
+function Get-CriticalClinicalDevices-Set {
+  $set = New-Object 'System.Collections.Generic.HashSet[string]'
+  if(-not $script:Computers){ return $set }
+  foreach ($pc in $script:Computers) {
+    try {
+      $status = ('' + $pc.u_device_rounding).Trim()
+      if ($status -match '^(?i)Critical Clinical$') {
+        $assetTag = ('' + $pc.asset_tag)
+        $normalized = $assetTag.Trim().ToUpper()
+        if ($normalized) { [void]$set.Add($normalized) }
+      }
+    } catch {}
+  }
+  return $set
+}
 function Update-NearbyCheckboxLabels {
   param(
     [int]$todayCount,
     [int]$excludedCount,
+    [int]$criticalCount,
     [int]$recentCount
   )
 
@@ -6289,6 +6305,12 @@ function Update-NearbyCheckboxLabels {
   try {
     if ($chkShowExcluded) {
       $chkShowExcluded.Text = "Excluded ({0})" -f $excludedCount
+    }
+  } catch {}
+
+  try {
+    if ($chkShowCriticalClinical) {
+      $chkShowCriticalClinical.Text = "Critical Clinical ({0})" -f $criticalCount
     }
   } catch {}
 
@@ -6408,9 +6430,15 @@ $chkRecentlyRounded.Text = "Recently Rounded"
 $chkRecentlyRounded.AutoSize = $true
 $chkRecentlyRounded.Location = '400,32'
 $chkRecentlyRounded.Checked = $true
+$chkShowCriticalClinical = New-Object System.Windows.Forms.CheckBox
+$chkShowCriticalClinical.Text = "Critical Clinical"
+$chkShowCriticalClinical.AutoSize = $true
+$chkShowCriticalClinical.Location = '570,32'
+$chkShowCriticalClinical.Checked = $false
 $chkShowExcluded.Add_CheckedChanged({ Rebuild-Nearby })
 $chkTodayRounded.Add_CheckedChanged({ Rebuild-Nearby })
 $chkRecentlyRounded.Add_CheckedChanged({ Rebuild-Nearby })
+$chkShowCriticalClinical.Add_CheckedChanged({ Rebuild-Nearby })
 
 $lblSort = New-Object System.Windows.Forms.Label
 $lblSort.AutoSize = $true
@@ -6462,8 +6490,8 @@ try {
     $tip.SetToolTip($btnZoomIn, 'Zoom in (+10%)')
   }
 } catch {}
-$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$chkRecentlyRounded,$btnClearScopes,$btnZoomOut,$btnZoomIn))
-Update-NearbyCheckboxLabels 0 0 0
+$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$chkRecentlyRounded,$chkShowCriticalClinical,$btnClearScopes,$btnZoomOut,$btnZoomIn))
+Update-NearbyCheckboxLabels 0 0 0 0
 $btnNearbyShowAll.Add_Click({
   try {
     if (-not $script:NearbyShowAllChanges) {
@@ -6483,6 +6511,10 @@ $btnNearbyShowAll.Add_Click({
         $chkRecentlyRounded.Checked = $true
         [void]$script:NearbyShowAllChanges.Add('Recent')
       }
+      if (-not $chkShowCriticalClinical.Checked) {
+        $chkShowCriticalClinical.Checked = $true
+        [void]$script:NearbyShowAllChanges.Add('CriticalClinical')
+      }
       $btnNearbyShowAll.Text = 'Hide Again'
     } else {
       foreach ($entry in @($script:NearbyShowAllChanges)) {
@@ -6495,6 +6527,9 @@ $btnNearbyShowAll.Add_Click({
           }
           'Recent' {
             if ($chkRecentlyRounded.Checked) { $chkRecentlyRounded.Checked = $false }
+          }
+          'CriticalClinical' {
+            if ($chkShowCriticalClinical.Checked) { $chkShowCriticalClinical.Checked = $false }
           }
         }
       }
@@ -7009,8 +7044,10 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   }
   $todaySet = Get-RoundedToday-Set
   $excludedSet = Get-ExcludedDevices-Set
+  $criticalSet = Get-CriticalClinicalDevices-Set
   $todayCount = 0
   $excludedCount = 0
+  $criticalCount = 0
   $recentCount = 0
   $dgvNearby.Rows.Clear()
   $seen = New-Object System.Collections.Generic.HashSet[string]
@@ -7033,17 +7070,23 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $isToday = $false
     if ($atKey -and $todaySet.Contains($atKey)) { $isToday = $true }
     $isExcluded = $false
+    $isCriticalClinical = $false
     try {
       $roundingFlag = ('' + $pc.u_device_rounding).Trim()
       if ($roundingFlag -match '^(?i)Excluded$') { $isExcluded = $true }
+      if ($roundingFlag -match '^(?i)Critical Clinical$') { $isCriticalClinical = $true }
     } catch {}
     if (-not $isExcluded -and $atKey -and $excludedSet.Contains($atKey)) { $isExcluded = $true }
+    if (-not $isCriticalClinical -and $atKey -and $criticalSet.Contains($atKey)) { $isCriticalClinical = $true }
     if ($isToday) { $todayCount++ }
     if ($isExcluded) { $excludedCount++ }
+    if ($isCriticalClinical) { $criticalCount++ }
     if ($isRecent) { $recentCount++ }
     if (-not $chkTodayRounded.Checked -and $isToday) { continue }
     if (-not $chkShowExcluded.Checked -and $isExcluded) { continue }
-    if (-not $chkRecentlyRounded.Checked -and $isRecent) { continue }
+    if (-not $chkShowCriticalClinical.Checked -and $isCriticalClinical) { continue }
+    $overrideRecentFilter = $isCriticalClinical -and $chkShowCriticalClinical.Checked
+    if (-not $chkRecentlyRounded.Checked -and $isRecent -and -not $overrideRecentFilter) { continue }
     $rowIdx = $dgvNearby.Rows.Add()
     $r = $dgvNearby.Rows[$rowIdx]
     $hostName = $pc.name
@@ -7108,7 +7151,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   # Apply sort and filters
   Apply-NearbySort
   Apply-NearbyFilters
-  Update-NearbyCheckboxLabels $todayCount $excludedCount $recentCount
+  Update-NearbyCheckboxLabels $todayCount $excludedCount $criticalCount $recentCount
 try { $dgvNearby.ResumeLayout() } catch {}
 if ($dgvNearby -and $dgvNearby.Rows.Count -gt 0 -and $script:NearbyLastScrollIndex -ne $null) {
     $targetIndex = [Math]::Min($script:NearbyLastScrollIndex, ($dgvNearby.Rows.Count - 1))
