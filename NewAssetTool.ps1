@@ -6277,7 +6277,8 @@ function Update-NearbyCheckboxLabels {
   param(
     [int]$todayCount,
     [int]$excludedCount,
-    [int]$recentCount
+    [int]$recentCount,
+    [int]$criticalCount
   )
 
   try {
@@ -6295,6 +6296,11 @@ function Update-NearbyCheckboxLabels {
   try {
     if ($chkRecentlyRounded) {
       $chkRecentlyRounded.Text = "Recently Rounded ({0})" -f $recentCount
+    }
+  } catch {}
+  try {
+    if ($chkCriticalClinical) {
+      $chkCriticalClinical.Text = "Critical Clinical ({0})" -f $criticalCount
     }
   } catch {}
 }
@@ -6408,14 +6414,20 @@ $chkRecentlyRounded.Text = "Recently Rounded"
 $chkRecentlyRounded.AutoSize = $true
 $chkRecentlyRounded.Location = '400,32'
 $chkRecentlyRounded.Checked = $true
+$chkCriticalClinical = New-Object System.Windows.Forms.CheckBox
+$chkCriticalClinical.Text = "Critical Clinical"
+$chkCriticalClinical.AutoSize = $true
+$chkCriticalClinical.Location = '560,32'
+$chkCriticalClinical.Checked = $true
 $chkShowExcluded.Add_CheckedChanged({ Rebuild-Nearby })
 $chkTodayRounded.Add_CheckedChanged({ Rebuild-Nearby })
 $chkRecentlyRounded.Add_CheckedChanged({ Rebuild-Nearby })
+$chkCriticalClinical.Add_CheckedChanged({ Rebuild-Nearby })
 
 $lblSort = New-Object System.Windows.Forms.Label
 $lblSort.AutoSize = $true
 $lblSort.Text = "Sort:"
-$lblSort.Location = '430,10'
+$lblSort.Location = '720,10'
 $cmbSort = New-Object System.Windows.Forms.ComboBox
 $cmbSort.DropDownStyle = 'DropDownList'
 $cmbSort.Items.AddRange(@(
@@ -6428,7 +6440,7 @@ $cmbSort.Items.AddRange(@(
 try { if ($cmbSort -and $cmbSort.Items -and $cmbSort.Items.Count -gt 4) { $cmbSort.SelectedIndex = 4 } else { $cmbSort.SelectedIndex = -1 } } catch {}
 $cmbSort.Visible = $false; $cmbSort.Enabled = $false
 ))
-$cmbSort.Location = '470,6'
+$cmbSort.Location = '760,6'
 $cmbSort.Width = 210
 $btnClearScopes = New-Object ModernUI.RoundedButton
 $btnClearScopes.Text = "Clear List"
@@ -6462,8 +6474,8 @@ try {
     $tip.SetToolTip($btnZoomIn, 'Zoom in (+10%)')
   }
 } catch {}
-$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$chkRecentlyRounded,$btnClearScopes,$btnZoomOut,$btnZoomIn))
-Update-NearbyCheckboxLabels 0 0 0
+$nearToolbar.Controls.AddRange(@($lblScopes,$btnNearbyShowAll,$chkTodayRounded,$chkShowExcluded,$chkRecentlyRounded,$chkCriticalClinical,$btnClearScopes,$btnZoomOut,$btnZoomIn))
+Update-NearbyCheckboxLabels 0 0 0 0
 $btnNearbyShowAll.Add_Click({
   try {
     if (-not $script:NearbyShowAllChanges) {
@@ -6483,6 +6495,10 @@ $btnNearbyShowAll.Add_Click({
         $chkRecentlyRounded.Checked = $true
         [void]$script:NearbyShowAllChanges.Add('Recent')
       }
+      if (-not $chkCriticalClinical.Checked) {
+        $chkCriticalClinical.Checked = $true
+        [void]$script:NearbyShowAllChanges.Add('Critical')
+      }
       $btnNearbyShowAll.Text = 'Hide Again'
     } else {
       foreach ($entry in @($script:NearbyShowAllChanges)) {
@@ -6495,6 +6511,9 @@ $btnNearbyShowAll.Add_Click({
           }
           'Recent' {
             if ($chkRecentlyRounded.Checked) { $chkRecentlyRounded.Checked = $false }
+          }
+          'Critical' {
+            if ($chkCriticalClinical.Checked) { $chkCriticalClinical.Checked = $false }
           }
         }
       }
@@ -7012,6 +7031,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   $todayCount = 0
   $excludedCount = 0
   $recentCount = 0
+  $criticalCount = 0
   $dgvNearby.Rows.Clear()
   $seen = New-Object System.Collections.Generic.HashSet[string]
   foreach ($pc in $script:Computers) {
@@ -7038,24 +7058,38 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
       if ($roundingFlag -match '^(?i)Excluded$') { $isExcluded = $true }
     } catch {}
     if (-not $isExcluded -and $atKey -and $excludedSet.Contains($atKey)) { $isExcluded = $true }
+    $roundingEvent = Get-LatestRoundingEventForAsset $at
+    $maintenanceRaw = ''
+    if($roundingEvent){
+      $eventMaintenance = Get-RoundingEventField $roundingEvent 'MaintenanceType'
+      if($eventMaintenance){ $maintenanceRaw = $eventMaintenance }
+    }
+    $mtRaw = ''
+    try {
+      if($pc.PSObject.Properties['u_device_rounding']){ $mtRaw = '' + $pc.u_device_rounding }
+    } catch {}
+    if(-not [string]::IsNullOrWhiteSpace($maintenanceRaw)){ $mtRaw = $maintenanceRaw }
+    $maintenanceTypeValue = Get-MaintenanceTypeOrDefault $mtRaw ([string]$pc.name)
+    $isCriticalClinical = $false
+    if ($maintenanceTypeValue -match '^(?i)Critical Clinical$') { $isCriticalClinical = $true }
     if ($isToday) { $todayCount++ }
     if ($isExcluded) { $excludedCount++ }
     if ($isRecent) { $recentCount++ }
+    if ($isCriticalClinical) { $criticalCount++ }
     if (-not $chkTodayRounded.Checked -and $isToday) { continue }
     if (-not $chkShowExcluded.Checked -and $isExcluded) { continue }
     if (-not $chkRecentlyRounded.Checked -and $isRecent) { continue }
+    if (-not $chkCriticalClinical.Checked -and $isCriticalClinical) { continue }
     $rowIdx = $dgvNearby.Rows.Add()
     $r = $dgvNearby.Rows[$rowIdx]
     $hostName = $pc.name
     $cachedIp = Get-NearbyCachedIp $hostName
     $cachedHostColor = Get-NearbyCachedHostColor $hostName
-    $roundingEvent = Get-LatestRoundingEventForAsset $at
     $location = $pc.location
     $building = $pc.u_building
     $floor = $pc.u_floor
     $room = $pc.u_room
     $department = $pc.u_department_location
-    $maintenanceRaw = ''
     if($roundingEvent){
       $eventLocation = Get-RoundingEventField $roundingEvent 'Location'
       if($eventLocation){ $location = $eventLocation }
@@ -7067,8 +7101,6 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
       if($eventRoom){ $room = $eventRoom }
       $eventDepartment = Get-RoundingEventField $roundingEvent 'Department'
       if($eventDepartment){ $department = $eventDepartment }
-      $eventMaintenance = Get-RoundingEventField $roundingEvent 'MaintenanceType'
-      if($eventMaintenance){ $maintenanceRaw = $eventMaintenance }
     }
     $r.Cells['Host'].Value      = $hostName
     $r.Cells['IP'].Value        = $cachedIp
@@ -7083,12 +7115,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $r.Cells['Floor'].Value     = $floor
     $r.Cells['Room'].Value      = $room
     $r.Cells['Department'].Value = $department
-    $mtRaw = ''
-    try {
-      if($pc.PSObject.Properties['u_device_rounding']){ $mtRaw = '' + $pc.u_device_rounding }
-    } catch {}
-    if(-not [string]::IsNullOrWhiteSpace($maintenanceRaw)){ $mtRaw = $maintenanceRaw }
-    $r.Cells['MaintenanceType'].Value = Get-MaintenanceTypeOrDefault $mtRaw ([string]$pc.name)
+    $r.Cells['MaintenanceType'].Value = $maintenanceTypeValue
     $r.Cells['LastRounded'].Value = (Fmt-DateLong $lr)
     $r.Cells['DaysAgo'].Value   = $days
     $r.Cells['Status'].Value    = "—"
@@ -7108,7 +7135,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
   # Apply sort and filters
   Apply-NearbySort
   Apply-NearbyFilters
-  Update-NearbyCheckboxLabels $todayCount $excludedCount $recentCount
+  Update-NearbyCheckboxLabels $todayCount $excludedCount $recentCount $criticalCount
 try { $dgvNearby.ResumeLayout() } catch {}
 if ($dgvNearby -and $dgvNearby.Rows.Count -gt 0 -and $script:NearbyLastScrollIndex -ne $null) {
     $targetIndex = [Math]::Min($script:NearbyLastScrollIndex, ($dgvNearby.Rows.Count - 1))
