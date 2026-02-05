@@ -2917,6 +2917,14 @@ $btnLiveDetails.Anchor = 'Left'
 $btnLiveDetails.BackColor = [System.Drawing.SystemColors]::Control
 $btnLiveDetails.ForeColor = [System.Drawing.SystemColors]::ControlText
 $tip.SetToolTip($btnLiveDetails, 'Open live details for the selected device')
+$btnMonitorLabel = New-Object ModernUI.RoundedButton
+$btnMonitorLabel.Text   = 'Monitor Label'
+$btnMonitorLabel.Size   = '140,32'
+$btnMonitorLabel.Margin = '8,0,0,0'
+$btnMonitorLabel.Anchor = 'Left'
+$btnMonitorLabel.BackColor = [System.Drawing.SystemColors]::Control
+$btnMonitorLabel.ForeColor = [System.Drawing.SystemColors]::ControlText
+$tip.SetToolTip($btnMonitorLabel, 'Open a large monitor label for the selected parent device')
 $assocButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
 $assocButtonsPanel.Dock = 'Left'
 $assocButtonsPanel.AutoSize = $true
@@ -2929,12 +2937,14 @@ $assocButtonsPanel.Controls.Add($btnAddPeripheral)
 $assocButtonsPanel.Controls.Add($btnRemove)
 $assocButtonsPanel.Controls.Add($btnValidateDevices)
 $assocButtonsPanel.Controls.Add($btnLiveDetails)
+$assocButtonsPanel.Controls.Add($btnMonitorLabel)
 $assocToolbarPanel.Controls.Add($assocButtonsPanel)
 
 Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled $false
 Set-SearchTextButtonBaseState -Button $btnRemove -BaseEnabled $true
 Set-SearchTextButtonBaseState -Button $btnValidateDevices -BaseEnabled $true
 Set-SearchTextButtonBaseState -Button $btnLiveDetails -BaseEnabled $false
+Set-SearchTextButtonBaseState -Button $btnMonitorLabel -BaseEnabled $false
 $assocGridPanel = New-Object System.Windows.Forms.Panel
 $assocGridPanel.Dock = 'Fill'
 $assocGridPanel.Margin = '0,0,0,0'
@@ -3365,7 +3375,7 @@ function Apply-ResponsiveHeights {
         $assocButtonsPanel.PreferredSize.Height,
         [Math]::Max(
           [Math]::Max($btnAddPeripheral.PreferredSize.Height, $btnRemove.PreferredSize.Height),
-          [Math]::Max($btnValidateDevices.PreferredSize.Height, $btnLiveDetails.PreferredSize.Height)
+          [Math]::Max([Math]::Max($btnValidateDevices.PreferredSize.Height, $btnLiveDetails.PreferredSize.Height), $btnMonitorLabel.PreferredSize.Height)
         )
       )
     }
@@ -3376,7 +3386,7 @@ function Apply-ResponsiveHeights {
           $assocButtonsPanel.Height,
           [Math]::Max(
             [Math]::Max($btnAddPeripheral.Height, $btnRemove.Height),
-            [Math]::Max($btnValidateDevices.Height, $btnLiveDetails.Height)
+            [Math]::Max([Math]::Max($btnValidateDevices.Height, $btnLiveDetails.Height), $btnMonitorLabel.Height)
           )
         )
       )
@@ -4558,6 +4568,88 @@ function Show-AddPeripheralDialog($parentRec,[string]$defaultSearchText='',[stri
   Apply-ModernThemeToForm -Form $dialog
   try { [void]$dialog.ShowDialog($form) } finally { try { $dialog.Dispose() } catch {} }
 }
+function Show-MonitorLabelDialog($parentRec){
+  if(-not $parentRec){ return }
+  $assetTag = ''
+  $hostName = ''
+  try { if($parentRec.asset_tag){ $assetTag = ('' + $parentRec.asset_tag).Trim() } } catch {}
+  try { if($parentRec.name){ $hostName = ('' + $parentRec.name).Trim() } } catch {}
+  if([string]::IsNullOrWhiteSpace($assetTag)){ $assetTag = '(blank)' }
+  if([string]::IsNullOrWhiteSpace($hostName)){ $hostName = '(blank)' }
+
+  $dialog = New-Object System.Windows.Forms.Form
+  $dialog.Text = 'Monitor Label'
+  $dialog.StartPosition = 'CenterParent'
+  $dialog.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+  $dialog.MaximizeBox = $false
+  $dialog.MinimizeBox = $false
+  $dialog.ShowIcon = $false
+  $dialog.AutoSize = $true
+  $dialog.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $dialog.Padding = New-Object System.Windows.Forms.Padding(16)
+
+  $layout = New-Object System.Windows.Forms.TableLayoutPanel
+  $layout.Dock = 'Fill'
+  $layout.AutoSize = $true
+  $layout.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $layout.ColumnCount = 2
+  $layout.RowCount = 3
+  $layout.ColumnStyles.Clear()
+  $layout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+  $layout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+
+  $largeFont = New-Object System.Drawing.Font('Segoe UI', 30, [System.Drawing.FontStyle]::Regular)
+  $largeBoldFont = New-Object System.Drawing.Font('Segoe UI', 30, [System.Drawing.FontStyle]::Bold)
+
+  $lblAsset = New-Object System.Windows.Forms.Label
+  $lblAsset.AutoSize = $true
+  $lblAsset.Margin = New-Object System.Windows.Forms.Padding(0,0,14,10)
+  $lblAsset.Font = $largeFont
+  $lblAsset.Text = 'Asset:'
+
+  $lblAssetValue = New-Object System.Windows.Forms.Label
+  $lblAssetValue.AutoSize = $true
+  $lblAssetValue.Margin = New-Object System.Windows.Forms.Padding(0,0,0,10)
+  $lblAssetValue.Font = $largeBoldFont
+  $lblAssetValue.Text = $assetTag
+
+  $lblHost = New-Object System.Windows.Forms.Label
+  $lblHost.AutoSize = $true
+  $lblHost.Margin = New-Object System.Windows.Forms.Padding(0,0,14,10)
+  $lblHost.Font = $largeFont
+  $lblHost.Text = 'Hostname:'
+
+  $lblHostValue = New-Object System.Windows.Forms.Label
+  $lblHostValue.AutoSize = $true
+  $lblHostValue.Margin = New-Object System.Windows.Forms.Padding(0,0,0,10)
+  $lblHostValue.Font = $largeBoldFont
+  $lblHostValue.Text = $hostName
+
+  $btnClose = New-Object ModernUI.RoundedButton
+  $btnClose.Text = 'Close'
+  $btnClose.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+  $btnClose.Margin = New-Object System.Windows.Forms.Padding(0,8,0,0)
+
+  $buttonPanel = New-Object System.Windows.Forms.FlowLayoutPanel
+  $buttonPanel.AutoSize = $true
+  $buttonPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
+  $buttonPanel.FlowDirection = [System.Windows.Forms.FlowDirection]::RightToLeft
+  $buttonPanel.Dock = 'Fill'
+  $buttonPanel.Controls.Add($btnClose)
+
+  $layout.Controls.Add($lblAsset,0,0)
+  $layout.Controls.Add($lblAssetValue,1,0)
+  $layout.Controls.Add($lblHost,0,1)
+  $layout.Controls.Add($lblHostValue,1,1)
+  $layout.Controls.Add($buttonPanel,0,2)
+  $layout.SetColumnSpan($buttonPanel,2)
+
+  $dialog.Controls.Add($layout)
+  $dialog.CancelButton = $btnClose
+  $dialog.Add_Shown({ $btnClose.Focus() })
+  Apply-ModernThemeToForm -Form $dialog
+  try { [void]$dialog.ShowDialog($form) } finally { try { $dialog.Dispose() } catch {} }
+}
 function Resolve-HostIpAddress([string]$hostName){
   if([string]::IsNullOrWhiteSpace($hostName)){ return $null }
   try {
@@ -5025,6 +5117,7 @@ function Populate-UI($displayRec,$parentRec){
   if($btnAddPeripheral){ Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled ([bool]$parentRec) }
   if($btnValidateDevices){ Set-SearchTextButtonBaseState -Button $btnValidateDevices -BaseEnabled ([bool]$displayRec) }
   if($btnLiveDetails){ Set-SearchTextButtonBaseState -Button $btnLiveDetails -BaseEnabled ([bool]$parentRec) }
+  if($btnMonitorLabel){ Set-SearchTextButtonBaseState -Button $btnMonitorLabel -BaseEnabled ([bool]$parentRec) }
   Validate-ParentAndName $displayRec $parentRec
   Update-FixNameButton $displayRec $parentRec
 }
@@ -5521,6 +5614,7 @@ function Clear-UI(){
   if($btnAddPeripheral){ Set-SearchTextButtonBaseState -Button $btnAddPeripheral -BaseEnabled $false }
   if($btnValidateDevices){ Set-SearchTextButtonBaseState -Button $btnValidateDevices -BaseEnabled $false }
   if($btnLiveDetails){ Set-SearchTextButtonBaseState -Button $btnLiveDetails -BaseEnabled $false }
+  if($btnMonitorLabel){ Set-SearchTextButtonBaseState -Button $btnMonitorLabel -BaseEnabled $false }
   $statusLabel.Text = "Ready - scan or enter a device."
   Size-AssocForRows(1) | Out-Null
 }
@@ -5561,6 +5655,17 @@ $btnLiveDetails.Add_Click({
     return
   }
   Show-LiveDetailsDialog $pc
+})
+$btnMonitorLabel.Add_Click({
+  $pc = $script:CurrentParent
+  if(-not $pc){
+    $pc = Resolve-ParentComputer $script:CurrentDisplay
+  }
+  if(-not $pc){
+    [System.Windows.Forms.MessageBox]::Show("No parent device available to show.","Monitor Label") | Out-Null
+    return
+  }
+  Show-MonitorLabelDialog $pc
 })
 # Double-click a grid row to open that record
 $dgv.Add_CellDoubleClick({
