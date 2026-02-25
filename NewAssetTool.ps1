@@ -3172,10 +3172,11 @@ $chkCableNeeded=New-Object System.Windows.Forms.CheckBox; $chkCableNeeded.Text="
 $chkCart=New-Object System.Windows.Forms.CheckBox; $chkCart.Text="Check Physical Cart Is Working"; $chkCart.AutoSize=$true; $chkCart.TabIndex = 5
 $chkLabels=New-Object System.Windows.Forms.CheckBox; $chkLabels.Text="Ensure monitor appropriately labelled"; $chkLabels.AutoSize=$true; $chkLabels.TabIndex = 6
 $chkPeriph=New-Object System.Windows.Forms.CheckBox; $chkPeriph.Text="Validate peripherals are connected and working"; $chkPeriph.AutoSize=$true; $chkPeriph.TabIndex = 7
+$chkMissingDevice=New-Object System.Windows.Forms.CheckBox; $chkMissingDevice.Text="Add device to device tracker"; $chkMissingDevice.AutoSize=$true; $chkMissingDevice.TabIndex = 8
 
-$btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Size='150,36'; $btnCheckComplete.TabIndex = 8
-$btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Size='132,36'; $btnSave.TabIndex = 9
-$btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 10
+$btnCheckComplete=New-Object ModernUI.RoundedButton; $btnCheckComplete.Text="Check Complete"; $btnCheckComplete.Size='150,36'; $btnCheckComplete.TabIndex = 9
+$btnSave=New-Object ModernUI.RoundedButton; $btnSave.Text="Save Event"; $btnSave.Size='132,36'; $btnSave.TabIndex = 10
+$btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual Round"; $btnManualRound.Size='140,36'; $btnManualRound.Enabled=$false; $btnManualRound.TabIndex = 11
 $tip.SetToolTip($btnCheckComplete, 'Mark the checklist as complete')
 $tip.SetToolTip($btnSave, 'Save the rounding event')
 $tip.SetToolTip($btnManualRound, 'Open the manual rounding link')
@@ -3260,13 +3261,14 @@ $rowChecks.Controls.Add($chkCableNeeded,1,0)
 $rowChecks.Controls.Add($chkLabels,0,1)
 $rowChecks.Controls.Add($chkCart,1,1)
 $rowChecks.Controls.Add($chkPeriph,0,2)
-$rowChecks.SetColumnSpan($chkPeriph,2)
+$rowChecks.Controls.Add($chkMissingDevice,1,2)
 $rowChecks.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $chkCable.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
 $chkCableNeeded.Margin = New-Object System.Windows.Forms.Padding(12,0,0,0)
 $chkLabels.Margin = New-Object System.Windows.Forms.Padding(0,6,12,0)
 $chkCart.Margin = New-Object System.Windows.Forms.Padding(12,6,0,0)
-$chkPeriph.Margin = New-Object System.Windows.Forms.Padding(0,6,0,0)
+$chkPeriph.Margin = New-Object System.Windows.Forms.Padding(0,6,12,0)
+$chkMissingDevice.Margin = New-Object System.Windows.Forms.Padding(12,6,0,0)
 
 $actionsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
 $actionsPanel.Dock = 'Fill'
@@ -5773,6 +5775,20 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
   $script:LastSavedRoundingEvent = $row
   Update-RoundingProgressStatus
   $script:ManualRoundUsed = $false
+  if($chkMissingDevice.Checked){
+    $missingDevicePath = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:DataFolder})) 'MissingDeviceList.csv'
+    $missingDeviceRow = [pscustomobject]@{
+      Timestamp = $row.Timestamp
+      Name      = $row.Name
+      'Asset Tag' = $row.AssetTag
+      Location  = $row.Location
+    }
+    if(-not (Test-Path $missingDevicePath)){
+      $missingDeviceRow | Export-Csv -Path $missingDevicePath -NoTypeInformation -Encoding UTF8
+    } else {
+      $missingDeviceRow | Export-Csv -Path $missingDevicePath -NoTypeInformation -Append -Encoding UTF8
+    }
+  }
   if($chkCableNeeded.Checked){
     $excelPath = Join-Path $script:OutputFolder 'CablingNeeded.xlsx'
     $excel = $null
@@ -5821,7 +5837,7 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
       [System.GC]::WaitForPendingFinalizers()
     }
   }
-  foreach($cb in @($chkCable,$chkCableNeeded,$chkLabels,$chkCart,$chkPeriph)){ $cb.Checked = $false }
+  foreach($cb in @($chkCable,$chkCableNeeded,$chkLabels,$chkCart,$chkPeriph,$chkMissingDevice)){ $cb.Checked = $false }
   [System.Windows.Forms.MessageBox]::Show(("Saved rounding event to
 " + $file),"Save Event") | Out-Null
   $cmbChkStatus.SelectedIndex = 0
