@@ -5782,6 +5782,7 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
       Name      = $row.Name
       'Asset Tag' = $row.AssetTag
       Location  = $row.Location
+      Room      = $row.Room
     }
     if(-not (Test-Path $missingDevicePath)){
       $missingDeviceRow | Export-Csv -Path $missingDevicePath -NoTypeInformation -Encoding UTF8
