@@ -3105,6 +3105,7 @@ $numTime=New-Object System.Windows.Forms.NumericUpDown; $numTime.Minimum=1; $num
 $numTime.TabIndex = 2
 
 $script:RoundingBaseMinutes = 3
+$script:RoundingDaysPerWeek = 5
 $script:RoundingStartTime = $null
 $script:RoundingTimer = New-Object System.Windows.Forms.Timer
 $script:RoundingTimer.Interval = 1000
@@ -3324,6 +3325,12 @@ $roundingStatusPrefix.Text = "Rounding Number:"
 $roundingStatusPrefix.Margin = New-Object System.Windows.Forms.Padding(6,3,2,3)
 $roundingStatusPrefix.ForeColor = [System.Drawing.Color]::DimGray
 $status.Items.Add($roundingStatusPrefix) | Out-Null
+$roundingDaysLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
+$roundingDaysLabel.Text = "Days/week 5,"
+$roundingDaysLabel.Margin = New-Object System.Windows.Forms.Padding(2,3,2,3)
+$roundingDaysLabel.IsLink = $true
+$roundingDaysLabel.ToolTipText = "Click to change days per week used in rounding calculations (1-5)."
+$status.Items.Add($roundingDaysLabel) | Out-Null
 $roundingTodayLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $roundingTodayLabel.Text = "Today 0 / 30,"
 $roundingTodayLabel.Margin = New-Object System.Windows.Forms.Padding(2,3,2,3)
@@ -6271,16 +6278,69 @@ function Get-RoundingEventTimestamp($e){
   }
   return $timestamp
 }
+function Select-RoundingDaysPerWeek {
+  $dialog = New-Object System.Windows.Forms.Form
+  $dialog.Text = 'Rounding days per week'
+  $dialog.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+  $dialog.StartPosition = 'CenterParent'
+  $dialog.Width = 340
+  $dialog.Height = 170
+  $dialog.MaximizeBox = $false
+  $dialog.MinimizeBox = $false
+
+  $label = New-Object System.Windows.Forms.Label
+  $label.Text = 'Choose days per week (1 to 5):'
+  $label.AutoSize = $true
+  $label.Location = New-Object System.Drawing.Point(16, 20)
+
+  $numDays = New-Object System.Windows.Forms.NumericUpDown
+  $numDays.Minimum = 1
+  $numDays.Maximum = 5
+  $numDays.Value = [Math]::Min([Math]::Max([int]$script:RoundingDaysPerWeek, 1), 5)
+  $numDays.Location = New-Object System.Drawing.Point(20, 52)
+  $numDays.Width = 80
+
+  $btnOk = New-Object System.Windows.Forms.Button
+  $btnOk.Text = 'OK'
+  $btnOk.Width = 85
+  $btnOk.Location = New-Object System.Drawing.Point(138, 90)
+  $btnOk.Add_Click({
+    $dialog.Tag = [int]$numDays.Value
+    $dialog.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $dialog.Close()
+  })
+
+  $btnCancel = New-Object System.Windows.Forms.Button
+  $btnCancel.Text = 'Cancel'
+  $btnCancel.Width = 85
+  $btnCancel.Location = New-Object System.Drawing.Point(230, 90)
+  $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+
+  $dialog.AcceptButton = $btnOk
+  $dialog.CancelButton = $btnCancel
+  $dialog.Controls.AddRange(@($label, $numDays, $btnOk, $btnCancel))
+
+  try {
+    $result = $dialog.ShowDialog($form)
+    if($result -eq [System.Windows.Forms.DialogResult]::OK -and $dialog.Tag){
+      return [int]$dialog.Tag
+    }
+  } finally {
+    try { $dialog.Dispose() } catch {}
+  }
+  return $null
+}
 function Update-RoundingProgressStatus {
-  if(-not $roundingTodayLabel -or -not $roundingWeekLabel -or -not $roundingRemainingLabel){ return }
+  if(-not $roundingTodayLabel -or -not $roundingWeekLabel -or -not $roundingRemainingLabel -or -not $roundingDaysLabel){ return }
   $todayCount = 0
   $weekCount = 0
   $now = Get-Date
   $today = $now.Date
+  $daysPerWeek = [Math]::Min([Math]::Max([int]$script:RoundingDaysPerWeek, 1), 5)
   $dayOfWeek = [int]$today.DayOfWeek
   $offset = if($dayOfWeek -eq 0){ 6 } else { $dayOfWeek - 1 }
   $weekStart = $today.AddDays(-$offset)
-  $weekEnd = $weekStart.AddDays(4)
+  $weekEnd = $weekStart.AddDays($daysPerWeek - 1)
   if($script:RoundingEvents){
     foreach($e in $script:RoundingEvents){
       $timestamp = Get-RoundingEventTimestamp $e
@@ -6291,19 +6351,21 @@ function Update-RoundingProgressStatus {
     }
   }
   $todayTarget = 30
-  $weekTarget = 150
+  $weekTarget = $todayTarget * $daysPerWeek
   $remaining = [Math]::Max(0, $weekTarget - $weekCount)
   $daysLeft = 0
   if($today -le $weekEnd){
     $daysLeft = [Math]::Max(0, ($weekEnd - $today).Days)
   }
   $remainingPerDay = if($daysLeft -gt 0){ [Math]::Ceiling($remaining / $daysLeft) } else { $remaining }
+  $roundingDaysLabel.Text = ("Days/week {0}," -f $daysPerWeek)
   $roundingTodayLabel.Text = ("Today {0} / {1}," -f $todayCount, $todayTarget)
   $roundingWeekLabel.Text = ("This week {0} / {1}," -f $weekCount, $weekTarget)
   $roundingRemainingLabel.Text = ("Remaining per day {0}" -f $remainingPerDay)
   $green = [System.Drawing.Color]::ForestGreen
   $orange = [System.Drawing.Color]::DarkOrange
   $red = [System.Drawing.Color]::Crimson
+  $roundingDaysLabel.ForeColor = [System.Drawing.Color]::DimGray
   $roundingTodayLabel.ForeColor = if($todayCount -ge $todayTarget){ $green } else { $orange }
   $roundingWeekLabel.ForeColor = if($weekCount -ge $weekTarget){ $green } else { $orange }
   if($remainingPerDay -le 30){
@@ -6314,6 +6376,13 @@ function Update-RoundingProgressStatus {
     $roundingRemainingLabel.ForeColor = $red
   }
 }
+$roundingDaysLabel.Add_Click({
+  $selectedDays = Select-RoundingDaysPerWeek
+  if($selectedDays -ge 1 -and $selectedDays -le 5){
+    $script:RoundingDaysPerWeek = [int]$selectedDays
+    Update-RoundingProgressStatus
+  }
+})
 function Load-RoundingEvents {
   $script:RoundingEvents = @()
   try {
