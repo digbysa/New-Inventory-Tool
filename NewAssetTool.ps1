@@ -7325,7 +7325,24 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $r.Cells['MaintenanceType'].Value = Get-MaintenanceTypeOrDefault $mtRaw ([string]$pc.name)
     $r.Cells['LastRounded'].Value = (Fmt-DateLong $lr)
     $r.Cells['DaysAgo'].Value   = $days
-    $r.Cells['Status'].Value    = "—"
+    $statusValue = "—"
+    if ($isToday -and $roundingEvent) {
+      $eventStatus = Get-RoundingEventField $roundingEvent 'CheckStatus'
+      if (-not [string]::IsNullOrWhiteSpace($eventStatus)) {
+        $statusValue = $eventStatus
+      }
+    }
+    try {
+      $statusCell = $r.Cells['Status']
+      if ($statusCell -and $statusCell -is [System.Windows.Forms.DataGridViewComboBoxCell]) {
+        if (-not $statusCell.Items.Contains($statusValue)) { [void]$statusCell.Items.Add($statusValue) }
+      }
+      $statusColumn = $dgvNearby.Columns['Status']
+      if ($statusColumn -and $statusColumn -is [System.Windows.Forms.DataGridViewComboBoxColumn]) {
+        if (-not $statusColumn.Items.Contains($statusValue)) { [void]$statusColumn.Items.Add($statusValue) }
+      }
+    } catch {}
+    $r.Cells['Status'].Value    = $statusValue
     $r.Cells['AT_KEY'].Value    = $atKey
     $r.Cells['TODAY'].Value     = if ($isToday) { "1" } else { "0" }
     $r.Cells['LRRAW'].Value     = if ($lr) { $lr.ToString("o") } else { "" }
