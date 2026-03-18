@@ -1986,6 +1986,29 @@ function Save-LocationUserAdd([string]$city,[string]$loc,[string]$b,[string]$f,[
   Rebuild-DepartmentListFromLocations
 }
 
+function Ensure-LocationUserAddExists([string]$city,[string]$loc,[string]$b,[string]$f,[string]$r,[string]$dept){
+  $needsUserAdd = $false
+  if($city -and -not (Test-LocationValueInColumn $city 'City')){ $needsUserAdd = $true }
+  if($loc -and -not (Test-LocationValueInColumn $loc 'Location')){ $needsUserAdd = $true }
+  if($b -and -not (Test-LocationValueInColumn $b 'Building')){ $needsUserAdd = $true }
+  if($f -and -not (Test-LocationValueInColumn $f 'Floor')){ $needsUserAdd = $true }
+  if($dept -and -not (Test-LocationValueInColumn $dept 'Department')){ $needsUserAdd = $true }
+  if($r){
+    $nRoom = Normalize-Field $r
+    $roomOk = $false
+    if($nRoom -and ($script:RoomsNorm -contains $nRoom)){ $roomOk = $true }
+    if(-not $roomOk){
+      $code = Extract-RoomCode $r
+      if($code -and ($script:RoomCodes -contains $code)){ $roomOk = $true }
+    }
+    if(-not $roomOk){ $needsUserAdd = $true }
+  }
+  if($needsUserAdd){
+    Save-LocationUserAdd $city $loc $b $f $r $dept
+  }
+  return $needsUserAdd
+}
+
 function Rebuild-LocationDropdownRows(){
   $unique = @{}
   $rows = New-Object 'System.Collections.Generic.List[object]'
@@ -5422,25 +5445,7 @@ function Toggle-EditLocation(){
     $dept = ''
     if($cmbDept -and $cmbDept.Text){ $dept = $cmbDept.Text }
     elseif($txtDept -and $txtDept.Text){ $dept = $txtDept.Text }
-    $needsUserAdd = $false
-    if($city -and -not (Test-LocationValueInColumn $city 'City')){ $needsUserAdd = $true }
-    if($loc -and -not (Test-LocationValueInColumn $loc 'Location')){ $needsUserAdd = $true }
-    if($b -and -not (Test-LocationValueInColumn $b 'Building')){ $needsUserAdd = $true }
-    if($f -and -not (Test-LocationValueInColumn $f 'Floor')){ $needsUserAdd = $true }
-    if($dept -and -not (Test-LocationValueInColumn $dept 'Department')){ $needsUserAdd = $true }
-    if($r){
-      $nRoom = Normalize-Field $r
-      $roomOk = $false
-      if($nRoom -and ($script:RoomsNorm -contains $nRoom)){ $roomOk = $true }
-      if(-not $roomOk){
-        $code = Extract-RoomCode $r
-        if($code -and ($script:RoomCodes -contains $code)){ $roomOk = $true }
-      }
-      if(-not $roomOk){ $needsUserAdd = $true }
-    }
-    if($needsUserAdd){
-      Save-LocationUserAdd $city $loc $b $f $r $dept
-    }
+    Ensure-LocationUserAddExists $city $loc $b $f $r $dept | Out-Null
     $txtCity.Text=$city; $txtLocation.Text=$loc; $txtBldg.Text=$b; $txtFloor.Text=$f; $txtRoom.Text=$r
     Update-LastLocationSelections $city $loc $b $f $r
     if($dept){
@@ -5747,6 +5752,9 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
     if($cmbDept){ $cmbDept.Text = $deptValue }
     try { Populate-Department-Combo $deptValue } catch {}
   }
+  try {
+    Ensure-LocationUserAddExists $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text $deptValue | Out-Null
+  } catch {}
   $row = [pscustomobject]@{
     Timestamp        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
     AssetTag         = if($pc){ $pc.asset_tag } else { $null }
