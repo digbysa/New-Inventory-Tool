@@ -5459,6 +5459,7 @@ function Toggle-EditLocation(){
       if(-not $targets.Contains($cand)){ [void]$targets.Add($cand) }
     }
     foreach($tgt in $targets){
+      try { $tgt | Add-Member -NotePropertyName City -NotePropertyValue $city -Force } catch {}
       try { $tgt | Add-Member -NotePropertyName location -NotePropertyValue $loc -Force } catch {}
       try { $tgt | Add-Member -NotePropertyName u_building -NotePropertyValue $b -Force } catch {}
       try { $tgt | Add-Member -NotePropertyName u_floor -NotePropertyValue $f -Force } catch {}
@@ -5470,7 +5471,7 @@ function Toggle-EditLocation(){
     if($targets.Count -gt 0){
       Validate-Location $targets[0]
     } else {
-      $tmp=[pscustomobject]@{location=$loc;u_building=$b;u_floor=$f;u_room=$r;u_department_location=$dept;Department=$dept}
+      $tmp=[pscustomobject]@{City=$city;location=$loc;u_building=$b;u_floor=$f;u_room=$r;u_department_location=$dept;Department=$dept}
       Validate-Location $tmp
     }
     $cmbCity.Visible=$false; $cmbLocation.Visible=$false; $cmbBuilding.Visible=$false; $cmbFloor.Visible=$false; $cmbRoom.Visible=$false
@@ -5760,7 +5761,7 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
     try { Populate-Department-Combo $deptValue } catch {}
   }
   try {
-    Ensure-LocationUserAddExists $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text $deptValue | Out-Null
+    Ensure-LocationUserAddExists $cityValue $locationValue $buildingValue $floorValue $roomValue $deptValue | Out-Null
   } catch {}
   $row = [pscustomobject]@{
     Timestamp        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
