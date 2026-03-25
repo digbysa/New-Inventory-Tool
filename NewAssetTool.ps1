@@ -5743,9 +5743,16 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
   }
   $url = if($pc){ Get-RoundingUrlForParent $pc } else { $null }
   $urlForCsv = ConvertTo-RoundingUrlHyperlink $url
+  $cityValue = if($script:editing -and $cmbCity -and $cmbCity.Visible){ $cmbCity.Text } else { $txtCity.Text }
+  $locationValue = if($script:editing -and $cmbLocation -and $cmbLocation.Visible){ $cmbLocation.Text } else { $txtLocation.Text }
+  $buildingValue = if($script:editing -and $cmbBuilding -and $cmbBuilding.Visible){ $cmbBuilding.Text } else { $txtBldg.Text }
+  $floorValue = if($script:editing -and $cmbFloor -and $cmbFloor.Visible){ $cmbFloor.Text } else { $txtFloor.Text }
+  $roomValue = if($script:editing -and $cmbRoom -and $cmbRoom.Visible){ $cmbRoom.Text } else { $txtRoom.Text }
+
   $deptValue = ''
-  if($cmbDept -and $cmbDept.Text){ $deptValue = $cmbDept.Text }
+  if($cmbDept -and $cmbDept.Visible -and $cmbDept.Text){ $deptValue = $cmbDept.Text }
   elseif($txtDept -and $txtDept.Text){ $deptValue = $txtDept.Text }
+  elseif($cmbDept -and $cmbDept.Text){ $deptValue = $cmbDept.Text }
   if($deptValue){
     try { Save-DepartmentUserAdd $deptValue } catch {}
     if($txtDept){ $txtDept.Text = $deptValue }
@@ -5760,11 +5767,11 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
     AssetTag         = if($pc){ $pc.asset_tag } else { $null }
     Name             = if($pc){ $pc.name } else { $null }
     Serial           = if($pc){ $pc.serial_number } else { $null }
-    City             = $txtCity.Text
-    Location         = $txtLocation.Text
-    Building         = $txtBldg.Text
-    Floor            = $txtFloor.Text
-    Room             = $txtRoom.Text
+    City             = $cityValue
+    Location         = $locationValue
+    Building         = $buildingValue
+    Floor            = $floorValue
+    Room             = $roomValue
     CheckStatus      = $cmbChkStatus.Text
     RoundingMinutes  = [int]$numTime.Value
     CableMgmtOK      = if ($chkCable.Checked) { 'Yes' } else { 'No' }
