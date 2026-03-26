@@ -6826,9 +6826,19 @@ function Update-NearbyIpTooltip {
 
   if(-not $Cell){ return }
   try {
-    $label = Get-SiteSubnetLabelForIp $IpAddress
-    $Cell.ToolTipText = if($label){ $label } else { '' }
+    $Cell.ToolTipText = Get-NearbySubnetValue $IpAddress
   } catch {}
+}
+
+function Get-NearbySubnetValue {
+  param([string]$IpAddress)
+
+  if([string]::IsNullOrWhiteSpace($IpAddress)){ return 'Unknown' }
+  $ip = $IpAddress.Trim()
+  if($ip.StartsWith('10.64.')){ return 'VPN' }
+  $label = Get-SiteSubnetLabelForIp $ip
+  if([string]::IsNullOrWhiteSpace($label)){ return 'Unknown' }
+  return $label
 }
 
 function Invoke-NearbyPingRows {
@@ -6914,6 +6924,7 @@ function Invoke-NearbyPingRows {
         try { $ipCell.Value = $ipAddress } catch {}
         Update-NearbyIpTooltip -Cell $ipCell -IpAddress $ipAddress
       }
+      try { $row.Cells['Subnet'].Value = Get-NearbySubnetValue $ipAddress } catch {}
 
       Set-NearbyCachedIp -HostName $hostName -IpAddress $ipAddress
       Set-NearbyCachedHostColor -HostName $hostName -ColorName $(if ($success) { 'Success' } else { 'Fail' })
@@ -7064,6 +7075,7 @@ function New-NearCol([string]$name,[string]$header,[int]$width,[bool]$ro=$true){
 # Visible columns
 $dgvNearby.Columns.Add((New-NearCol 'Host' 'Host Name' 140))         | Out-Null
 $dgvNearby.Columns.Add((New-NearCol 'IP' 'IP Address' 140))          | Out-Null
+$dgvNearby.Columns.Add((New-NearCol 'Subnet' 'Subnet' 110))          | Out-Null
 $dgvNearby.Columns.Add((New-NearCol 'Asset' 'Asset Tag' 110))        | Out-Null
 $dgvNearby.Columns.Add((New-NearCol 'Location' 'Location' 120))      | Out-Null
 $dgvNearby.Columns.Add((New-NearCol 'Building' 'Building' 110))      | Out-Null
@@ -7323,6 +7335,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $r.Cells['Host'].Value      = $hostName
     $r.Cells['IP'].Value        = $cachedIp
     Update-NearbyIpTooltip -Cell $r.Cells['IP'] -IpAddress $cachedIp
+    $r.Cells['Subnet'].Value    = Get-NearbySubnetValue $cachedIp
     if ($cachedHostColor) {
       $resolvedColor = Resolve-NearbyHostColor $cachedHostColor
       if ($resolvedColor) { $r.Cells['Host'].Style.ForeColor = $resolvedColor }
