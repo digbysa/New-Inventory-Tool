@@ -6833,7 +6833,7 @@ function Update-NearbyIpTooltip {
 function Get-NearbySubnetValue {
   param([string]$IpAddress)
 
-  if([string]::IsNullOrWhiteSpace($IpAddress)){ return 'Unknown' }
+  if([string]::IsNullOrWhiteSpace($IpAddress)){ return '' }
   $ip = $IpAddress.Trim()
   if($ip.StartsWith('10.64.')){ return 'VPN' }
   $label = Get-SiteSubnetLabelForIp $ip
