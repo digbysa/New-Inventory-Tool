@@ -2424,6 +2424,7 @@ $panelTop.AutoSize = $true
 $panelTop.AutoSizeMode = 'GrowAndShrink'
 $panelTop.Padding = New-Object System.Windows.Forms.Padding($GAP, $GAP, $GAP, 0)
 $panelTop.BackColor = $script:ThemeColors.Header
+$panelTop.Visible = $false
 # Row 1: Paths + counters
 $flpTop = New-Object System.Windows.Forms.FlowLayoutPanel
 $flpTop.Dock = 'Top'
