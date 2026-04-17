@@ -82,7 +82,7 @@
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
-                        <TextBlock Text="AO400568"
+                        <TextBlock Text="-"
                                    Foreground="White"
                                    FontSize="40"
                                    FontWeight="SemiBold">

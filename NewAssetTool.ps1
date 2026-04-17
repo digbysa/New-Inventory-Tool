@@ -5562,6 +5562,11 @@ function Focus-ScanInput(){
   }
 }
 function Do-Lookup(){
+  try {
+    if ($tabTop -and $tabPageMain) {
+      $tabTop.SelectedTab = $tabPageMain
+    }
+  } catch {}
   Stop-RoundingTimer
   $scanText = Get-CurrentSearchInputText
   $raw = Find-RecordRaw $scanText
