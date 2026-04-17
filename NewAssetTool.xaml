@@ -43,8 +43,7 @@
                             <TextBlock Text="NEW INVENTORY TOOL"
                                        Foreground="#FF8CEEFF"
                                        FontSize="10"
-                                       FontWeight="SemiBold"
-                                       CharacterSpacing="120"/>
+                                       FontWeight="SemiBold"/>
                         </Border>
                         <Border BorderBrush="#33FFFFFF" BorderThickness="1" CornerRadius="8" Padding="8,3">
                             <TextBlock Text="{Binding SelectedSiteName, TargetNullValue=Cowichan Site}"
