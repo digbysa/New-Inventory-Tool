@@ -11,6 +11,25 @@
         MinWidth="1100"
         MinHeight="700"
         WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Grid x:Name="RootGrid" Margin="8">
         <Grid.LayoutTransform>
             <ScaleTransform x:Name="RootScaleTransform"
@@ -39,13 +58,13 @@
 
                 <StackPanel Grid.Row="0" Grid.Column="0" VerticalAlignment="Top">
                     <StackPanel Orientation="Horizontal">
-                        <Border Background="#1937A5C9" CornerRadius="8" Padding="8,3" Margin="0,0,8,0">
+                        <Border Background="#1937A5C9" CornerRadius="12" Padding="8,3" Margin="0,0,8,0">
                             <TextBlock Text="NEW INVENTORY TOOL"
                                        Foreground="#FF8CEEFF"
                                        FontSize="10"
                                        FontWeight="SemiBold"/>
                         </Border>
-                        <Border BorderBrush="#33FFFFFF" BorderThickness="1" CornerRadius="8" Padding="8,3">
+                        <Border BorderBrush="#33FFFFFF" BorderThickness="1" CornerRadius="12" Padding="8,3">
                             <TextBlock Text="{Binding SelectedSiteName, TargetNullValue=Cowichan Site}"
                                        Foreground="#FFD3DBEE"
                                        FontSize="10"/>
