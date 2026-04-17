@@ -6986,6 +6986,7 @@ function Set-NearbySelectedStatus {
   foreach ($row in $dgvNearby.SelectedRows) {
     try {
       $cell = $row.Cells['Status']
+      if ($cell -and $cell.ReadOnly) { continue }
       if ($cell -and $cell -is [System.Windows.Forms.DataGridViewComboBoxCell]) {
         if (-not $cell.Items.Contains($Value)) { [void]$cell.Items.Add($Value) }
       }
@@ -7354,7 +7355,26 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $r.Cells['MaintenanceType'].Value = Get-MaintenanceTypeOrDefault $mtRaw ([string]$pc.name)
     $r.Cells['LastRounded'].Value = (Fmt-DateLong $lr)
     $r.Cells['DaysAgo'].Value   = $days
-    $r.Cells['Status'].Value    = "—"
+    $eventStatus = $null
+    if($roundingEvent){
+      $eventStatus = Get-RoundingEventField $roundingEvent 'CheckStatus'
+    }
+    $statusCell = $r.Cells['Status']
+    if($statusCell -and $statusCell -is [System.Windows.Forms.DataGridViewComboBoxCell]){
+      if($eventStatus){
+        if(-not $statusCell.Items.Contains($eventStatus)){ [void]$statusCell.Items.Add($eventStatus) }
+        $statusCell.Value = $eventStatus
+        $statusCell.DisplayStyle = [System.Windows.Forms.DataGridViewComboBoxDisplayStyle]::Nothing
+        $statusCell.ReadOnly = $true
+        $statusCell.Style.BackColor = [System.Drawing.Color]::WhiteSmoke
+      } else {
+        $statusCell.Value = "—"
+        $statusCell.DisplayStyle = [System.Windows.Forms.DataGridViewComboBoxDisplayStyle]::ComboBox
+        $statusCell.ReadOnly = $false
+      }
+    } else {
+      $r.Cells['Status'].Value = if($eventStatus){ $eventStatus } else { "—" }
+    }
     $r.Cells['AT_KEY'].Value    = $atKey
     $r.Cells['TODAY'].Value     = if ($isToday) { "1" } else { "0" }
     $r.Cells['LRRAW'].Value     = if ($lr) { $lr.ToString("o") } else { "" }
@@ -7481,6 +7501,7 @@ $file = Join-Path ($(if($script:OutputFolder){$script:OutputFolder}else{$script:
   $saved = 0
   foreach ($row in $dgvNearby.Rows) {
     if ($row.IsNewRow) { continue }
+    if ($row.Cells['Status'] -and $row.Cells['Status'].ReadOnly) { continue }
     $status = [string]$row.Cells['Status'].Value
     if (-not $status -or $status -eq '—') { continue }
     $asset = [string]$row.Cells['Asset'].Value
