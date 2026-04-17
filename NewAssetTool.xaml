@@ -2,61 +2,137 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wfi="clr-namespace:System.Windows.Forms.Integration;assembly=WindowsFormsIntegration"
         Title="{Binding SelectedSiteName, StringFormat=New Inventory Tool - {0}}"
-        Background="#FFF8F9FB"
+        Background="#FFF3F5F9"
         FontFamily="Segoe UI"
-        FontSize="15"
+        FontSize="14"
         WindowState="Normal"
         ResizeMode="CanResize"
         SizeToContent="Height"
-        MinWidth="1024"
-        MinHeight="640"
+        MinWidth="1100"
+        MinHeight="700"
         WindowStartupLocation="CenterScreen">
-    <Grid x:Name="RootGrid">
+    <Grid x:Name="RootGrid" Margin="8">
         <Grid.LayoutTransform>
             <ScaleTransform x:Name="RootScaleTransform"
                             ScaleX="1"
                             ScaleY="1"/>
         </Grid.LayoutTransform>
+
         <Grid.RowDefinitions>
-            <RowDefinition Height="42"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Margin="24,0"
-                Height="42"
-                Background="#FFFDFDFE"
-                BorderBrush="Black"
-                BorderThickness="0.5"
-                CornerRadius="6"
-                VerticalAlignment="Center">
+                CornerRadius="22,22,0,0"
+                Background="#FF0D1B3B"
+                Padding="18,14,18,12">
             <Grid>
-                <TextBox x:Name="SearchTextBox"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         FontSize="16"
-                         Padding="12,10"
-                         VerticalContentAlignment="Center"/>
-                <TextBlock Text="Scan / Enter Name, SN# or Asset Tag ⌕"
-                           Margin="12,0"
-                           VerticalAlignment="Center"
-                           Foreground="#FF8A92A6"
-                           IsHitTestVisible="False">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Text, ElementName=SearchTextBox}" Value="">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="600"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Row="0" Grid.Column="0" VerticalAlignment="Top">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Background="#1937A5C9" CornerRadius="8" Padding="8,3" Margin="0,0,8,0">
+                            <TextBlock Text="NEW INVENTORY TOOL"
+                                       Foreground="#FF8CEEFF"
+                                       FontSize="10"
+                                       FontWeight="SemiBold"
+                                       CharacterSpacing="120"/>
+                        </Border>
+                        <Border BorderBrush="#33FFFFFF" BorderThickness="1" CornerRadius="8" Padding="8,3">
+                            <TextBlock Text="{Binding SelectedSiteName, TargetNullValue=Cowichan Site}"
+                                       Foreground="#FFD3DBEE"
+                                       FontSize="10"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="AO400568"
+                               Margin="0,10,0,0"
+                               Foreground="White"
+                               FontSize="40"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="Cleaner workflow for lookup, validation, rounding, and location review."
+                               Margin="0,4,0,0"
+                               Foreground="#FFB3C0DA"
+                               FontSize="13"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="0" Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Top">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="110"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0"
+                                Height="42"
+                                Background="#FF2A3754"
+                                BorderBrush="#335D6886"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Margin="0,0,10,0">
+                            <Grid>
+                                <TextBox x:Name="SearchTextBox"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Foreground="White"
+                                         FontSize="15"
+                                         Padding="14,0"
+                                         VerticalContentAlignment="Center"/>
+                                <TextBlock Text="Search device / asset / serial"
+                                           Margin="14,0,14,0"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Right"
+                                           Foreground="#FFD0D8EA"
+                                           IsHitTestVisible="False">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text, ElementName=SearchTextBox}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </Border>
+
+                        <Button Grid.Column="1"
+                                Height="42"
+                                Content="Lookup"
+                                FontWeight="SemiBold"
+                                Background="#FF19D4F2"
+                                Foreground="#FF0D1B3B"
+                                BorderThickness="0"
+                                Cursor="Hand"
+                                Padding="14,0"/>
+                    </Grid>
+
+                    <StackPanel Margin="0,10,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Main" Width="62" Height="30" Margin="0,0,8,0" Background="White" Foreground="#FF0D1B3B" BorderThickness="0"/>
+                        <Button Content="Nearby" Width="62" Height="30" Margin="0,0,8,0" Background="Transparent" Foreground="White" BorderBrush="#33FFFFFF" BorderThickness="1"/>
+                        <Button Content="History" Width="62" Height="30" Margin="0,0,8,0" Background="Transparent" Foreground="White" BorderBrush="#33FFFFFF" BorderThickness="1"/>
+                        <Button Content="Validation" Width="80" Height="30" Background="Transparent" Foreground="White" BorderBrush="#33FFFFFF" BorderThickness="1"/>
+                    </StackPanel>
+                </StackPanel>
             </Grid>
         </Border>
 
-        <wfi:WindowsFormsHost x:Name="WinFormsHost"
-                              Grid.Row="1"/>
+        <Border Grid.Row="1"
+                Background="#FFEFF2F7"
+                BorderBrush="#FFD4DCEB"
+                BorderThickness="1"
+                CornerRadius="0,0,22,22"
+                Padding="0,14,0,0">
+            <wfi:WindowsFormsHost x:Name="WinFormsHost" Margin="0"/>
+        </Border>
     </Grid>
 </Window>
