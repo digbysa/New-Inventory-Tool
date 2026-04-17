@@ -6577,7 +6577,7 @@ function Build-LatestRoundingEventIndex {
         try { $timestamp = [datetime]::Parse($timestampRaw) } catch {}
       }
       if(-not $timestamp){ continue }
-      if(-not $script:LatestRoundingTimestampByAsset.ContainsKey($candidate) -or $timestamp -gt $script:LatestRoundingTimestampByAsset[$candidate]){
+      if(-not $script:LatestRoundingTimestampByAsset.ContainsKey($candidate) -or $timestamp -ge $script:LatestRoundingTimestampByAsset[$candidate]){
         $script:LatestRoundingTimestampByAsset[$candidate] = $timestamp
         $script:LatestRoundingEventByAsset[$candidate] = $e
       }
@@ -6602,7 +6602,7 @@ function Update-LatestRoundingEventIndexForEvent {
     if(-not $timestamp){ return }
     if(-not $script:LatestRoundingTimestampByAsset){ $script:LatestRoundingTimestampByAsset = @{} }
     if(-not $script:LatestRoundingEventByAsset){ $script:LatestRoundingEventByAsset = @{} }
-    if(-not $script:LatestRoundingTimestampByAsset.ContainsKey($candidate) -or $timestamp -gt $script:LatestRoundingTimestampByAsset[$candidate]){
+    if(-not $script:LatestRoundingTimestampByAsset.ContainsKey($candidate) -or $timestamp -ge $script:LatestRoundingTimestampByAsset[$candidate]){
       $script:LatestRoundingTimestampByAsset[$candidate] = $timestamp
       $script:LatestRoundingEventByAsset[$candidate] = $Event
     }
@@ -6989,7 +6989,7 @@ function Set-NearbySelectedStatus {
       if ($cell -and $cell -is [System.Windows.Forms.DataGridViewComboBoxCell]) {
         if (-not $cell.Items.Contains($Value)) { [void]$cell.Items.Add($Value) }
       }
-      if ($row -and $row.Cells['Status']) {
+      if ($row -and $row.Cells['Status'] -and -not $row.Cells['Status'].ReadOnly) {
         $row.Cells['Status'].Value = $Value
         $count++
       }
@@ -7354,7 +7354,17 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $r.Cells['MaintenanceType'].Value = Get-MaintenanceTypeOrDefault $mtRaw ([string]$pc.name)
     $r.Cells['LastRounded'].Value = (Fmt-DateLong $lr)
     $r.Cells['DaysAgo'].Value   = $days
-    $r.Cells['Status'].Value    = "—"
+    $statusValue = "—"
+    $statusReadOnly = $false
+    if ($isToday -and $chkTodayRounded.Checked -and $roundingEvent) {
+      $eventCheckStatus = Get-RoundingEventField $roundingEvent 'CheckStatus'
+      if (-not [string]::IsNullOrWhiteSpace($eventCheckStatus)) {
+        $statusValue = $eventCheckStatus
+      }
+      $statusReadOnly = $true
+    }
+    $r.Cells['Status'].Value    = $statusValue
+    $r.Cells['Status'].ReadOnly = $statusReadOnly
     $r.Cells['AT_KEY'].Value    = $atKey
     $r.Cells['TODAY'].Value     = if ($isToday) { "1" } else { "0" }
     $r.Cells['LRRAW'].Value     = if ($lr) { $lr.ToString("o") } else { "" }
@@ -7366,6 +7376,8 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     }
     if ($isToday) {
       $r.DefaultCellStyle.ForeColor = [System.Drawing.Color]::Gray
+      $r.Cells['Status'].Style.ForeColor = [System.Drawing.Color]::Gray
+      $r.Cells['Status'].Style.SelectionForeColor = [System.Drawing.Color]::Gray
     }
   }
   # Apply sort and filters
