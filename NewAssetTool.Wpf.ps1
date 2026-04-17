@@ -215,6 +215,32 @@ if ($window) {
 
 $searchTextBox = $window.FindName('SearchTextBox')
 $lookupButton = $window.FindName('LookupButton')
+$bannerDeviceNameText = $window.FindName('BannerDeviceNameText')
+
+function Update-BannerDeviceName {
+  $bannerText = ''
+  try {
+    if ($txtParent) {
+      $bannerText = ('' + $txtParent.Text).Trim()
+    }
+  } catch {}
+  if ([string]::IsNullOrWhiteSpace($bannerText)) {
+    try {
+      if ($script:CurrentParent -and $script:CurrentParent.name) {
+        $bannerText = ('' + $script:CurrentParent.name).Trim()
+      }
+    } catch {}
+  }
+  if ([string]::IsNullOrWhiteSpace($bannerText)) {
+    $bannerText = '-'
+  }
+  try {
+    if ($bannerDeviceNameText) {
+      $bannerDeviceNameText.Text = $bannerText
+    }
+  } catch {}
+}
+
 if ($searchTextBox) {
   try { Set-ScanSearchControl $searchTextBox } catch {}
   $hasHandleScanTextChanged = $false
@@ -261,6 +287,7 @@ if ($searchTextBox) {
     if ($eventArgs.Key -in @([System.Windows.Input.Key]::Enter,[System.Windows.Input.Key]::Return)) {
       $eventArgs.Handled = $true
       try { Do-Lookup } catch {}
+      try { Update-BannerDeviceName } catch {}
     }
   })
   try { Focus-ScanInput } catch {}
@@ -274,8 +301,17 @@ if ($searchTextBox) {
 if ($lookupButton) {
   $lookupButton.Add_Click({
     try { Do-Lookup } catch {}
+    try { Update-BannerDeviceName } catch {}
   })
 }
+
+if ($txtParent) {
+  $txtParent.Add_TextChanged({
+    try { Update-BannerDeviceName } catch {}
+  })
+}
+
+try { Update-BannerDeviceName } catch {}
 
 $app = [System.Windows.Application]::Current
 if (-not $app) { $app = New-Object System.Windows.Application }
