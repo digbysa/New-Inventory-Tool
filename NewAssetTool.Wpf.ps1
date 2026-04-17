@@ -214,6 +214,7 @@ if ($window) {
 }
 
 $searchTextBox = $window.FindName('SearchTextBox')
+$lookupButton = $window.FindName('LookupButton')
 if ($searchTextBox) {
   try { Set-ScanSearchControl $searchTextBox } catch {}
   $hasHandleScanTextChanged = $false
@@ -268,6 +269,12 @@ if ($searchTextBox) {
       Update-RoundNowButtonState
     }
   } catch {}
+}
+
+if ($lookupButton) {
+  $lookupButton.Add_Click({
+    try { Do-Lookup } catch {}
+  })
 }
 
 $app = [System.Windows.Application]::Current

@@ -45,66 +45,85 @@
         <Border Grid.Row="0"
                 CornerRadius="22,22,0,0"
                 Background="#FF0D1B3B"
-                Padding="18,14,18,12">
+                Padding="18,14,18,6">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="340"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="600"/>
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Row="0" Grid.Column="0" VerticalAlignment="Top">
+                <StackPanel Grid.Column="0" VerticalAlignment="Top">
                     <StackPanel Orientation="Horizontal">
-                        <Border Background="#1937A5C9" CornerRadius="12" Padding="8,3" Margin="0,0,8,0">
+                        <Border Background="#1937A5C9" CornerRadius="12" Padding="12,5" Margin="0,0,8,0">
                             <TextBlock Text="NEW INVENTORY TOOL"
                                        Foreground="#FF8CEEFF"
-                                       FontSize="10"
+                                       FontSize="12"
                                        FontWeight="SemiBold"/>
                         </Border>
-                        <Border BorderBrush="#33FFFFFF" BorderThickness="1" CornerRadius="12" Padding="8,3">
+                        <Border BorderBrush="#33FFFFFF" BorderThickness="1" CornerRadius="12" Padding="12,5">
                             <TextBlock Text="{Binding SelectedSiteName, TargetNullValue=Cowichan Site}"
                                        Foreground="#FFD3DBEE"
-                                       FontSize="10"/>
+                                       FontSize="12"/>
                         </Border>
                     </StackPanel>
-                    <TextBlock Text="AO400568"
-                               Margin="0,10,0,0"
-                               Foreground="White"
-                               FontSize="40"
-                               FontWeight="SemiBold"/>
-                    <TextBlock Text="Cleaner workflow for lookup, validation, rounding, and location review."
-                               Margin="0,4,0,0"
-                               Foreground="#FFB3C0DA"
-                               FontSize="13"/>
+                    <Grid Margin="0,10,0,0">
+                        <TextBlock Foreground="White"
+                                   FontSize="40"
+                                   FontWeight="SemiBold"
+                                   Text="{Binding Text, ElementName=SearchTextBox}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Text, ElementName=SearchTextBox}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text="AO400568"
+                                   Foreground="White"
+                                   FontSize="40"
+                                   FontWeight="SemiBold">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Text, ElementName=SearchTextBox}" Value="">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
                 </StackPanel>
 
-                <StackPanel Grid.Row="0" Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Top">
+                <StackPanel Grid.Column="1" VerticalAlignment="Top">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="130"/>
                         </Grid.ColumnDefinitions>
 
                         <Border Grid.Column="0"
-                                Height="42"
+                                Height="50"
                                 Background="#FF2A3754"
                                 BorderBrush="#335D6886"
                                 BorderThickness="1"
                                 CornerRadius="12"
-                                Margin="0,0,10,0">
+                                Margin="0,0,12,0">
                             <Grid>
                                 <TextBox x:Name="SearchTextBox"
                                          Background="Transparent"
                                          BorderThickness="0"
                                          Foreground="White"
-                                         FontSize="15"
-                                         Padding="14,0"
+                                         FontSize="17"
+                                         Padding="16,0"
                                          VerticalContentAlignment="Center"/>
                                 <TextBlock Text="Search device / asset / serial"
-                                           Margin="14,0,14,0"
+                                           Margin="16,0,16,0"
                                            VerticalAlignment="Center"
                                            HorizontalAlignment="Right"
                                            Foreground="#FFD0D8EA"
@@ -123,8 +142,9 @@
                             </Grid>
                         </Border>
 
-                        <Button Grid.Column="1"
-                                Height="42"
+                        <Button x:Name="LookupButton"
+                                Grid.Column="1"
+                                Height="50"
                                 Content="Lookup"
                                 FontWeight="SemiBold"
                                 Background="#FF19D4F2"
@@ -133,13 +153,6 @@
                                 Cursor="Hand"
                                 Padding="14,0"/>
                     </Grid>
-
-                    <StackPanel Margin="0,10,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button Content="Main" Width="62" Height="30" Margin="0,0,8,0" Background="White" Foreground="#FF0D1B3B" BorderThickness="0"/>
-                        <Button Content="Nearby" Width="62" Height="30" Margin="0,0,8,0" Background="Transparent" Foreground="White" BorderBrush="#33FFFFFF" BorderThickness="1"/>
-                        <Button Content="History" Width="62" Height="30" Margin="0,0,8,0" Background="Transparent" Foreground="White" BorderBrush="#33FFFFFF" BorderThickness="1"/>
-                        <Button Content="Validation" Width="80" Height="30" Background="Transparent" Foreground="White" BorderBrush="#33FFFFFF" BorderThickness="1"/>
-                    </StackPanel>
                 </StackPanel>
             </Grid>
         </Border>
