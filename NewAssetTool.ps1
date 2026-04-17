@@ -6970,26 +6970,39 @@ function Invoke-NearbyPingAll {
   Invoke-NearbyPingRows -Rows $rows -EmptyMessage "No host names available to ping."
 }
 
+function Ensure-NearbyStatusOption {
+  param([string]$Value)
+  if ([string]::IsNullOrWhiteSpace($Value)) { return }
+
+  if (-not $script:NEAR_STATUSES) {
+    $script:NEAR_STATUSES = @('—')
+  }
+  if ($script:NEAR_STATUSES -contains $Value) { return }
+
+  $script:NEAR_STATUSES = @($script:NEAR_STATUSES + $Value)
+
+  try {
+    $col = $dgvNearby.Columns['Status']
+    if ($col -and $col -is [System.Windows.Forms.DataGridViewComboBoxColumn]) {
+      $col.DataSource = $null
+      $col.DataSource = $script:NEAR_STATUSES
+    }
+  } catch {}
+}
+
 function Set-NearbySelectedStatus {
   param(
     [string]$Value,
     [switch]$ShowConfirmation
   )
   if ([string]::IsNullOrWhiteSpace($Value)) { return }
-  try {
-    $col = $dgvNearby.Columns['Status']
-    if ($col -and $col -is [System.Windows.Forms.DataGridViewComboBoxColumn]) {
-      if (-not $col.Items.Contains($Value)) { [void]$col.Items.Add($Value) }
-    }
-  } catch {}
+  Ensure-NearbyStatusOption $Value
+
   $count = 0
   foreach ($row in $dgvNearby.SelectedRows) {
     try {
       $cell = $row.Cells['Status']
       if ($cell -and $cell.ReadOnly) { continue }
-      if ($cell -and $cell -is [System.Windows.Forms.DataGridViewComboBoxCell]) {
-        if (-not $cell.Items.Contains($Value)) { [void]$cell.Items.Add($Value) }
-      }
       if ($row -and $row.Cells['Status']) {
         $row.Cells['Status'].Value = $Value
         $count++
@@ -7362,7 +7375,7 @@ try { $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor } catch {}
     $statusCell = $r.Cells['Status']
     if($statusCell -and $statusCell -is [System.Windows.Forms.DataGridViewComboBoxCell]){
       if($eventStatus){
-        if(-not $statusCell.Items.Contains($eventStatus)){ [void]$statusCell.Items.Add($eventStatus) }
+        Ensure-NearbyStatusOption $eventStatus
         $statusCell.Value = $eventStatus
         $statusCell.DisplayStyle = [System.Windows.Forms.DataGridViewComboBoxDisplayStyle]::Nothing
         $statusCell.ReadOnly = $true
@@ -7601,14 +7614,8 @@ Update-ScopeLabel
 function Get-StatusOptionsFromGrid {
   $opts = New-Object System.Collections.Generic.List[string]
   try {
-    $col = $dgvNearby.Columns['Status']
-    if ($col -and $col -is [System.Windows.Forms.DataGridViewComboBoxColumn]) {
-      foreach ($i in $col.Items) { $opts.Add([string]$i) }
-    } elseif ($dgvNearby.Rows.Count -gt 0) {
-      $cell0 = $dgvNearby.Rows[0].Cells['Status']
-      if ($cell0 -and $cell0 -is [System.Windows.Forms.DataGridViewComboBoxCell]) {
-        foreach ($i in $cell0.Items) { $opts.Add([string]$i) }
-      }
+    if ($script:NEAR_STATUSES) {
+      foreach ($i in $script:NEAR_STATUSES) { $opts.Add([string]$i) }
     }
   } catch {}
   if ($opts.Count -eq 0) {
