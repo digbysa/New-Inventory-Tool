@@ -417,26 +417,16 @@ function Invoke-NewAssetToolWpfScale {
   } catch {}
 }
 $script:ThemeColors = @{
-  Background         = [System.Drawing.Color]::FromArgb(241, 245, 249)
-  Surface            = [System.Drawing.Color]::FromArgb(255, 255, 255)
-  Header             = [System.Drawing.Color]::FromArgb(28, 43, 63)
-  HeaderAccent       = [System.Drawing.Color]::FromArgb(45, 94, 140)
-  HeaderText         = [System.Drawing.Color]::FromArgb(240, 246, 252)
-  Text               = [System.Drawing.Color]::FromArgb(32, 40, 52)
-  MutedText          = [System.Drawing.Color]::FromArgb(94, 106, 120)
-  Accent             = [System.Drawing.Color]::FromArgb(18, 136, 214)
-  AccentHover        = [System.Drawing.Color]::FromArgb(11, 112, 182)
-  AccentSubtle       = [System.Drawing.Color]::FromArgb(225, 240, 252)
-  Border             = [System.Drawing.Color]::FromArgb(213, 221, 230)
-  Grid               = [System.Drawing.Color]::FromArgb(224, 232, 240)
-  AltRow             = [System.Drawing.Color]::FromArgb(248, 251, 255)
-  Selection          = [System.Drawing.Color]::FromArgb(212, 233, 250)
-  Success            = [System.Drawing.Color]::FromArgb(30, 133, 74)
-  SuccessSoft        = [System.Drawing.Color]::FromArgb(220, 245, 230)
-  Warning            = [System.Drawing.Color]::FromArgb(185, 122, 0)
-  WarningSoft        = [System.Drawing.Color]::FromArgb(255, 242, 208)
-  Danger             = [System.Drawing.Color]::FromArgb(167, 53, 74)
-  DangerSoft         = [System.Drawing.Color]::FromArgb(252, 229, 235)
+  Background = [System.Drawing.Color]::FromArgb(248, 249, 251)
+  Surface    = [System.Drawing.Color]::FromArgb(255, 255, 255)
+  Header     = [System.Drawing.Color]::FromArgb(246, 247, 249)
+  Text       = [System.Drawing.Color]::FromArgb(32, 32, 32)
+  MutedText  = [System.Drawing.Color]::FromArgb(90, 90, 90)
+  Accent     = [System.Drawing.Color]::FromArgb(0, 120, 212)
+  AccentHover= [System.Drawing.Color]::FromArgb(0, 102, 189)
+  Grid       = [System.Drawing.Color]::FromArgb(230, 234, 238)
+  AltRow     = [System.Drawing.Color]::FromArgb(250, 252, 255)
+  Selection  = [System.Drawing.Color]::FromArgb(229, 241, 251)
 }
 $script:NewAssetToolSearchTextBox = $null
 function Set-ScanSearchControl {
@@ -829,29 +819,6 @@ function Set-RoundedCorners {
   $applyRegion.Invoke($Control, [System.EventArgs]::Empty)
 }
 
-function Style-CardGroup {
-  param([System.Windows.Forms.GroupBox]$Group)
-  if (-not $Group) { return }
-  try {
-    $Group.ForeColor = $script:ThemeColors.Text
-    $Group.BackColor = $script:ThemeColors.Surface
-    $Group.Padding = New-Object System.Windows.Forms.Padding(14, 12, 14, 14)
-    $Group.Margin = New-Object System.Windows.Forms.Padding(10)
-    $Group.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
-  } catch {}
-}
-
-function Style-PanelAsCard {
-  param([System.Windows.Forms.Panel]$Panel, [int]$Padding = 10)
-  if (-not $Panel) { return }
-  try {
-    $Panel.BackColor = $script:ThemeColors.Surface
-    $Panel.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-    $Panel.Padding = New-Object System.Windows.Forms.Padding($Padding)
-    $Panel.Margin = New-Object System.Windows.Forms.Padding(0)
-  } catch {}
-}
-
 # --- DataGridView modern style (dark, compact, anti-flicker) ---
 function Style-DataGridView {
   param([System.Windows.Forms.DataGridView]$Dgv)
@@ -863,8 +830,6 @@ function Style-DataGridView {
   $Dgv.BackgroundColor = $script:ThemeColors.Surface
   $Dgv.EnableHeadersVisualStyles = $false
   $Dgv.GridColor = $script:ThemeColors.Grid
-  $Dgv.CellBorderStyle = [System.Windows.Forms.DataGridViewCellBorderStyle]::SingleHorizontal
-  $Dgv.ColumnHeadersBorderStyle = [System.Windows.Forms.DataGridViewHeaderBorderStyle]::Single
   $Dgv.RowHeadersVisible = $false
   $Dgv.AutoSizeColumnsMode = 'Fill'
   $Dgv.SelectionMode = 'FullRowSelect'
@@ -886,16 +851,14 @@ function Style-DataGridView {
   $Dgv.AlternatingRowsDefaultCellStyle.BackColor = $bg2
 
   $Dgv.ColumnHeadersDefaultCellStyle.BackColor = $header
-  $Dgv.ColumnHeadersDefaultCellStyle.ForeColor = $script:ThemeColors.HeaderText
-  $Dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = $script:ThemeColors.HeaderAccent
+  $Dgv.ColumnHeadersDefaultCellStyle.ForeColor = $fg
+  $Dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = $header
   $Dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = $fg
   $Dgv.ColumnHeadersDefaultCellStyle.Font = $script:ThemeFontSemibold
-  $Dgv.ColumnHeadersHeight = 32
-  $Dgv.ColumnHeadersHeightSizeMode = [System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode]::DisableResizing
   $Dgv.RowHeadersDefaultCellStyle.BackColor = $header
-  $Dgv.RowHeadersDefaultCellStyle.ForeColor = $script:ThemeColors.HeaderText
+  $Dgv.RowHeadersDefaultCellStyle.ForeColor = $fg
   $Dgv.RowHeadersDefaultCellStyle.SelectionBackColor = $header
-  $Dgv.RowHeadersDefaultCellStyle.SelectionForeColor = $script:ThemeColors.HeaderText
+  $Dgv.RowHeadersDefaultCellStyle.SelectionForeColor = $fg
   foreach ($c in $Dgv.Columns) { $c.MinimumWidth = 60 }
 }
 
@@ -930,9 +893,9 @@ function Set-ModernTheme {
   foreach ($ctl in $Root.Controls) {
     switch -Regex ($ctl.GetType().FullName) {
       'System\.Windows\.Forms\.StatusStrip|System\.Windows\.Forms\.ToolStrip|System\.Windows\.Forms\.MenuStrip|System\.Windows\.Forms\.ContextMenuStrip' {
-        $ctl.BackColor = $bgHeader; $ctl.ForeColor = $script:ThemeColors.HeaderText
+        $ctl.BackColor = $bgHeader; $ctl.ForeColor = $fgText
       }
-      'System\.Windows\.Forms\.(Panel|TableLayoutPanel|FlowLayoutPanel)' {
+      'System\.Windows\.Forms\.(Panel|GroupBox|TableLayoutPanel|FlowLayoutPanel)' {
         $ctl.BackColor = $bgPane; $ctl.ForeColor = $fgText
       }
       'System\.Windows\.Forms\.TabControl' {
@@ -949,34 +912,25 @@ function Set-ModernTheme {
         } catch { $ctl.ForeColor = $fgText }
       }
       'System\.Windows\.Forms\.Button|ModernUI\.RoundedButton' {
-        try { $ctl.FlatStyle = 'Flat' } catch {}
-        try { $ctl.UseVisualStyleBackColor = $false } catch {}
-        try { $ctl.FlatAppearance.BorderSize = 1 } catch {}
-        try { $ctl.FlatAppearance.BorderColor = $script:ThemeColors.Border } catch {}
-        $ctl.BackColor = [System.Drawing.Color]::White
-        $ctl.ForeColor = if ($ctl.Enabled) { $script:ThemeColors.Text } else { [System.Drawing.Color]::FromArgb(156,164,173) }
-        $buttonText = ''
-        try { $buttonText = ('' + $ctl.Text).ToLowerInvariant() } catch {}
-        if ($buttonText -match 'save|complete|validate|add|show') {
-          $ctl.BackColor = $accent
-          $ctl.ForeColor = [System.Drawing.Color]::White
-          try { $ctl.FlatAppearance.BorderColor = $accent } catch {}
-        } elseif ($buttonText -match 'remove|cancel|clear') {
-          $ctl.BackColor = [System.Drawing.Color]::White
-          $ctl.ForeColor = $script:ThemeColors.Danger
-          try { $ctl.FlatAppearance.BorderColor = $script:ThemeColors.Danger } catch {}
+        try { $ctl.FlatStyle = 'Standard' } catch {}
+        try { $ctl.UseVisualStyleBackColor = $true } catch {}
+        $ctl.BackColor = [System.Drawing.SystemColors]::Control
+        if ($ctl.Enabled) {
+          $ctl.ForeColor = [System.Drawing.SystemColors]::ControlText
+        } else {
+          $ctl.ForeColor = [System.Drawing.Color]::FromArgb(160,160,160)
         }
         if ($ctl -is [ModernUI.RoundedButton]) {
-          $ctl.CornerRadius = 6
+          $ctl.CornerRadius = 4
         }
       }
       'System\.Windows\.Forms\.TextBox' {
         $ctl.BorderStyle = 'FixedSingle'
-        $ctl.BackColor = if ($ctl.ReadOnly) { [System.Drawing.Color]::FromArgb(251, 253, 255) } else { [System.Drawing.Color]::White }
+        $ctl.BackColor = [System.Drawing.Color]::White
         $ctl.ForeColor = $fgText
       }
       'System\.Windows\.Forms\.ComboBox' {
-        $ctl.FlatStyle = 'Flat'
+        $ctl.FlatStyle = 'Standard'
         $ctl.BackColor = [System.Drawing.Color]::White
         $ctl.ForeColor = $fgText
         $tagValues = @()
@@ -1010,9 +964,6 @@ function Set-ModernTheme {
       }
       'System\.Windows\.Forms\.CheckBox|System\.Windows\.Forms\.RadioButton' {
         $ctl.ForeColor = $fgText; $ctl.BackColor = [System.Drawing.Color]::Transparent
-      }
-      'System\.Windows\.Forms\.GroupBox' {
-        Style-CardGroup -Group $ctl
       }
       'System\.Windows\.Forms\.DataGridView' { Style-DataGridView $ctl }
     }
@@ -1065,25 +1016,6 @@ function Apply-ModernThemeToForm {
     }) { Enable-DoubleBuffer $container }
 
   foreach ($dgv in $all | Where-Object { $_ -is [System.Windows.Forms.DataGridView] }) { Style-DataGridView $dgv }
-
-  foreach ($tabs in $all | Where-Object { $_ -is [System.Windows.Forms.TabControl] }) {
-    try {
-      $tabs.Appearance = [System.Windows.Forms.TabAppearance]::Normal
-      $tabs.DrawMode = [System.Windows.Forms.TabDrawMode]::Normal
-      $tabs.Padding = New-Object System.Drawing.Point(18, 8)
-      $tabs.BackColor = $script:ThemeColors.Background
-      $tabs.ForeColor = $script:ThemeColors.Text
-    } catch {}
-  }
-
-  foreach ($strip in $all | Where-Object { $_ -is [System.Windows.Forms.StatusStrip] }) {
-    try {
-      $strip.SizingGrip = $false
-      $strip.BackColor = $script:ThemeColors.Header
-      $strip.ForeColor = $script:ThemeColors.HeaderText
-      $strip.Padding = New-Object System.Windows.Forms.Padding(8,2,8,2)
-    } catch {}
-  }
 
   $Form.Add_Shown({ Enable-ModernWindowEffects $Form -Mica })
 }
@@ -2490,7 +2422,7 @@ $panelTop = New-Object System.Windows.Forms.Panel
 $panelTop.Dock = 'Top'
 $panelTop.AutoSize = $true
 $panelTop.AutoSizeMode = 'GrowAndShrink'
-$panelTop.Padding = New-Object System.Windows.Forms.Padding(16, 12, 16, 8)
+$panelTop.Padding = New-Object System.Windows.Forms.Padding($GAP, $GAP, $GAP, 0)
 $panelTop.BackColor = $script:ThemeColors.Header
 # Row 1: Paths + counters
 $flpTop = New-Object System.Windows.Forms.FlowLayoutPanel
@@ -2500,22 +2432,19 @@ $flpTop.AutoSizeMode = 'GrowAndShrink'
 $flpTop.WrapContents = $false
 $flpTop.FlowDirection = 'LeftToRight'
 $flpTop.Margin = '0,0,0,0'
-$flpTop.Padding = '0,0,0,4'
+$flpTop.Padding = '0,0,0,0'
 $lblDataPath = New-Object System.Windows.Forms.Label
 $lblDataPath.Text = "Data: (not set)"
 $lblDataPath.AutoSize = $true
 $lblDataPath.Margin = '0,6,12,0'
-$lblDataPath.ForeColor = $script:ThemeColors.HeaderText
 $lblOutputPath = New-Object System.Windows.Forms.Label
 $lblOutputPath.Text = "Output: (not set)"
 $lblOutputPath.AutoSize = $true
 $lblOutputPath.Margin = '0,6,12,0'
-$lblOutputPath.ForeColor = $script:ThemeColors.HeaderText
 $lblDataStatus = New-Object System.Windows.Forms.Label
 $lblDataStatus.Text = "Computers: 0 | Monitors: 0 | Mics: 0 | Scanners: 0 | Carts: 0 | Locations: 0"
 $lblDataStatus.AutoSize = $true
 $lblDataStatus.Margin = '0,6,0,0'
-$lblDataStatus.ForeColor = $script:ThemeColors.HeaderText
 $flpTop.Visible = $false  # moved to status bar
 # Row 2: Scan box logic (UI hosted in WPF shell)
 $txtScan = New-Object System.Windows.Forms.TextBox
@@ -2593,8 +2522,8 @@ if ($global:NewAssetToolPerMonitorDpiContextEnabled) {
 $splitter.SplitterDistance = $LEFT_COL_WIDTH
 $splitter.SplitterWidth = 6
 $splitter.IsSplitterFixed = $false
-$splitter.Padding = New-Object System.Windows.Forms.Padding(14)
-$splitter.BackColor = $script:ThemeColors.Background
+$splitter.Padding = New-Object System.Windows.Forms.Padding(16)
+$splitter.BackColor = [System.Drawing.Color]::White
 Set-SplitterMinimums -target $splitter -panel1Desired $LEFT_COL_WIDTH -panel2Desired $PANEL2_MIN_WIDTH
 function New-L($t,$x,$y){$l=New-Object System.Windows.Forms.Label;$l.Text=$t;$l.AutoSize=$true;$l.Location=New-Object System.Drawing.Point($x,$y);$l}
 function New-RO($x,$y,$w){$t=New-Object System.Windows.Forms.TextBox;$t.Location="$x,$y";$t.Size="$w,24";$t.ReadOnly=$true;$t.BackColor='White';$t}
@@ -2603,8 +2532,8 @@ $tlpLeft = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpLeft.Dock = 'Fill'
 $tlpLeft.ColumnCount = 1
 $tlpLeft.RowCount = 2
-$tlpLeft.Margin = New-Object System.Windows.Forms.Padding(10, 10, 5, 10)
-$tlpLeft.Padding = New-Object System.Windows.Forms.Padding(6)
+$tlpLeft.Margin = New-Object System.Windows.Forms.Padding($GAP, $GAP, 3, $GAP)
+$tlpLeft.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tlpLeft.RowStyles.Clear()
 $tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
 $tlpLeft.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
@@ -2614,15 +2543,15 @@ $grpSummary = New-Object System.Windows.Forms.GroupBox; $grpSummary.Text="Device
 $grpSummary.AutoSize = $true
 $grpSummary.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $grpSummary.Dock = 'Top'
-$grpSummary.Margin = New-Object System.Windows.Forms.Padding(8,8,8,10)
-$grpSummary.Padding = New-Object System.Windows.Forms.Padding(14,12,14,14)
+$grpSummary.Margin = New-Object System.Windows.Forms.Padding($GAP)
+$grpSummary.Padding = New-Object System.Windows.Forms.Padding($GAP)
 
 $tlpSummary = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpSummary.AutoSize = $true
 $tlpSummary.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $tlpSummary.Dock = 'Top'
 $tlpSummary.Margin = New-Object System.Windows.Forms.Padding(0)
-$tlpSummary.Padding = New-Object System.Windows.Forms.Padding(0,2,0,0)
+$tlpSummary.Padding = New-Object System.Windows.Forms.Padding(0)
 
 $tlpSummary.ColumnCount = 2
 $tlpSummary.RowCount = 0
@@ -2706,7 +2635,7 @@ $nameRow.Dock = 'Fill'
 
 $btnCopyHost = New-Object System.Windows.Forms.Button
 $btnCopyHost.Text = "📋"
-$btnCopyHost.Size = '30,26'
+$btnCopyHost.Size = '28,24'
 $btnCopyHost.Margin = New-Object System.Windows.Forms.Padding(0,0,2,0)
 $btnCopyHost.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
 $btnCopyHost.UseVisualStyleBackColor = $true
@@ -2749,7 +2678,7 @@ $nameValueRow.Controls.Add($txtHost,0,0)
 
 $btnFixName = New-Object ModernUI.RoundedButton
 $btnFixName.Text = "Fix"
-$btnFixName.Size = '66,26'
+$btnFixName.Size = '60,24'
 $btnFixName.Anchor = 'Top,Right'
 $btnFixName.Margin = New-Object System.Windows.Forms.Padding(6,0,0,0)
 $btnFixName.Enabled = $false
@@ -2787,31 +2716,20 @@ $txtRetire = New-SummaryTextBox
 Add-SummaryRow -LabelText 'Retire Date:' -Control $txtRetire
 
 $txtRound = New-SummaryTextBox -IsLast $true
-$roundStatusPanel = New-Object System.Windows.Forms.Panel
-$roundStatusPanel.Dock = 'Fill'
-$roundStatusPanel.Margin = New-Object System.Windows.Forms.Padding(12,8,0,$GAP)
-$roundStatusPanel.Padding = New-Object System.Windows.Forms.Padding(8,6,8,6)
-$roundStatusPanel.BackColor = $script:ThemeColors.WarningSoft
-$roundStatusPanel.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-$txtRound.Margin = New-Object System.Windows.Forms.Padding(0)
-$txtRound.Dock = 'Fill'
-$txtRound.MinimumSize = New-Object System.Drawing.Size(0,28)
-$txtRound.Height = 28
-$roundStatusPanel.Controls.Add($txtRound)
-Add-SummaryRow -LabelText 'Last Rounded:' -Control $roundStatusPanel
+Add-SummaryRow -LabelText 'Last Rounded:' -Control $txtRound
 
 $grpSummary.Controls.Add($tlpSummary)
 # Device Location (with City)
 $grpLoc = New-Object System.Windows.Forms.GroupBox; $grpLoc.Text="Device Location"; $grpLoc.Dock='Fill'
-$grpLoc.Margin = New-Object System.Windows.Forms.Padding(8,0,8,8)
-$grpLoc.Padding = New-Object System.Windows.Forms.Padding(14,12,14,14)
+$grpLoc.Margin = New-Object System.Windows.Forms.Padding($GAP)
+$grpLoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
 
 $tlpLoc = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpLoc.Dock = 'Fill'
 $tlpLoc.ColumnCount = 2
 $tlpLoc.RowCount = 0
 $tlpLoc.Margin = New-Object System.Windows.Forms.Padding(0)
-$tlpLoc.Padding = New-Object System.Windows.Forms.Padding(0,2,0,0)
+$tlpLoc.Padding = New-Object System.Windows.Forms.Padding(0)
 $tlpLoc.ColumnStyles.Clear()
 $tlpLoc.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $tlpLoc.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
@@ -2822,7 +2740,7 @@ function Add-LocLabel([string]$text, [bool]$isFirst){
   $label = New-Object System.Windows.Forms.Label
   $label.Text = $text
   $label.AutoSize = $true
-  $label.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(0,0,8,0) } else { New-Object System.Windows.Forms.Padding(0,10,8,0) }
+  $label.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(0,0,0,0) } else { New-Object System.Windows.Forms.Padding(0,8,0,0) }
   $label.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
   return $label
 }
@@ -2833,7 +2751,7 @@ function New-LocTextBox {
   $box.ReadOnly = $true
   $box.BackColor = [System.Drawing.Color]::White
   $box.Dock = 'Fill'
-  $box.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(12,0,0,0) } else { New-Object System.Windows.Forms.Padding(12,10,0,0) }
+  $box.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(12,0,0,0) } else { New-Object System.Windows.Forms.Padding(12,8,0,0) }
   $box.MinimumSize = New-Object System.Drawing.Size(0,24)
   $box.Height = 24
   Register-NewAssetToolFixedHeightControl -Control $box -BaseHeight 24 -BaseMinimumHeight 24
@@ -2844,7 +2762,7 @@ function New-LocCombo {
   param([bool]$isFirst = $false)
   $combo = New-Object System.Windows.Forms.ComboBox
   $combo.Dock = 'Fill'
-  $combo.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(12,0,0,0) } else { New-Object System.Windows.Forms.Padding(12,10,0,0) }
+  $combo.Margin = if($isFirst){ New-Object System.Windows.Forms.Padding(12,0,0,0) } else { New-Object System.Windows.Forms.Padding(12,8,0,0) }
   $combo.Visible = $false
   $combo.DropDownStyle = 'DropDown'
   $combo.Tag = 'AllowDropDown'
@@ -2936,10 +2854,8 @@ if(-not $locButtonsPanel){
   $locButtonsPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
   $locButtonsPanel.Dock = 'Fill'
   $locButtonsPanel.Anchor = 'Top,Right'
-  $locButtonsPanel.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
-  $locButtonsPanel.Padding = New-Object System.Windows.Forms.Padding(8,6,8,6)
-  $locButtonsPanel.BackColor = $script:ThemeColors.AccentSubtle
-  $locButtonsPanel.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+  $locButtonsPanel.Margin = New-Object System.Windows.Forms.Padding(0,8,0,0)
+  $locButtonsPanel.Padding = New-Object System.Windows.Forms.Padding(0)
 }
 
 if(-not $locButtonsPanel.Controls.Contains($btnEditLoc)){
@@ -2965,21 +2881,21 @@ $tlpRight = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpRight.Dock = 'Fill'
 $tlpRight.ColumnCount = 1
 $tlpRight.RowCount = 2
-$tlpRight.Margin = New-Object System.Windows.Forms.Padding(5, 10, 10, 10)
-$tlpRight.Padding = New-Object System.Windows.Forms.Padding(6)
+$tlpRight.Margin = New-Object System.Windows.Forms.Padding(3, $GAP, $GAP, $GAP)
+$tlpRight.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tlpRight.RowStyles.Clear()
 $tlpRight.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
 $tlpRight.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 100)) )
 # Associated devices (right column, top)
 $grpAssoc = New-Object System.Windows.Forms.GroupBox; $grpAssoc.Text="Associated Devices"; $grpAssoc.Dock='Fill'
-$grpAssoc.Margin = New-Object System.Windows.Forms.Padding(8,8,8,10)
-$grpAssoc.Padding = New-Object System.Windows.Forms.Padding(14,12,14,14)
+$grpAssoc.Margin = New-Object System.Windows.Forms.Padding($GAP)
+$grpAssoc.Padding = New-Object System.Windows.Forms.Padding($GAP)
 $tlpAssoc = New-Object System.Windows.Forms.TableLayoutPanel
 $tlpAssoc.Dock = 'Fill'
 $tlpAssoc.ColumnCount = 1
 $tlpAssoc.RowCount = 2
 $tlpAssoc.Margin = '0,0,0,0'
-$tlpAssoc.Padding = '0,2,0,0'
+$tlpAssoc.Padding = '0,0,0,0'
 $tlpAssoc.ColumnStyles.Clear()
 $tlpAssoc.ColumnStyles.Add( (New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)) )
 $tlpAssoc.RowStyles.Clear()
@@ -2988,12 +2904,10 @@ $tlpAssoc.RowStyles.Add( (New-Object System.Windows.Forms.RowStyle([System.Windo
 $assocToolbarPanel = New-Object System.Windows.Forms.Panel
 $assocToolbarPanel.Dock = 'Fill'
 $assocToolbarPanel.AutoSize = $false
-$assocToolbarPanel.Margin = '0,0,0,8'
-$assocToolbarPanel.Padding = '8,6,8,6'
-$assocToolbarPanel.Height = 46
-$assocToolbarPanel.BackColor = $script:ThemeColors.AccentSubtle
-$assocToolbarPanel.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-try { $assocToolbarPanel.MinimumSize = New-Object System.Drawing.Size(0, 46) } catch {}
+$assocToolbarPanel.Margin = '0,0,0,6'
+$assocToolbarPanel.Padding = '0,0,0,0'
+$assocToolbarPanel.Height = 40
+try { $assocToolbarPanel.MinimumSize = New-Object System.Drawing.Size(0, 40) } catch {}
 $btnAddPeripheral = New-Object ModernUI.RoundedButton
 $btnAddPeripheral.Text   = 'Add Peripheral'
 $btnAddPeripheral.Size   = '140,32'
@@ -3041,7 +2955,7 @@ $assocButtonsPanel.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndSh
 $assocButtonsPanel.WrapContents = $false
 $assocButtonsPanel.FlowDirection = 'LeftToRight'
 $assocButtonsPanel.Margin = '0,0,0,0'
-$assocButtonsPanel.Padding = '0,0,0,0'
+$assocButtonsPanel.Padding = '0,4,0,0'
 $assocButtonsPanel.Controls.Add($btnAddPeripheral)
 $assocButtonsPanel.Controls.Add($btnRemove)
 $assocButtonsPanel.Controls.Add($btnValidateDevices)
@@ -3057,8 +2971,7 @@ Set-SearchTextButtonBaseState -Button $btnMonitorLabel -BaseEnabled $false
 $assocGridPanel = New-Object System.Windows.Forms.Panel
 $assocGridPanel.Dock = 'Fill'
 $assocGridPanel.Margin = '0,0,0,0'
-$assocGridPanel.Padding = '0,2,0,0'
-$assocGridPanel.BackColor = $script:ThemeColors.Surface
+$assocGridPanel.Padding = '0,0,0,0'
 $dgv = New-Object System.Windows.Forms.DataGridView
 $dgv.Dock='Fill'; $dgv.AutoGenerateColumns=$false; $dgv.AllowUserToAddRows=$false; $dgv.ReadOnly=$true
 $dgv.SelectionMode=[System.Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
@@ -3160,8 +3073,8 @@ $tlpAssoc.Controls.Add($assocGridPanel,0,1)
 $grpAssoc.Controls.Add($tlpAssoc)
 # Rounding group
 $grpMaint = New-Object System.Windows.Forms.GroupBox; $grpMaint.Text="Device Rounding"; $grpMaint.Dock='Fill'
-$grpMaint.Margin = New-Object System.Windows.Forms.Padding(8,0,8,8)
-$grpMaint.Padding = New-Object System.Windows.Forms.Padding(14,12,14,14)
+$grpMaint.Margin = New-Object System.Windows.Forms.Padding($GAP)
+$grpMaint.Padding = New-Object System.Windows.Forms.Padding(12)
 
 $lblMaintType=New-Object System.Windows.Forms.Label; $lblMaintType.Text='Maintenance Type'; $lblMaintType.AutoSize=$true
 $cmbMaintType=New-Object System.Windows.Forms.ComboBox; $cmbMaintType.DropDownStyle='DropDownList'; $cmbMaintType.Dock='None'; $cmbMaintType.Anchor='Left'
@@ -3307,9 +3220,7 @@ $txtComments = New-Object System.Windows.Forms.TextBox; $txtComments.Multiline=$
 $layoutMaint = New-Object System.Windows.Forms.TableLayoutPanel
 $layoutMaint.Dock = 'Fill'
 $layoutMaint.ColumnCount = 1
-$layoutMaint.RowCount = 5
-$layoutMaint.Padding = New-Object System.Windows.Forms.Padding(0,2,0,0)
-$layoutMaint.Margin = New-Object System.Windows.Forms.Padding(0)
+$layoutMaint.RowCount = 6
 $layoutMaint.ColumnStyles.Clear()
 $layoutMaint.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $layoutMaint.RowStyles.Clear()
@@ -3317,44 +3228,47 @@ $layoutMaint.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Win
 $layoutMaint.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $layoutMaint.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $layoutMaint.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$layoutMaint.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $layoutMaint.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 
 $rowCombos = New-Object System.Windows.Forms.TableLayoutPanel
-$rowCombos.Dock = 'Top'
+$rowCombos.Dock = 'Fill'
 $rowCombos.AutoSize = $true
 $rowCombos.AutoSizeMode = 'GrowAndShrink'
-$rowCombos.ColumnCount = 6
+$rowCombos.ColumnCount = 4
 $rowCombos.RowCount = 1
 $rowCombos.ColumnStyles.Clear()
 $rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 38)))
 $rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 38)))
 $rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 24)))
+$rowCombos.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 $rowCombos.RowStyles.Clear()
 $rowCombos.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-$rowCombos.Margin = New-Object System.Windows.Forms.Padding(0)
-$rowCombos.Padding = New-Object System.Windows.Forms.Padding(8,8,8,8)
-$rowCombos.BackColor = $script:ThemeColors.AccentSubtle
-$rowCombos.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
 $rowCombos.Controls.Add($lblMaintType,0,0)
 $rowCombos.Controls.Add($cmbMaintType,1,0)
 $rowCombos.Controls.Add($lblChkStatus,2,0)
 $rowCombos.Controls.Add($cmbChkStatus,3,0)
-$rowCombos.Controls.Add($lblTime,4,0)
-$rowCombos.Controls.Add($numTime,5,0)
 $lblMaintType.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
-$cmbMaintType.Margin = New-Object System.Windows.Forms.Padding(0,0,20,0)
-$cmbMaintType.Dock = 'Fill'
+$cmbMaintType.Margin = New-Object System.Windows.Forms.Padding(0,0,24,0)
 $lblChkStatus.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
-$cmbChkStatus.Margin = New-Object System.Windows.Forms.Padding(0,0,20,0)
-$cmbChkStatus.Dock = 'Fill'
+$cmbChkStatus.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
+
+$rowTime = New-Object System.Windows.Forms.TableLayoutPanel
+$rowTime.Dock = 'Fill'
+$rowTime.AutoSize = $true
+$rowTime.AutoSizeMode = 'GrowAndShrink'
+$rowTime.ColumnCount = 2
+$rowTime.ColumnStyles.Clear()
+$rowTime.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$rowTime.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+$rowTime.Controls.Add($lblTime,0,0)
+$rowTime.Controls.Add($numTime,1,0)
+$rowTime.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $lblTime.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
 $numTime.Margin = New-Object System.Windows.Forms.Padding(0,0,0,0)
 
 $rowChecks = New-Object System.Windows.Forms.TableLayoutPanel
-$rowChecks.Dock = 'Top'
+$rowChecks.Dock = 'Fill'
 $rowChecks.AutoSize = $true
 $rowChecks.AutoSizeMode = 'GrowAndShrink'
 $rowChecks.ColumnCount = 2
@@ -3373,8 +3287,6 @@ $rowChecks.Controls.Add($chkCart,1,1)
 $rowChecks.Controls.Add($chkPeriph,0,2)
 $rowChecks.Controls.Add($chkMissingDevice,1,2)
 $rowChecks.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
-$rowChecks.Padding = New-Object System.Windows.Forms.Padding(8,6,8,6)
-$rowChecks.BackColor = [System.Drawing.Color]::White
 $chkCable.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
 $chkCableNeeded.Margin = New-Object System.Windows.Forms.Padding(12,0,0,0)
 $chkLabels.Margin = New-Object System.Windows.Forms.Padding(0,6,12,0)
@@ -3383,13 +3295,12 @@ $chkPeriph.Margin = New-Object System.Windows.Forms.Padding(0,6,12,0)
 $chkMissingDevice.Margin = New-Object System.Windows.Forms.Padding(12,6,0,0)
 
 $actionsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
-$actionsPanel.Dock = 'Top'
+$actionsPanel.Dock = 'Fill'
 $actionsPanel.AutoSize = $true
 $actionsPanel.AutoSizeMode = 'GrowAndShrink'
 $actionsPanel.WrapContents = $false
 $actionsPanel.FlowDirection = 'LeftToRight'
 $actionsPanel.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
-$actionsPanel.Padding = New-Object System.Windows.Forms.Padding(0,2,0,2)
 $btnCheckComplete.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
 $btnSave.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
 $btnManualRound.Margin = New-Object System.Windows.Forms.Padding(0,0,12,0)
@@ -3401,10 +3312,11 @@ $lblComments.Margin = New-Object System.Windows.Forms.Padding(0,12,0,0)
 $txtComments.Margin = New-Object System.Windows.Forms.Padding(0,4,0,0)
 
 $layoutMaint.Controls.Add($rowCombos,0,0)
-$layoutMaint.Controls.Add($rowChecks,0,1)
-$layoutMaint.Controls.Add($actionsPanel,0,2)
-$layoutMaint.Controls.Add($lblComments,0,3)
-$layoutMaint.Controls.Add($txtComments,0,4)
+$layoutMaint.Controls.Add($rowTime,0,1)
+$layoutMaint.Controls.Add($rowChecks,0,2)
+$layoutMaint.Controls.Add($actionsPanel,0,3)
+$layoutMaint.Controls.Add($lblComments,0,4)
+$layoutMaint.Controls.Add($txtComments,0,5)
 
 $grpMaint.Controls.Add($layoutMaint)
 $txtComments.Add_TextChanged({
@@ -3425,10 +3337,6 @@ $splitter.Panel2.Controls.Add($tlpRight)
 # StatusStrip
 $status = New-Object System.Windows.Forms.StatusStrip
 $status.ShowItemToolTips = $true
-$status.SizingGrip = $false
-$status.BackColor = $script:ThemeColors.Header
-$status.ForeColor = $script:ThemeColors.HeaderText
-$status.Padding = New-Object System.Windows.Forms.Padding(8,2,8,2)
 $statusPathLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $statusPathLabel.Spring = $true
 $statusPathLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
@@ -3438,7 +3346,7 @@ $status.Items.Add($statusPathLabel) | Out-Null
 $roundingStatusPrefix = New-Object System.Windows.Forms.ToolStripStatusLabel
 $roundingStatusPrefix.Text = "Rounding Number:"
 $roundingStatusPrefix.Margin = New-Object System.Windows.Forms.Padding(6,3,2,3)
-$roundingStatusPrefix.ForeColor = $script:ThemeColors.HeaderText
+$roundingStatusPrefix.ForeColor = [System.Drawing.Color]::DimGray
 $status.Items.Add($roundingStatusPrefix) | Out-Null
 $roundingDaysLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $roundingDaysLabel.Text = "Days/week 5,"
@@ -6703,9 +6611,8 @@ function Update-LatestRoundingEventIndexForEvent {
 # ---- Build Nearby UI ----
 $nearToolbar = New-Object System.Windows.Forms.Panel
 $nearToolbar.Dock = 'Top'
-$nearToolbar.Height = 74
+$nearToolbar.Height = 68
 $nearToolbar.BackColor = $script:ThemeColors.Header
-$nearToolbar.Padding = New-Object System.Windows.Forms.Padding(10,8,10,8)
 $lblScopes = New-Object System.Windows.Forms.Label
 $lblScopes.AutoSize = $true
 $lblScopes.Text = "Nearby scopes: 0"
@@ -7271,7 +7178,6 @@ $dgvNearby.add_CellValueChanged({
 $nearBottom = New-Object System.Windows.Forms.Panel
 $nearBottom.Dock = 'Bottom'
 $nearBottom.Height = 48
-$nearBottom.BackColor = $script:ThemeColors.Surface
 $lblNearNote = New-Object System.Windows.Forms.Label
 $lblNearNote.AutoSize = $true
 $lblNearNote.Text = "Bulk Save adds events with selected Status, 3 min each."
@@ -7287,8 +7193,6 @@ $nearBottom.Controls.AddRange(@($lblNearNote,$btnNearSave))
 # Build Nearby tab page
 $tabTop = New-Object System.Windows.Forms.TabControl
 $tabTop.Dock = 'Fill'
-$tabTop.Padding = New-Object System.Drawing.Point(18, 8)
-$tabTop.Margin = New-Object System.Windows.Forms.Padding(0)
 $tabPageMain = New-Object System.Windows.Forms.TabPage
 $tabPageMain.Text = 'Main'
 $tabPageMain.UseVisualStyleBackColor = $false
@@ -7298,7 +7202,6 @@ $tabPageNear.UseVisualStyleBackColor = $false
 # Move existing main UI into a panel and then into TabPageMain
 $pageMain = New-Object System.Windows.Forms.Panel
 $pageMain.Dock = 'Fill'
-$pageMain.Padding = New-Object System.Windows.Forms.Padding(0)
 # Re-parent header + main table into panel
 $form.Controls.Remove($panelTop)
 $form.Controls.Remove($splitter)
@@ -7308,7 +7211,6 @@ $tabPageMain.Controls.Add($pageMain)
 # Compose Nearby page
 $nearPage = New-Object System.Windows.Forms.Panel
 $nearPage.Dock = 'Fill'
-$nearPage.Padding = New-Object System.Windows.Forms.Padding(10)
 $nearPage.Controls.Add($dgvNearby)
 $nearPage.Controls.Add($nearBottom)
 $nearPage.Controls.Add($nearToolbar)
@@ -7735,9 +7637,7 @@ try {
   $panelTop.BackColor = $script:ThemeColors.Header
   $nearToolbar.BackColor = $script:ThemeColors.Header
   $status.BackColor = $script:ThemeColors.Header
-  $status.ForeColor = $script:ThemeColors.HeaderText
-  $lblScopes.ForeColor = $script:ThemeColors.HeaderText
-  $lblNearNote.ForeColor = $script:ThemeColors.MutedText
+  $status.ForeColor = $script:ThemeColors.Text
 } catch {}
 try {
   $splitter.BackColor = $script:ThemeColors.Background
@@ -7746,11 +7646,9 @@ try {
   $tabPageMain.BackColor = $script:ThemeColors.Background
   $tabPageNear.BackColor = $script:ThemeColors.Background
   $tlpAssoc.BackColor = $script:ThemeColors.Surface
-  $assocToolbarPanel.BackColor = $script:ThemeColors.AccentSubtle
+  $assocToolbarPanel.BackColor = $script:ThemeColors.Surface
   $assocGridPanel.BackColor = $script:ThemeColors.Surface
   $cards.BackColor = $script:ThemeColors.Background
-  $tabTop.BackColor = $script:ThemeColors.Background
-  $tabTop.ForeColor = $script:ThemeColors.Text
 } catch {}
 
 $script:NewAssetToolMainForm = $form
