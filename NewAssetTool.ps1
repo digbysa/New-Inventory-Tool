@@ -6761,14 +6761,21 @@ $btnRebuildNearby.Text = 'Rebuild Nearby'
 $btnRebuildNearby.AutoSize = $true
 $btnRebuildNearby.Anchor = 'Top,Right'
 $btnRebuildNearby.Margin = '0,0,0,0'
+$btnIsolateNearby = New-Object ModernUI.RoundedButton
+$btnIsolateNearby.Text = 'Isolate'
+$btnIsolateNearby.AutoSize = $true
+$btnIsolateNearby.Anchor = 'Top,Right'
+$btnIsolateNearby.Margin = '0,0,0,0'
 $tip.SetToolTip($btnPingAll, 'Ping all devices listed in Nearby')
 $tip.SetToolTip($btnRebuildNearby, 'Rebuild the Nearby list from active scopes')
+$tip.SetToolTip($btnIsolateNearby, 'Keep only selected rows in Nearby')
 $nearToolbar.Controls.Add($btnPingAll)
 $nearToolbar.Controls.Add($btnRebuildNearby)
+$nearToolbar.Controls.Add($btnIsolateNearby)
 function Update-NearToolbarButtons {
   if (-not $nearToolbar) { return }
   $buttons = @()
-  foreach ($button in @($btnZoomIn, $btnZoomOut, $btnClearScopes, $btnPingAll, $btnRebuildNearby)) {
+  foreach ($button in @($btnZoomIn, $btnZoomOut, $btnClearScopes, $btnPingAll, $btnRebuildNearby, $btnIsolateNearby)) {
     if ($button -and $button.Visible) { $buttons += $button }
   }
   if (-not $buttons) { return }
@@ -6976,6 +6983,36 @@ function Invoke-NearbyPingAll {
   Invoke-NearbyPingRows -Rows $rows -EmptyMessage "No host names available to ping."
 }
 
+function Invoke-NearbyIsolateSelection {
+  if (-not $dgvNearby) { return }
+  if ($dgvNearby.SelectedRows.Count -le 0) {
+    [System.Windows.Forms.MessageBox]::Show("Select one or more rows to isolate.","Nearby",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+    return
+  }
+
+  $selectedIndexes = New-Object 'System.Collections.Generic.HashSet[int]'
+  foreach ($selectedRow in $dgvNearby.SelectedRows) {
+    if ($selectedRow -and -not $selectedRow.IsNewRow) {
+      [void]$selectedIndexes.Add([int]$selectedRow.Index)
+    }
+  }
+
+  if ($selectedIndexes.Count -le 0) { return }
+
+  for ($i = $dgvNearby.Rows.Count - 1; $i -ge 0; $i--) {
+    $row = $dgvNearby.Rows[$i]
+    if ($row -and -not $row.IsNewRow -and -not $selectedIndexes.Contains($i)) {
+      $dgvNearby.Rows.RemoveAt($i)
+    }
+  }
+
+  try { $dgvNearby.ClearSelection() } catch {}
+  foreach ($row in $dgvNearby.Rows) {
+    if ($row -and -not $row.IsNewRow) { $row.Selected = $true }
+  }
+  Update-ScopeLabel
+}
+
 function Ensure-NearbyStatusOption {
   param([string]$Value)
   if ([string]::IsNullOrWhiteSpace($Value)) { return }
@@ -7059,6 +7096,7 @@ function Show-NearbyStatusMenu {
 }
 
 $btnPingAll.Add_Click({ Invoke-NearbyPingAll })
+$btnIsolateNearby.Add_Click({ Invoke-NearbyIsolateSelection })
 $dgvNearby = New-Object System.Windows.Forms.DataGridView
 $dgvNearby.Dock='Fill'
 $dgvNearby.AllowUserToAddRows=$false
