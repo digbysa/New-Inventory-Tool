@@ -1,300 +1,736 @@
-Add-Type -AssemblyName PresentationCore,PresentationFramework,WindowsBase,System.Xaml
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName WindowsFormsIntegration
+[CmdletBinding()]
+param(
+    [string]$XamlPath = $(if ($PSScriptRoot) { Join-Path $PSScriptRoot 'NewAssetTool.matching.v14.xaml' } else { 'NewAssetTool.xaml' })
+)
 
-function Get-LoaderScriptDir {
-  try {
-    if ($PSScriptRoot -and $PSScriptRoot -ne '') { return $PSScriptRoot }
-  } catch {}
-  try {
-    if ($PSCommandPath -and $PSCommandPath -ne '') { return (Split-Path -Parent $PSCommandPath) }
-  } catch {}
-  try {
-    if ($MyInvocation -and $MyInvocation.MyCommand -and $MyInvocation.MyCommand.Path) {
-      return (Split-Path -Parent $MyInvocation.MyCommand.Path)
+Set-StrictMode -Version 3
+$ErrorActionPreference = 'Stop'
+
+Add-Type -AssemblyName PresentationCore
+Add-Type -AssemblyName PresentationFramework
+Add-Type -AssemblyName WindowsBase
+
+function Show-StartupError {
+    param(
+        [Parameter(Mandatory=$true)]
+        [System.Exception]$Exception,
+        [string]$ScriptPath
+    )
+    $baseFolder = if ($ScriptPath) { Split-Path -Parent $ScriptPath } else { [Environment]::GetFolderPath('Desktop') }
+    $logPath = Join-Path $baseFolder 'NewAssetTool.startup-error.log'
+    $message = @"
+NewAssetTool.Wpf.ps1 failed to start.
+
+Error:
+$($Exception.ToString())
+
+Log file:
+$logPath
+"@
+    try { $message | Set-Content -LiteralPath $logPath -Encoding UTF8 } catch {}
+    try { [System.Windows.MessageBox]::Show($message, 'New Inventory Tool startup error') | Out-Null } catch { Write-Host $message }
+}
+
+try {
+    if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
+        throw "This WPF script must be run in STA mode."
     }
-  } catch {}
-  return (Get-Location).Path
-}
 
-$scriptDir = Get-LoaderScriptDir
-$ps1Path   = Join-Path $scriptDir 'NewAssetTool.ps1'
-$xamlPath  = Join-Path $scriptDir 'NewAssetTool.xaml'
-
-if (-not (Test-Path $ps1Path)) {
-  throw "Could not find NewAssetTool.ps1 at '$ps1Path'."
-}
-if (-not (Test-Path $xamlPath)) {
-  throw "Could not find NewAssetTool.xaml at '$xamlPath'."
-}
-
-$previousSuppress = $null
-$hadPrevious = $false
-try {
-  if (Test-Path Variable:\global:NewAssetToolSuppressShow) {
-    $previousSuppress = $global:NewAssetToolSuppressShow
-    $hadPrevious = $true
-  }
-} catch {}
-$global:NewAssetToolSuppressShow = $true
-
-try {
-  $scriptOutput = . $ps1Path
-} catch {
-  if ($hadPrevious) {
-    $global:NewAssetToolSuppressShow = $previousSuppress
-  } else {
-    Remove-Variable -Scope Global -Name NewAssetToolSuppressShow -ErrorAction SilentlyContinue
-  }
-  throw
-}
-
-if ($scriptOutput -is [System.Windows.Forms.Form]) {
-  $form = $scriptOutput
-} else {
-  $form = ($scriptOutput | Where-Object { $_ -is [System.Windows.Forms.Form] } | Select-Object -First 1)
-}
-
-if (-not $form -and $script:NewAssetToolMainForm -is [System.Windows.Forms.Form]) {
-  $form = $script:NewAssetToolMainForm
-}
-
-if (-not $form -or -not ($form -is [System.Windows.Forms.Form])) {
-  throw "NewAssetTool.ps1 did not expose a main form instance."
-}
-
-$form.TopLevel = $false
-$form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
-$form.Dock = [System.Windows.Forms.DockStyle]::Fill
-
-if (-not (Test-Path $xamlPath)) {
-  throw "XAML window definition missing at '$xamlPath'."
-}
-
-$reader = [System.Xml.XmlReader]::Create($xamlPath)
-try {
-  $window = [System.Windows.Markup.XamlReader]::Load($reader)
-} finally {
-  $reader.Close()
-}
-
-try {
-  $iconPath = Join-Path $scriptDir 'icon.ico'
-  if (Test-Path $iconPath) {
-    $iconImage = New-Object System.Windows.Media.Imaging.BitmapImage
-    $iconImage.BeginInit()
-    $iconImage.UriSource = New-Object System.Uri($iconPath)
-    $iconImage.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
-    $iconImage.EndInit()
-    $window.Icon = $iconImage
-  }
-} catch {}
-
-$selectedSiteName = $null
-try { $selectedSiteName = $script:SelectedSiteName } catch {}
-if ([string]::IsNullOrWhiteSpace($selectedSiteName) -and $form -and $form.Text) {
-  $selectedSiteName = ($form.Text -replace '^New Inventory Tool\s*-\s*', '').Trim()
-}
-if ($window) {
-  $window.DataContext = [pscustomobject]@{
-    SelectedSiteName = $selectedSiteName
-  }
-}
-
-$windowsFormsHost = $window.FindName('WinFormsHost')
-if (-not $windowsFormsHost) {
-  throw "Could not locate the WindowsFormsHost named 'WinFormsHost' in XAML."
-}
-$windowsFormsHost.Child = $form
-$form.Visible = $true
-
-$rootGrid = $window.FindName('RootGrid')
-$rootScaleTransform = $window.FindName('RootScaleTransform')
-$applyWpfScale = {
-  param([string]$Source = 'unspecified')
-
-  if (-not $rootScaleTransform) {
-    Write-Verbose "[DPI][WPF] Root scale transform not located; skipping scale." -Verbose
-    return
-  }
-
-  $scale = 1.0
-  try {
-    if (Get-Command Get-NewAssetToolChromeScale -ErrorAction SilentlyContinue) {
-      $scale = Get-NewAssetToolChromeScale
+    function ConvertFrom-XamlFile {
+        param([Parameter(Mandatory=$true)][string]$Path)
+        if (-not (Test-Path -LiteralPath $Path)) { throw "XAML file not found: $Path" }
+        $rawXaml = Get-Content -LiteralPath $Path -Raw
+        $xml = [xml]$rawXaml
+        $reader = New-Object System.Xml.XmlNodeReader $xml
+        return [Windows.Markup.XamlReader]::Load($reader)
     }
-  } catch {}
 
-  if (-not $global:NewAssetToolPerMonitorDpiContextEnabled -and [Math]::Abs($scale - 1.0) -lt 0.0001) {
-    return
-  }
-
-  $contextDescription = 'unknown'
-  try {
-    if (Get-Command Get-NewAssetToolDpiContextDescription -ErrorAction SilentlyContinue) {
-      $contextDescription = Get-NewAssetToolDpiContextDescription
-    }
-  } catch {}
-
-  try {
-    $rootScaleTransform.ScaleX = $scale
-    $rootScaleTransform.ScaleY = $scale
-    Write-Verbose (
-      "[DPI][WPF] Applied root layout scale {0:n3} ({1}) context={2}" -f $scale, $Source, $contextDescription
-    ) -Verbose
-  } catch {
-    Write-Verbose "[DPI][WPF] Failed to apply layout scale ({0}): $($_.Exception.Message)" -Verbose
-  }
-}
-
-Set-Variable -Scope Global -Name NewAssetToolApplyWpfScale -Value $applyWpfScale
-
-if ($window) {
-  if ($global:NewAssetToolPerMonitorDpiContextEnabled) {
-    try {
-      if (Get-Command Set-NewAssetToolMonitorScale -ErrorAction SilentlyContinue) {
-        $dpiInfo = [System.Windows.Media.VisualTreeHelper]::GetDpi($window)
-        $initialScale = $null
-        try { $initialScale = [double]$dpiInfo.DpiScaleX } catch {}
-        if ($null -ne $initialScale -and $initialScale -gt 0) {
-          Set-NewAssetToolMonitorScale -Scale $initialScale -Source 'Wpf.Initial' | Out-Null
+    function Get-NamedControls {
+        param(
+            [Parameter(Mandatory=$true)][System.Windows.Window]$Window,
+            [Parameter(Mandatory=$true)][string[]]$Names
+        )
+        $controls = @{}
+        foreach ($name in $Names) {
+            $control = $Window.FindName($name)
+            if ($null -eq $control) { throw "Required control '$name' was not found in the XAML." }
+            $controls[$name] = $control
         }
-      }
-    } catch {}
-  }
+        return $controls
+    }
 
-  if ($global:NewAssetToolPerMonitorDpiContextEnabled) {
-    try {
-      $window.Add_DpiChanged({
-        param($sender,$eventArgs)
+    function New-Brush {
+        param([Parameter(Mandatory=$true)][string]$Hex)
+        $converter = New-Object System.Windows.Media.BrushConverter
+        return $converter.ConvertFromString($Hex)
+    }
 
-        if (Get-Command Set-NewAssetToolMonitorScale -ErrorAction SilentlyContinue) {
-          $scale = $null
-          try {
-            $dpiScale = $eventArgs.NewDpi.DpiScaleX
-            if ($dpiScale -gt 0) { $scale = [double]$dpiScale }
-          } catch {}
-          if ($null -eq $scale) {
+    function Set-BadgeText {
+        param([System.Windows.Controls.Border]$Border,[string]$Text)
+        if ($Border.Child -is [System.Windows.Controls.TextBlock]) { $Border.Child.Text = $Text }
+    }
+
+    function Set-BadgeStyle {
+        param([System.Windows.Controls.Border]$Border,[string]$BackgroundHex,[string]$ForegroundHex)
+        $Border.Background = New-Brush $BackgroundHex
+        if ($Border.Child -is [System.Windows.Controls.TextBlock]) { $Border.Child.Foreground = New-Brush $ForegroundHex }
+    }
+
+    function Set-StatusMessage {
+        param([hashtable]$Ui,[ValidateSet('Found','PingComplete','Warning')][string]$Mode,[string]$CustomText)
+        switch ($Mode) {
+            'Found' {
+                Set-BadgeText -Border $Ui.StatusMessageBadge -Text $(if ($CustomText) { $CustomText } else { 'Found Computer / Computer' })
+                Set-BadgeStyle -Border $Ui.StatusMessageBadge -BackgroundHex '#FCE3E5' -ForegroundHex '#BE123C'
+            }
+            'PingComplete' {
+                Set-BadgeText -Border $Ui.StatusMessageBadge -Text $(if ($CustomText) { $CustomText } else { 'Ping complete' })
+                Set-BadgeStyle -Border $Ui.StatusMessageBadge -BackgroundHex '#DDF7E5' -ForegroundHex '#15803D'
+            }
+            'Warning' {
+                Set-BadgeText -Border $Ui.StatusMessageBadge -Text $(if ($CustomText) { $CustomText } else { 'No matching device found' })
+                Set-BadgeStyle -Border $Ui.StatusMessageBadge -BackgroundHex '#FEE7C3' -ForegroundHex '#B45309'
+            }
+        }
+        $script:AppState.LastStatusMode = $Mode
+    }
+
+    function Get-OutputFolder { param([string]$ResolvedXamlPath) Join-Path (Split-Path -Parent $ResolvedXamlPath) 'Output' }
+    function Get-RoundingEventsPath { param([string]$ResolvedXamlPath) Join-Path (Get-OutputFolder -ResolvedXamlPath $ResolvedXamlPath) 'RoundingEvents.csv' }
+
+    function Ensure-OutputFolder {
+        param([string]$ResolvedXamlPath)
+        $folder = Get-OutputFolder -ResolvedXamlPath $ResolvedXamlPath
+        if (-not (Test-Path -LiteralPath $folder)) { $null = New-Item -ItemType Directory -Path $folder -Force }
+    }
+
+    function Add-CsvRow {
+        param([string]$Path,[psobject]$Row)
+        if (Test-Path -LiteralPath $Path) { $Row | Export-Csv -LiteralPath $Path -NoTypeInformation -Append }
+        else { $Row | Export-Csv -LiteralPath $Path -NoTypeInformation }
+    }
+
+    function Set-DisplayText {
+        param([hashtable]$Ui,[string]$BaseName,[string]$Value)
+        $display = $Ui["${BaseName}Display"]
+        if ($display) { $display.Text = $Value }
+        $textbox = $Ui["${BaseName}TextBox"]
+        if ($textbox) { $textbox.Text = $Value }
+    }
+
+    function Parse-DateLoose {
+        param([string]$Value)
+        if ([string]::IsNullOrWhiteSpace($Value)) { return $null }
+        $formats = @('yyyy-MM-dd','yyyy/MM/dd','MM/dd/yyyy','MM-dd-yyyy','dd/MM/yyyy','dd-MM-yyyy','d/M/yyyy','M/d/yyyy','dd MMMM yyyy','d MMMM yyyy','dd MMM yyyy','d MMM yyyy')
+        foreach ($format in $formats) {
             try {
-              $pixelsPerDip = $eventArgs.NewDpi.PixelsPerDip
-              if ($pixelsPerDip -gt 0) { $scale = [double]$pixelsPerDip }
+                return [datetime]::ParseExact($Value, $format, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AssumeLocal)
             } catch {}
-          }
-          if ($null -ne $scale -and $scale -gt 0) {
-            Set-NewAssetToolMonitorScale -Scale $scale -Source 'Wpf.DpiChanged' | Out-Null
-          }
+        }
+        try { return (Get-Date -Date $Value) } catch { return $null }
+    }
+
+    function Format-DateLong {
+        param([string]$Value)
+        $dt = Parse-DateLoose -Value $Value
+        if (-not $dt) { return $Value }
+        return $dt.ToString('dd MMMM yyyy')
+    }
+
+    function Extract-Ritm {
+        param([string]$Value)
+        if ([string]::IsNullOrWhiteSpace($Value)) { return '' }
+        $trimmed = $Value.Trim()
+        $ritm = [regex]::Match($trimmed, '(RITM\d+)')
+        if ($ritm.Success) { return $ritm.Groups[1].Value }
+        $trpEight = [regex]::Match($trimmed, 'TRP(?<date>\d{8})')
+        if ($trpEight.Success) {
+            try {
+                $dt = [datetime]::ParseExact($trpEight.Groups['date'].Value, 'yyyyMMdd', [System.Globalization.CultureInfo]::InvariantCulture)
+                return ('TRP - {0}' -f $dt.ToString('dd MMMM yyyy'))
+            } catch {}
+        }
+        $trpSix = [regex]::Match($trimmed, 'TRP(?<date>\d{6})(?!\d)')
+        if ($trpSix.Success) {
+            try {
+                $digits = $trpSix.Groups['date'].Value
+                $month = [int]$digits.Substring(0,2)
+                $day = [int]$digits.Substring(2,2)
+                $year = 2000 + [int]$digits.Substring(4,2)
+                $dt = [datetime]::new($year, $month, $day)
+                return ('TRP - {0}' -f $dt.ToString('dd MMMM yyyy'))
+            } catch {}
+        }
+        return $trimmed
+    }
+
+    function Get-RoundingStatus {
+        param([Nullable[datetime]]$RoundedDate)
+        if (-not $RoundedDate) { return 'Red' }
+        $daysAgo = [int](((Get-Date).Date - $RoundedDate.Date).TotalDays)
+        if ($daysAgo -lt 7) { return 'Green' }
+        if ($daysAgo -lt 35) { return 'Yellow' }
+        return 'Red'
+    }
+
+    function Set-LastRoundedDisplay {
+        param([hashtable]$Ui,[string]$LastRoundedRaw)
+        $dt = Parse-DateLoose -Value $LastRoundedRaw
+        if (-not $dt) {
+            $Ui.LastRoundedText.Text = ''
+            $Ui.LastRoundedText.Foreground = New-Brush '#BE123C'
+            $Ui.LastRoundedContainer.Background = New-Brush '#FDF0F1'
+            $Ui.LastRoundedContainer.BorderBrush = New-Brush '#F5C2C7'
+            return
+        }
+        $dateText = $dt.ToString('dd MMMM yyyy')
+        $daysAgo = [int](((Get-Date).Date - $dt.Date).TotalDays)
+        if ($daysAgo -le 0) { $Ui.LastRoundedText.Text = "$dateText - Today" }
+        else {
+            $plural = if ($daysAgo -eq 1) { '' } else { 's' }
+            $Ui.LastRoundedText.Text = ("{0} - {1} day{2} ago" -f $dateText, $daysAgo, $plural)
+        }
+        $status = Get-RoundingStatus -RoundedDate $dt
+        switch ($status) {
+            'Green' {
+                $Ui.LastRoundedText.Foreground = New-Brush '#15803D'
+                $Ui.LastRoundedLabelText.Foreground = New-Brush '#15803D'
+                $Ui.LastRoundedContainer.Background = New-Brush '#ECFDF3'
+                $Ui.LastRoundedContainer.BorderBrush = New-Brush '#BBF7D0'
+                $Ui.LastRoundedAttentionBadge.Visibility = 'Collapsed'
+            }
+            'Yellow' {
+                $Ui.LastRoundedText.Foreground = New-Brush '#B45309'
+                $Ui.LastRoundedLabelText.Foreground = New-Brush '#B45309'
+                $Ui.LastRoundedContainer.Background = New-Brush '#FEE7C3'
+                $Ui.LastRoundedContainer.BorderBrush = New-Brush '#FCD49B'
+                $Ui.LastRoundedAttentionBadge.Visibility = 'Collapsed'
+            }
+            default {
+                $Ui.LastRoundedText.Foreground = New-Brush '#BE123C'
+                $Ui.LastRoundedLabelText.Foreground = New-Brush '#BE123C'
+                $Ui.LastRoundedContainer.Background = New-Brush '#FDF0F1'
+                $Ui.LastRoundedContainer.BorderBrush = New-Brush '#F5C2C7'
+                $Ui.LastRoundedAttentionBadge.Visibility = 'Visible'
+                $Ui.LastRoundedAttentionText.Text = 'Attention needed'
+            }
+        }
+    }
+
+
+    function Get-FieldValue {
+        param([object]$Row,[string[]]$Names)
+        foreach ($name in $Names) {
+            if ($Row.PSObject.Properties.Name -contains $name) {
+                $value = $Row.$name
+                if (-not [string]::IsNullOrWhiteSpace([string]$value)) { return [string]$value }
+            }
+        }
+        return ''
+    }
+
+    function Import-InventoryCsv {
+        param([string]$Path)
+        try { return @(Import-Csv -LiteralPath $Path -ErrorAction Stop) } catch { return @() }
+    }
+
+    function Load-InventoryData {
+        param([string]$ResolvedXamlPath)
+        $dataRoot = Join-Path (Split-Path -Parent $ResolvedXamlPath) 'Data'
+        $computers = @(); $monitors = @(); $locations = @(); $carts = @(); $mics = @(); $scanners = @()
+        if (Test-Path -LiteralPath $dataRoot) {
+            foreach ($file in Get-ChildItem -LiteralPath $dataRoot -Recurse -File -Filter '*.csv') {
+                if ($file.Name -like 'Computers - *.csv') { $computers += Import-InventoryCsv -Path $file.FullName }
+                elseif ($file.Name -like 'Monitors - *.csv') { $monitors += Import-InventoryCsv -Path $file.FullName }
+                elseif ($file.Name -like 'LocationMaster*.csv') { $locations += Import-InventoryCsv -Path $file.FullName }
+                elseif ($file.Name -eq 'Carts.csv') { $carts += Import-InventoryCsv -Path $file.FullName }
+                elseif ($file.Name -eq 'Mics.csv') { $mics += Import-InventoryCsv -Path $file.FullName }
+                elseif ($file.Name -eq 'Scanners.csv') { $scanners += Import-InventoryCsv -Path $file.FullName }
+            }
+        }
+        return [pscustomobject]@{ DataRoot=$dataRoot; Computers=$computers; Monitors=$monitors; Carts=$carts; Mics=$mics; Scanners=$scanners; Locations=$locations }
+    }
+
+    function ConvertTo-DeviceRecord {
+        param([object]$Row)
+        $name = Get-FieldValue -Row $Row -Names @('name','HostName')
+        return [pscustomobject]@{
+            SearchKeys=@($name,(Get-FieldValue -Row $Row -Names @('asset_tag','AssetTag')),(Get-FieldValue -Row $Row -Names @('serial_number','Serial')))
+            DetectedType='Computer'; Name=$name
+            AssetTag=Get-FieldValue -Row $Row -Names @('asset_tag','AssetTag')
+            Serial=Get-FieldValue -Row $Row -Names @('serial_number','Serial')
+            Parent='(n/a)'; RITM=Extract-Ritm (Get-FieldValue -Row $Row -Names @('po_number','RITM'))
+            RetireDate=Format-DateLong (Get-FieldValue -Row $Row -Names @('u_scheduled_retirement','RetireDate'))
+            LastRounded=Get-FieldValue -Row $Row -Names @('u_last_rounded_date','LastRounded')
+            City=Get-FieldValue -Row $Row -Names @('location.city','City')
+            Location=Get-FieldValue -Row $Row -Names @('location','Location')
+            Building=Get-FieldValue -Row $Row -Names @('u_building','Building')
+            Floor=Get-FieldValue -Row $Row -Names @('u_floor','Floor')
+            Room=Get-FieldValue -Row $Row -Names @('u_room','Room')
+            Department=Get-FieldValue -Row $Row -Names @('u_department_location','Department')
+        }
+    }
+
+    function Find-InventoryMatch {
+        param([string]$SearchTerm,[pscustomobject]$Inventory)
+        $term = $SearchTerm.Trim().ToUpper()
+        if ([string]::IsNullOrWhiteSpace($term)) { return $null }
+        foreach ($row in $Inventory.Computers) {
+            $candidates = @(
+                (Get-FieldValue -Row $row -Names @('name')),
+                (Get-FieldValue -Row $row -Names @('asset_tag')),
+                (Get-FieldValue -Row $row -Names @('serial_number'))
+            )
+            foreach ($candidate in $candidates) {
+                if (-not [string]::IsNullOrWhiteSpace($candidate) -and $candidate.ToUpper() -like "*$term*") {
+                    return ConvertTo-DeviceRecord -Row $row
+                }
+            }
+        }
+        return $null
+    }
+
+    function Build-AssociatedDevices {
+        param([pscustomobject]$Device,[pscustomobject]$Inventory)
+        $results = @([pscustomobject]@{ Role='Parent'; Type='Computer'; Name=$Device.Name; AssetTag=$Device.AssetTag; Serial=$Device.Serial; RITM=$Device.RITM; Retire=(Format-DateLong $Device.RetireDate) })
+        $childrenByParent = @{}
+        foreach ($collectionName in @('Monitors','Carts','Mics','Scanners')) {
+            $collection = $Inventory.$collectionName
+            if (-not $collection) { continue }
+            foreach ($row in $collection) {
+                $token = (Get-FieldValue -Row $row -Names @('u_parent_asset')).Trim()
+                if ([string]::IsNullOrWhiteSpace($token)) { continue }
+                $key = $token.ToUpper()
+                if (-not $childrenByParent.ContainsKey($key)) { $childrenByParent[$key] = @() }
+                $childrenByParent[$key] += ,$row
+            }
+        }
+        function Add-AssociatedRecord {
+            param($Role,$Type,$Row)
+            $record = [pscustomobject]@{
+                Role=$Role; Type=$Type
+                Name=(Get-FieldValue -Row $Row -Names @('name'))
+                AssetTag=(Get-FieldValue -Row $Row -Names @('asset_tag'))
+                Serial=(Get-FieldValue -Row $Row -Names @('serial_number'))
+                RITM=(Extract-Ritm (Get-FieldValue -Row $Row -Names @('po_number')))
+                Retire=(Format-DateLong (Get-FieldValue -Row $Row -Names @('u_scheduled_retirement')))
+            }
+            $results = @($results + $record)
+        }
+        $parentTokens = @($Device.AssetTag,$Device.Name,$Device.Serial) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim().ToUpper() }
+        $cartsForParent = @()
+        foreach ($token in $parentTokens) {
+            if (-not $childrenByParent.ContainsKey($token)) { continue }
+            foreach ($row in $childrenByParent[$token]) {
+                $type = if ($Inventory.Carts -contains $row) { 'Cart' } elseif ($Inventory.Mics -contains $row) { 'Mic' } elseif ($Inventory.Scanners -contains $row) { 'Scanner' } else { 'Monitor' }
+                Add-AssociatedRecord -Role 'Child' -Type $type -Row $row
+                if ($type -eq 'Cart') { $cartsForParent += ,$row }
+            }
+        }
+        foreach ($cart in $cartsForParent) {
+            $cartTokens = @((Get-FieldValue -Row $cart -Names @('asset_tag')),(Get-FieldValue -Row $cart -Names @('name'))) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim().ToUpper() }
+            foreach ($token in $cartTokens) {
+                if (-not $childrenByParent.ContainsKey($token)) { continue }
+                foreach ($row in $childrenByParent[$token]) {
+                    $type = if ($Inventory.Mics -contains $row) { 'Mic' } elseif ($Inventory.Scanners -contains $row) { 'Scanner' } else { 'Monitor' }
+                    Add-AssociatedRecord -Role 'Grandchild' -Type $type -Row $row
+                }
+            }
+        }
+        return ,$results
+    }
+
+    function Build-QueryData {
+        param([pscustomobject]$Device,[pscustomobject]$Inventory)
+        return [pscustomobject]@{ Device=$Device; Associated=(Build-AssociatedDevices -Device $Device -Inventory $Inventory); Nearby=(Build-NearbyDevices -Device $Device -Inventory $Inventory) }
+    }
+
+
+    function Set-PrimaryDeviceBindings {
+        param([hashtable]$Ui,[pscustomobject]$Device)
+        $Ui.SelectedDeviceText.Text = $Device.Name
+        Set-DisplayText -Ui $Ui -BaseName 'DetectedType' -Value $Device.DetectedType
+        Set-DisplayText -Ui $Ui -BaseName 'HostName' -Value $Device.Name
+        Set-DisplayText -Ui $Ui -BaseName 'AssetTag' -Value $Device.AssetTag
+        Set-DisplayText -Ui $Ui -BaseName 'Serial' -Value $Device.Serial
+        Set-DisplayText -Ui $Ui -BaseName 'Parent' -Value $Device.Parent
+        Set-DisplayText -Ui $Ui -BaseName 'Ritm' -Value $Device.RITM
+        Set-DisplayText -Ui $Ui -BaseName 'Retire' -Value (Format-DateLong $Device.RetireDate)
+        Set-LastRoundedDisplay -Ui $Ui -LastRoundedRaw $Device.LastRounded
+        $Ui.CityTextBox.Text = $Device.City
+        $Ui.LocationTextBox.Text = $Device.Location
+        $Ui.BuildingTextBox.Text = $Device.Building
+        $Ui.FloorTextBox.Text = $Device.Floor
+        $Ui.RoomTextBox.Text = $Device.Room
+        $Ui.DepartmentTextBox.Text = $Device.Department
+    }
+
+    function Start-QueryDataPopulationAsync {
+        param([hashtable]$Ui,[pscustomobject]$Device,[pscustomobject]$Inventory,[string]$QueryToken)
+        [System.Threading.Tasks.Task]::Run([Action]{
+            $associated = Build-AssociatedDevices -Device $Device -Inventory $Inventory
+            $Ui.MainTabControl.Dispatcher.BeginInvoke([Action]{
+                if ($script:AppState.CurrentQueryToken -ne $QueryToken) { return }
+                $Ui.AssociatedDevicesDataGrid.ItemsSource = $associated
+                $Ui.NearbyDataGrid.ItemsSource = @()
+                $Ui.NearbyScopeSummaryText.Text = 'Nearby disabled'
+                $script:AppState.SampleData = [pscustomobject]@{ Device=$Device; Associated=$associated; Nearby=@() }
+            }) | Out-Null
+        }) | Out-Null
+    }
+
+    function New-SampleData {
+        # fallback sample data when CSV sources are unavailable
+        $device = [pscustomobject]@{
+            SearchKeys   = @('AO400568', 'HSS-8093577', 'C24102M031')
+            DetectedType = 'Tangent'
+            Name         = 'AO400568'
+            AssetTag     = 'HSS-8093577'
+            Serial       = 'C24102M031'
+            Parent       = '(n/a)'
+            RITM         = 'TRP - 26 May 2025'
+            RetireDate   = '31 May 2028'
+            LastRounded  = '12 March 2026 - 39 days ago'
+            City         = 'Duncan'
+            Location     = 'VIHA-CDH-Cowichan District Hospital'
+            Building     = 'Main Building'
+            Floor        = '1'
+            Room         = '1068 (PACU)'
+            Department   = 'Medical Device Reprocessing Department (MDRD)'
         }
 
-        & $applyWpfScale 'Window.DpiChanged'
-      })
-    } catch {
-      Write-Verbose "[DPI][WPF] Failed to attach DpiChanged handler: $($_.Exception.Message)" -Verbose
-    }
-  }
-  & $applyWpfScale 'Window.Initial'
-}
+        $associated = @(
+            [pscustomobject]@{ Role='Parent'; Type='Tangent'; Name='AO400568'; AssetTag='HSS-8093577'; Serial='C24102M031'; RITM='TRP - 26 May 2025'; Retire='31 May 2028' },
+            [pscustomobject]@{ Role='Child'; Type='Cart'; Name='AO400568-CRT'; AssetTag='CO09167'; Serial='1896875-0016'; RITM='-'; Retire='-' }
+        )
 
-if ($window) {
-  if ($window.WindowState -ne [System.Windows.WindowState]::Normal) {
-    $window.WindowState = [System.Windows.WindowState]::Normal
-  }
-  if ($window.SizeToContent -ne [System.Windows.SizeToContent]::Height) {
-    $window.SizeToContent = [System.Windows.SizeToContent]::Height
-  }
-  $sizeLockApplied = $false
-  $window.Add_ContentRendered({
-    param($sender, $eventArgs)
-    if (-not $sizeLockApplied) {
-      if ($sender.SizeToContent -ne [System.Windows.SizeToContent]::Manual) {
-        $sender.SizeToContent = [System.Windows.SizeToContent]::Manual
-      }
-      $sizeLockApplied = $true
-    }
-  })
-}
+        $nearby = @(
+            [pscustomobject]@{ HostName='LD065898'; IPAddress='';             Subnet='';       AssetTag='HSS-8077199'; Location='VIHA-DNDR-Duncan Norcr...'; Building='Main Building'; Floor='1'; Room='101 (#6 Charge Cabinet)'; Department='CHS - Community Health Se...'; MaintenanceType='General Rounding'; LastRounded='20 April 2026'; DaysAgo='0';   Status='Inaccessible - Asset not found' },
+            [pscustomobject]@{ HostName='LD065911'; IPAddress='10.64.45.232'; Subnet='VPN';    AssetTag='HSS-8077204'; Location='VIHA-DNDR-Duncan Norcr...'; Building='Main Building'; Floor='1'; Room='101 (#7 Charge Cabinet)'; Department='CHS - Community Health Se...'; MaintenanceType='General Rounding'; LastRounded='20 April 2026'; DaysAgo='0';   Status='Inaccessible - Laptop is not available' },
+            [pscustomobject]@{ HostName='LD062047'; IPAddress='10.64.47.15';  Subnet='VPN';    AssetTag='HSS-1037495'; Location='VIHA-DNDR-Duncan Norcr...'; Building='Main Building'; Floor='1'; Room='101 (#8 Charge Cabinet)'; Department='CHS (Reception)'; MaintenanceType='General Rounding'; LastRounded='20 April 2026'; DaysAgo='0'; Status='Inaccessible - Laptop is not available' },
+            [pscustomobject]@{ HostName='PC077708'; IPAddress='10.209.233.167';Subnet='Unknown';AssetTag='HSS-1037501'; Location='VIHA-DNDR-Duncan Norcr...'; Building='Main Building'; Floor='1'; Room='102'; Department='CHS - Community Health Se...'; MaintenanceType='General Rounding'; LastRounded='06 March 2026'; DaysAgo='45'; Status='-' },
+            [pscustomobject]@{ HostName='LD072236'; IPAddress='10.209.233.47'; Subnet='Unknown';AssetTag='HSS-1037488'; Location='VIHA-DNDR-Duncan Norcr...'; Building='Main Building'; Floor='1'; Room='104 (Chart Room)'; Department='Charting'; MaintenanceType='General Rounding'; LastRounded='20 April 2026'; DaysAgo='0'; Status='Complete' }
+        )
 
-$searchTextBox = $window.FindName('SearchTextBox')
-if ($searchTextBox) {
-  try { Set-ScanSearchControl $searchTextBox } catch {}
-  $hasHandleScanTextChanged = $false
-  $hasUpdateRoundNowButtonState = $false
-  try { $hasHandleScanTextChanged = [bool](Get-Command Handle-ScanTextChanged -ErrorAction SilentlyContinue) } catch {}
-  try { $hasUpdateRoundNowButtonState = [bool](Get-Command Update-RoundNowButtonState -ErrorAction SilentlyContinue) } catch {}
-  $scanSyncTimer = New-Object System.Windows.Threading.DispatcherTimer
-  $scanSyncTimer.Interval = [TimeSpan]::FromMilliseconds(60)
-  $scanSyncTimer.Add_Tick({
-    $scanSyncTimer.Stop()
-    if ($txtScan) {
-      if ($txtScan.Text -ne $script:PendingScanText) {
-        $txtScan.Text = $script:PendingScanText
-      }
+        return [pscustomobject]@{ Device=$device; Associated=$associated; Nearby=$nearby }
     }
-  })
-  if ($txtScan) {
-    if ($searchTextBox.Text -ne $txtScan.Text) { $searchTextBox.Text = $txtScan.Text }
-    $txtScan.Add_TextChanged({
-      param($sender,$eventArgs)
-      $target = $script:NewAssetToolSearchTextBox
-      if ($target -and $target.Text -ne $sender.Text) {
-        $target.Text = $sender.Text
-        try { $target.CaretIndex = $target.Text.Length } catch {}
-      }
+
+    function Set-WindowDataBindings {
+        param([hashtable]$Ui,[pscustomobject]$SampleData)
+        $device = $SampleData.Device
+        $Ui.SelectedDeviceText.Text = $device.Name
+        Set-DisplayText -Ui $Ui -BaseName 'DetectedType' -Value $device.DetectedType
+        Set-DisplayText -Ui $Ui -BaseName 'HostName' -Value $device.Name
+        Set-DisplayText -Ui $Ui -BaseName 'AssetTag' -Value $device.AssetTag
+        Set-DisplayText -Ui $Ui -BaseName 'Serial' -Value $device.Serial
+        Set-DisplayText -Ui $Ui -BaseName 'Parent' -Value $device.Parent
+        Set-DisplayText -Ui $Ui -BaseName 'Ritm' -Value $device.RITM
+        Set-DisplayText -Ui $Ui -BaseName 'Retire' -Value (Format-DateLong $device.RetireDate)
+        Set-LastRoundedDisplay -Ui $Ui -LastRoundedRaw $device.LastRounded
+        $Ui.CityTextBox.Text = $device.City
+        $Ui.LocationTextBox.Text = $device.Location
+        $Ui.BuildingTextBox.Text = $device.Building
+        $Ui.FloorTextBox.Text = $device.Floor
+        $Ui.RoomTextBox.Text = $device.Room
+        $Ui.DepartmentTextBox.Text = $device.Department
+        $Ui.LastQueryBadgeText.Text = "Queried $(Get-Date -Format 'HH:mm')"
+        $Ui.NearbyScopeSummaryText.Text = 'Nearby disabled'
+        $Ui.AssociatedDevicesDataGrid.ItemsSource = $SampleData.Associated
+        $Ui.NearbyDataGrid.ItemsSource = $SampleData.Nearby
+    }
+
+    
+    function Update-OnlineStatus {
+        param([hashtable]$Ui,[string]$HostName)
+        $isOnline = $false
+        $latencyMs = $null
+        try {
+            $result = Test-Connection -ComputerName $HostName -Count 1 -ErrorAction Stop
+            if ($result) {
+                $isOnline = $true
+                $latencyMs = [int][Math]::Round(($result | Select-Object -First 1).ResponseTime)
+            }
+        } catch {}
+
+        if ($isOnline) {
+            $Ui.DeviceOnlineText.Text = 'Online'
+            $Ui.DeviceOnlineText.Foreground = New-Brush '#16A34A'
+            $Ui.DeviceOnlineDot.Fill = New-Brush '#16A34A'
+            $Ui.DeviceResponseTimeText.Text = "($latencyMs ms)"
+        }
+        else {
+            $Ui.DeviceOnlineText.Text = 'Offline'
+            $Ui.DeviceOnlineText.Foreground = New-Brush '#BE123C'
+            $Ui.DeviceOnlineDot.Fill = New-Brush '#BE123C'
+            $Ui.DeviceResponseTimeText.Text = '(No response)'
+        }
+
+        $Ui.LastQueryBadgeText.Text = "Queried $(Get-Date -Format 'HH:mm:ss')"
+    }
+
+    function Set-OnlineStatusUi {
+        param([hashtable]$Ui,[bool]$IsOnline,[Nullable[int]]$LatencyMs)
+        if ($IsOnline) {
+            $Ui.DeviceOnlineText.Text = 'Online'
+            $Ui.DeviceOnlineText.Foreground = New-Brush '#16A34A'
+            $Ui.DeviceOnlineDot.Fill = New-Brush '#16A34A'
+            $Ui.DeviceResponseTimeText.Text = "($LatencyMs ms)"
+        }
+        else {
+            $Ui.DeviceOnlineText.Text = 'Offline'
+            $Ui.DeviceOnlineText.Foreground = New-Brush '#BE123C'
+            $Ui.DeviceOnlineDot.Fill = New-Brush '#BE123C'
+            $Ui.DeviceResponseTimeText.Text = '(No response)'
+        }
+        $Ui.LastQueryBadgeText.Text = "Queried $(Get-Date -Format 'HH:mm:ss')"
+    }
+
+    function Start-OnlineStatusUpdateAsync {
+        param([hashtable]$Ui,[string]$HostName)
+        if ([string]::IsNullOrWhiteSpace($HostName)) {
+            Set-OnlineStatusUi -Ui $Ui -IsOnline:$false -LatencyMs $null
+            return
+        }
+        [System.Threading.Tasks.Task]::Run([Action]{
+            $isOnline = $false
+            $latencyMs = $null
+            try {
+                $result = Test-Connection -ComputerName $HostName -Count 1 -ErrorAction Stop
+                if ($result) {
+                    $isOnline = $true
+                    $latencyMs = [int][Math]::Round(($result | Select-Object -First 1).ResponseTime)
+                }
+            } catch {}
+            $Ui.MainTabControl.Dispatcher.BeginInvoke([Action]{
+                Set-OnlineStatusUi -Ui $Ui -IsOnline:$isOnline -LatencyMs $latencyMs
+            }) | Out-Null
+        }) | Out-Null
+    }
+
+    function Increment-Fonts {
+        param([System.Windows.DependencyObject]$Root)
+        if ($null -eq $Root) { return }
+        if ($Root -is [System.Windows.Controls.Control] -or $Root -is [System.Windows.Controls.TextBlock]) {
+            $skip = ($Root -is [System.Windows.Controls.TextBlock]) -and ($Root.Text -in @('System','Nearby'))
+            if (-not $skip) { $Root.FontSize = [Math]::Max(1, $Root.FontSize + 1) }
+        }
+        $count = [System.Windows.Media.VisualTreeHelper]::GetChildrenCount($Root)
+        for ($i=0; $i -lt $count; $i++) {
+            Increment-Fonts -Root ([System.Windows.Media.VisualTreeHelper]::GetChild($Root, $i))
+        }
+    }
+
+    function Clear-WindowData {
+        param([hashtable]$Ui)
+        foreach ($name in @('DetectedType','HostName','AssetTag','Serial','Parent','Ritm','Retire')) { Set-DisplayText -Ui $Ui -BaseName $name -Value '' }
+        $Ui.SelectedDeviceText.Text = ''
+        $Ui.LastRoundedLabelText.Foreground = New-Brush '#64748B'
+        $Ui.LastRoundedText.Text = ''
+        $Ui.LastRoundedText.Foreground = New-Brush '#64748B'
+        $Ui.LastRoundedContainer.Background = New-Brush '#F8FAFC'
+        $Ui.LastRoundedContainer.BorderBrush = New-Brush '#D9E1EA'
+        $Ui.LastRoundedAttentionBadge.Visibility = 'Collapsed'
+        foreach ($box in @($Ui.CityTextBox,$Ui.LocationTextBox,$Ui.BuildingTextBox,$Ui.FloorTextBox,$Ui.RoomTextBox,$Ui.DepartmentTextBox)) { $box.Text = '' }
+        $Ui.NearbyScopeSummaryText.Text = 'Nearby disabled'
+        $Ui.AssociatedDevicesDataGrid.ItemsSource = @()
+        $Ui.NearbyDataGrid.ItemsSource = @()
+        $Ui.DeviceOnlineText.Text = 'Ready'
+        $Ui.DeviceOnlineText.Foreground = New-Brush '#64748B'
+        $Ui.DeviceOnlineDot.Fill = New-Brush '#94A3B8'
+        $Ui.DeviceResponseTimeText.Text = ''
+        $Ui.LastQueryBadgeText.Text = 'Awaiting query'
+    }
+function Find-SampleDevice {
+        param([string]$SearchTerm,[pscustomobject]$SampleData)
+        $term = $SearchTerm.Trim()
+        if ([string]::IsNullOrWhiteSpace($term)) { return $null }
+        foreach ($key in $SampleData.Device.SearchKeys) {
+            if ($key -like "*$term*" -or $term -like "*$key*") { return $SampleData.Device }
+        }
+        return $null
+    }
+
+    function Get-RoundingMinutes {
+        param([hashtable]$Ui)
+        $minutes = 0
+        if (-not [int]::TryParse($Ui.RoundingTimeTextBox.Text, [ref]$minutes)) { return 0 }
+        return [Math]::Max(0, $minutes)
+    }
+
+    function Set-RoundingMinutes {
+        param([hashtable]$Ui,[int]$Minutes)
+        $Ui.RoundingTimeTextBox.Text = [Math]::Max(0, $Minutes).ToString()
+    }
+
+    function Save-RoundingEvent {
+        param([hashtable]$Ui,[pscustomobject]$CurrentDevice,[string]$ResolvedXamlPath)
+        Ensure-OutputFolder -ResolvedXamlPath $ResolvedXamlPath
+        $csvPath = Get-RoundingEventsPath -ResolvedXamlPath $ResolvedXamlPath
+        $row = [pscustomobject]@{
+            AssetTag=$CurrentDevice.AssetTag; Name=$CurrentDevice.Name; Serial=$CurrentDevice.Serial
+            City=$CurrentDevice.City; Location=$CurrentDevice.Location; Building=$CurrentDevice.Building
+            Floor=$CurrentDevice.Floor; Room=$CurrentDevice.Room; CheckStatus=$Ui.CheckStatusComboBox.Text
+            RoundingMinutes=(Get-RoundingMinutes -Ui $Ui); CableMgmtOK=[bool]$Ui.ValidateCableCheckBox.IsChecked
+            LabelOK=[bool]$Ui.LabelMonitorCheckBox.IsChecked; CartOK=[bool]$Ui.PhysicalCartCheckBox.IsChecked
+            PeripheralsOK=[bool]$Ui.ValidatePeripheralsCheckBox.IsChecked; Comments=$Ui.CommentsTextBox.Text
+            SavedAt=(Get-Date).ToString('s'); SavedFrom='System'
+        }
+        Add-CsvRow -Path $csvPath -Row $row
+        [System.Windows.MessageBox]::Show("Saved event to:`n$csvPath", 'Save Event') | Out-Null
+    }
+
+    function Save-NearbyEvents {
+        param([hashtable]$Ui,[string]$ResolvedXamlPath)
+        Ensure-OutputFolder -ResolvedXamlPath $ResolvedXamlPath
+        $csvPath = Get-RoundingEventsPath -ResolvedXamlPath $ResolvedXamlPath
+        $selectedRows = @($Ui.NearbyDataGrid.SelectedItems)
+        if ($selectedRows.Count -eq 0) {
+            [System.Windows.MessageBox]::Show('Select one or more Nearby rows before saving.', 'Nearby Save') | Out-Null
+            return
+        }
+        foreach ($item in $selectedRows) {
+            $row = [pscustomobject]@{
+                AssetTag=$item.AssetTag; Name=$item.HostName; Serial=''; City='Duncan'; Location=$item.Location; Building=$item.Building; Floor=$item.Floor; Room=$item.Room
+                CheckStatus=$(if ([string]::IsNullOrWhiteSpace($item.Status) -or $item.Status -eq '-') { 'Complete' } else { $item.Status })
+                RoundingMinutes=3; CableMgmtOK=$true; LabelOK=$true; CartOK=$true; PeripheralsOK=$true
+                Comments='Saved from Nearby tab'; SavedAt=(Get-Date).ToString('s'); SavedFrom='Nearby'
+            }
+            Add-CsvRow -Path $csvPath -Row $row
+        }
+        [System.Windows.MessageBox]::Show("Saved $($selectedRows.Count) nearby row(s) to:`n$csvPath", 'Nearby Save') | Out-Null
+    }
+
+    function Toggle-LocationEditMode {
+        param([hashtable]$Ui,[bool]$IsEditing)
+        $readOnlyControls = @($Ui.CityTextBox,$Ui.LocationTextBox,$Ui.BuildingTextBox,$Ui.FloorTextBox,$Ui.RoomTextBox,$Ui.DepartmentTextBox)
+        $comboControls = @($Ui.CityComboBox,$Ui.LocationComboBox,$Ui.BuildingComboBox,$Ui.FloorComboBox,$Ui.RoomComboBox,$Ui.DepartmentComboBox)
+        foreach ($control in $readOnlyControls) { $control.Visibility = if ($IsEditing) { 'Collapsed' } else { 'Visible' } }
+        foreach ($control in $comboControls) { $control.Visibility = if ($IsEditing) { 'Visible' } else { 'Collapsed' } }
+        $Ui.CancelEditLocationButton.Visibility = if ($IsEditing) { 'Visible' } else { 'Collapsed' }
+        $Ui.EditLocationButton.Content = if ($IsEditing) { 'Save' } else { 'Edit Location' }
+    }
+
+    function Save-LocationValues {
+        param([hashtable]$Ui)
+
+        $Ui.CityTextBox.Text = $Ui.CityComboBox.Text
+        $Ui.LocationTextBox.Text = $Ui.LocationComboBox.Text
+        $Ui.BuildingTextBox.Text = $Ui.BuildingComboBox.Text
+        $Ui.FloorTextBox.Text = $Ui.FloorComboBox.Text
+        $Ui.RoomTextBox.Text = $Ui.RoomComboBox.Text
+        $Ui.DepartmentTextBox.Text = $Ui.DepartmentComboBox.Text
+    }
+
+    $resolvedXamlPath = (Resolve-Path -LiteralPath $XamlPath).Path
+    $window = ConvertFrom-XamlFile -Path $resolvedXamlPath
+
+    $ui = Get-NamedControls -Window $window -Names @(
+        'SearchTextBox','QueryButton','PingButton','LiveDetailsButton','MonitorLabelButton',
+        'MainTabControl','SystemTab','NearbyTab','SelectedDeviceText','DeviceOnlineText','DeviceOnlineDot','DeviceResponseTimeText','LastQueryBadgeText',
+        'DetectedTypeDisplay','HostNameDisplay','AssetTagDisplay','SerialDisplay','ParentDisplay','RitmDisplay','RetireDisplay',
+        'DetectedTypeTextBox','HostNameTextBox','AssetTagTextBox','SerialNumberTextBox','ParentTextBox','RitmTextBox','RetireDateTextBox','LastRoundedContainer','LastRoundedLabelText','LastRoundedText','LastRoundedAttentionBadge','LastRoundedAttentionText',
+        'AssociatedDevicesDataGrid','FixNameButton',
+        'AddPeripheralButton','RemovePeripheralButton','ValidateAssociatedButton',
+        'CityTextBox','LocationTextBox','BuildingTextBox','FloorTextBox','RoomTextBox','DepartmentTextBox',
+        'CityComboBox','LocationComboBox','BuildingComboBox','FloorComboBox','RoomComboBox','DepartmentComboBox',
+        'EditLocationButton','CancelEditLocationButton',
+        'MaintenanceTypeComboBox','CheckStatusComboBox','RoundingTimeTextBox',
+        'RoundingTimeUpButton','RoundingTimeDownButton',
+        'ValidateCableCheckBox','LabelMonitorCheckBox','ValidatePeripheralsCheckBox',
+        'CablingNeededCheckBox','PhysicalCartCheckBox','AddDeviceToTrackerCheckBox',
+        'CheckCompleteButton','SaveEventButton','ManualRoundButton','CommentsTextBox',
+        'NearbyScopeSummaryText','RebuildNearbyButton','PingAllButton','ClearNearbyButton',
+        'NearbyCollapseButton','NearbyExpandButton','NearbyDataGrid','NearbySaveButton',
+        'ShowAllNearbyCheckBox','TodaysRoundedCheckBox','ExcludedCheckBox','RecentlyRoundedCheckBox','CriticalClinicalCheckBox',
+        'DataPathText','OutputPathText','DaysPerWeekBadge','TodayBadge','ThisWeekBadge','RemainingPerDayBadge','StatusMessageBadge'
+    )
+
+    $inventory = Load-InventoryData -ResolvedXamlPath $resolvedXamlPath
+    $script:AppState = [pscustomobject]@{ LastStatusMode='Found'; SampleData=$null; CurrentDevice=$null; CurrentQueryToken=''; Inventory=$inventory }
+
+    Clear-WindowData -Ui $ui
+    Increment-Fonts -Root $window
+    Set-StatusMessage -Ui $ui -Mode 'Warning' -CustomText 'Ready. Enter a device and click Query.'
+    Toggle-LocationEditMode -Ui $ui -IsEditing:$false
+
+    $ui.DataPathText.Text = "Data: $(Join-Path (Split-Path -Parent $resolvedXamlPath) 'Data')"
+    $ui.OutputPathText.Text = "Output: $(Get-OutputFolder -ResolvedXamlPath $resolvedXamlPath)"
+
+    foreach ($combo in @($ui.CityComboBox,$ui.LocationComboBox,$ui.BuildingComboBox,$ui.FloorComboBox,$ui.RoomComboBox,$ui.DepartmentComboBox)) {
+        $combo.Items.Clear()
+        $combo.Text = ''
+    }
+
+    $ui.QueryButton.Add_Click({
+$match = Find-InventoryMatch -SearchTerm $ui.SearchTextBox.Text -Inventory $script:AppState.Inventory
+        if ($null -eq $match) {
+            Set-StatusMessage -Ui $ui -Mode 'Warning' -CustomText 'No matching device found'
+            return
+        }
+        $script:AppState.CurrentDevice = $match
+        $associated = Build-AssociatedDevices -Device $match -Inventory $script:AppState.Inventory
+        $script:AppState.SampleData = [pscustomobject]@{ Device=$match; Associated=$associated; Nearby=@() }
+        $script:AppState.CurrentQueryToken = [guid]::NewGuid().ToString('N')
+        Set-PrimaryDeviceBindings -Ui $ui -Device $match
+        $ui.AssociatedDevicesDataGrid.ItemsSource = $associated
+        $ui.NearbyDataGrid.ItemsSource = @()
+        $ui.NearbyScopeSummaryText.Text = 'Nearby disabled'
+        $ui.DeviceOnlineText.Text = 'Checking...'
+        $ui.DeviceOnlineText.Foreground = New-Brush '#64748B'
+        $ui.DeviceOnlineDot.Fill = New-Brush '#94A3B8'
+        $ui.DeviceResponseTimeText.Text = ''
+        $ui.LastQueryBadgeText.Text = "Queried $(Get-Date -Format 'HH:mm:ss')"
+        Set-StatusMessage -Ui $ui -Mode 'Found'
+        Start-OnlineStatusUpdateAsync -Ui $ui -HostName $match.Name
     })
-  }
-  $searchTextBox.Add_TextChanged({
-    param($sender,$eventArgs)
-    $script:PendingScanText = $sender.Text
-    $scanSyncTimer.Stop()
-    $scanSyncTimer.Start()
-    if ($hasHandleScanTextChanged) {
-      Handle-ScanTextChanged $sender.Text
-    }
-    try {
-      if ($hasUpdateRoundNowButtonState) {
-        Update-RoundNowButtonState
-      }
-    } catch {}
-  })
-  $searchTextBox.Add_KeyDown({
-    param($sender,$eventArgs)
-    if ($eventArgs.Key -in @([System.Windows.Input.Key]::Enter,[System.Windows.Input.Key]::Return)) {
-      $eventArgs.Handled = $true
-      try { Do-Lookup } catch {}
-    }
-  })
-  try { Focus-ScanInput } catch {}
-  try {
-    if ($hasUpdateRoundNowButtonState) {
-      Update-RoundNowButtonState
-    }
-  } catch {}
+
+    $ui.SearchTextBox.Add_KeyDown({
+        if ($_.Key -eq 'Return') {
+            $ui.QueryButton.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Button]::ClickEvent)))
+        }
+    })
+
+    $ui.PingButton.Add_Click({ [System.Windows.MessageBox]::Show('Ping button clicked.', 'Ping') | Out-Null })
+    $ui.LiveDetailsButton.Add_Click({ [System.Windows.MessageBox]::Show('Live Details button clicked.', 'Live Details') | Out-Null })
+    $ui.MonitorLabelButton.Add_Click({ [System.Windows.MessageBox]::Show('Monitor Label button clicked.', 'Monitor Label') | Out-Null })
+    $ui.FixNameButton.Add_Click({ [System.Windows.MessageBox]::Show('Fix Name button clicked.', 'Fix Name') | Out-Null })
+    $ui.EditLocationButton.Add_Click({
+        if ($ui.EditLocationButton.Content -eq 'Save') {
+            Save-LocationValues -Ui $ui
+            Toggle-LocationEditMode -Ui $ui -IsEditing:$false
+        }
+        else {
+            Toggle-LocationEditMode -Ui $ui -IsEditing:$true
+        }
+    })
+    $ui.CancelEditLocationButton.Add_Click({ Toggle-LocationEditMode -Ui $ui -IsEditing:$false })
+    $ui.RoundingTimeUpButton.Add_Click({ Set-RoundingMinutes -Ui $ui -Minutes ((Get-RoundingMinutes -Ui $ui) + 1) })
+    $ui.RoundingTimeDownButton.Add_Click({ Set-RoundingMinutes -Ui $ui -Minutes ([Math]::Max(0, (Get-RoundingMinutes -Ui $ui) - 1)) })
+    $ui.CheckCompleteButton.Add_Click({ $ui.CheckStatusComboBox.Text = 'Complete' })
+    $ui.SaveEventButton.Add_Click({ Save-RoundingEvent -Ui $ui -CurrentDevice $script:AppState.CurrentDevice -ResolvedXamlPath $resolvedXamlPath })
+    $ui.ManualRoundButton.Add_Click({ [System.Windows.MessageBox]::Show('Manual Round button clicked.', 'Manual Round') | Out-Null })
+    $ui.RebuildNearbyButton.Add_Click({ $ui.NearbyScopeSummaryText.Text = 'Nearby disabled' })
+    $ui.ClearNearbyButton.Add_Click({ $ui.NearbyDataGrid.ItemsSource = @(); $ui.NearbyScopeSummaryText.Text = 'Nearby disabled' })
+    $ui.PingAllButton.Add_Click({ $ui.NearbyScopeSummaryText.Text = 'Nearby disabled' })
+    $ui.NearbySaveButton.Add_Click({ [System.Windows.MessageBox]::Show('Nearby logic is currently disabled.', 'Nearby Disabled') | Out-Null })
+
+    $ui.MainTabControl.Add_SelectionChanged({
+        if ($window.IsLoaded) {
+            if ($script:AppState.LastStatusMode -eq 'PingComplete') { Set-StatusMessage -Ui $ui -Mode 'PingComplete' }
+            else { Set-StatusMessage -Ui $ui -Mode 'Found' }
+        }
+    })
+
+    $ui.ValidatePeripheralsCheckBox.IsChecked = $true
+    $ui.LabelMonitorCheckBox.IsChecked = $false
+    $ui.ValidateCableCheckBox.IsChecked = $false
+    $ui.CablingNeededCheckBox.IsChecked = $false
+    $ui.PhysicalCartCheckBox.IsChecked = $false
+    $ui.AddDeviceToTrackerCheckBox.IsChecked = $false
+
+    [void]$window.ShowDialog()
 }
-
-$app = [System.Windows.Application]::Current
-if (-not $app) { $app = New-Object System.Windows.Application }
-$app.ShutdownMode = [System.Windows.ShutdownMode]::OnMainWindowClose
-$app.MainWindow = $window
-
-$script:__newAssetToolCleanupRan = $false
-$cleanupAction = {
-  if (-not $script:__newAssetToolCleanupRan) {
-    $script:__newAssetToolCleanupRan = $true
-    try { if ($form) { $form.Dispose() } } catch {}
-    try {
-      if ($hadPrevious) {
-        $global:NewAssetToolSuppressShow = $previousSuppress
-      } else {
-        Remove-Variable -Scope Global -Name NewAssetToolSuppressShow -ErrorAction SilentlyContinue
-      }
-    } catch {}
-    try { Remove-Variable -Scope Global -Name NewAssetToolApplyWpfScale -ErrorAction SilentlyContinue } catch {}
-  }
-}
-
-$window.Add_Closed($cleanupAction)
-
-try {
-  [void]$app.Run($window)
-} finally {
-  & $cleanupAction
+catch {
+    Show-StartupError -Exception $_.Exception -ScriptPath $PSCommandPath
+    throw
 }
