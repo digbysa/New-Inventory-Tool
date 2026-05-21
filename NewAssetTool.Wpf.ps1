@@ -214,6 +214,21 @@ if ($window) {
 }
 
 $searchTextBox = $window.FindName('SearchTextBox')
+
+$queryButton = $window.FindName('QueryButton')
+if ($queryButton) {
+  $queryButton.Add_Click({
+    try { Do-Lookup } catch {}
+  })
+}
+
+$pingButton = $window.FindName('PingButton')
+if ($pingButton) {
+  $pingButton.Add_Click({
+    # Placeholder for future ping logic.
+  })
+}
+
 if ($searchTextBox) {
   try { Set-ScanSearchControl $searchTextBox } catch {}
   $hasHandleScanTextChanged = $false
