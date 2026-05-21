@@ -417,7 +417,7 @@ function Invoke-NewAssetToolWpfScale {
   } catch {}
 }
 $script:ThemeColors = @{
-  Background = [System.Drawing.Color]::FromArgb(248, 249, 251)
+  Background = [System.Drawing.Color]::FromArgb(243, 245, 247)
   Surface    = [System.Drawing.Color]::FromArgb(255, 255, 255)
   Header     = [System.Drawing.Color]::FromArgb(246, 247, 249)
   Text       = [System.Drawing.Color]::FromArgb(32, 32, 32)
@@ -7165,7 +7165,7 @@ $nearBottom.Controls.AddRange(@($lblNearNote,$btnNearSave))
 $tabTop = New-Object System.Windows.Forms.TabControl
 $tabTop.Dock = 'Fill'
 $tabPageMain = New-Object System.Windows.Forms.TabPage
-$tabPageMain.Text = 'Main'
+$tabPageMain.Text = 'System'
 $tabPageMain.UseVisualStyleBackColor = $false
 $tabPageNear = New-Object System.Windows.Forms.TabPage
 $tabPageNear.Text = 'Nearby'
@@ -7173,10 +7173,57 @@ $tabPageNear.UseVisualStyleBackColor = $false
 # Move existing main UI into a panel and then into TabPageMain
 $pageMain = New-Object System.Windows.Forms.Panel
 $pageMain.Dock = 'Fill'
+$pageMain.BackColor = $script:ThemeColors.Background
+
+$systemStatusRow = New-Object System.Windows.Forms.TableLayoutPanel
+$systemStatusRow.Dock = 'Top'
+$systemStatusRow.Height = 56
+$systemStatusRow.Padding = New-Object System.Windows.Forms.Padding(16,8,16,8)
+$systemStatusRow.ColumnCount = 2
+$systemStatusRow.RowCount = 1
+$systemStatusRow.BackColor = $script:ThemeColors.Background
+$systemStatusRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
+$systemStatusRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50)))
+
+function New-SystemStatusCard {
+  param(
+    [string]$Title,
+    [string]$Value,
+    [bool]$AlignRight = $false
+  )
+  $card = New-Object System.Windows.Forms.Panel
+  $card.Dock = 'Fill'
+  $card.BackColor = [System.Drawing.Color]::White
+  $card.Margin = if ($AlignRight) { New-Object System.Windows.Forms.Padding(6,0,0,0) } else { New-Object System.Windows.Forms.Padding(0,0,6,0) }
+  $card.Padding = New-Object System.Windows.Forms.Padding(10,7,10,7)
+  $card.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+
+  $lblTitle = New-Object System.Windows.Forms.Label
+  $lblTitle.Dock = 'Top'
+  $lblTitle.Text = $Title
+  $lblTitle.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
+  $lblTitle.ForeColor = [System.Drawing.Color]::FromArgb(71,85,105)
+  $lblTitle.AutoSize = $true
+
+  $lblValue = New-Object System.Windows.Forms.Label
+  $lblValue.Dock = 'Bottom'
+  $lblValue.Text = $Value
+  $lblValue.Font = New-Object System.Drawing.Font('Segoe UI', 9)
+  $lblValue.ForeColor = [System.Drawing.Color]::FromArgb(100,116,139)
+  $lblValue.AutoSize = $true
+
+  $card.Controls.Add($lblValue)
+  $card.Controls.Add($lblTitle)
+  return $card
+}
+
+$systemStatusRow.Controls.Add((New-SystemStatusCard -Title 'Online Status' -Value 'Waiting for query...'),0,0)
+$systemStatusRow.Controls.Add((New-SystemStatusCard -Title 'Nearby Status' -Value 'Use Nearby tab to review devices' -AlignRight $true),1,0)
 # Re-parent header + main table into panel
 $form.Controls.Remove($panelTop)
 $form.Controls.Remove($splitter)
 $pageMain.Controls.Add($splitter); $splitter.Dock='Fill'
+$pageMain.Controls.Add($systemStatusRow)
 $pageMain.Controls.Add($panelTop); $panelTop.Dock='Top'
 $tabPageMain.Controls.Add($pageMain)
 # Compose Nearby page
