@@ -436,6 +436,8 @@ function Set-ScanSearchControl {
 
 $script:DeviceTypeSummaryControl = $null
 $script:SearchTextButtonStates = @{}
+$script:SaveEventButton = $null
+$script:SaveButtonLocationComplete = $false
 $script:EditLocationOriginal = $null
 
 function Get-CurrentSearchInputText {
@@ -476,6 +478,9 @@ function Update-SearchDependentButtonStates {
     try {
       $baseEnabled = [bool]$entry.BaseEnabled
       $shouldEnable = $hasDeviceType -and $baseEnabled
+      if ($script:SaveEventButton -and [object]::ReferenceEquals($button, $script:SaveEventButton)) {
+        $shouldEnable = $shouldEnable -and [bool]$script:SaveButtonLocationComplete
+      }
       if ($button.Enabled -ne $shouldEnable) {
         $button.Enabled = $shouldEnable
       }
@@ -2873,6 +2878,48 @@ $tlpLoc.RowCount++
 # Editable combos
 $cmbCity.Visible=$false; $cmbLocation.Visible=$false; $cmbBuilding.Visible=$false; $cmbFloor.Visible=$false; $cmbRoom.Visible=$false; $cmbDept.Visible=$false
 Populate-Department-Combo ''
+
+function Get-DeviceLocationFieldText {
+  param(
+    [System.Windows.Forms.Control]$ReadOnlyControl,
+    [System.Windows.Forms.Control]$EditControl
+  )
+
+  if($script:editing -and $EditControl -and $EditControl.Visible){ return '' + $EditControl.Text }
+  if($ReadOnlyControl){ return '' + $ReadOnlyControl.Text }
+  if($EditControl){ return '' + $EditControl.Text }
+  return ''
+}
+
+function Test-DeviceLocationFieldsComplete {
+  $locationValues = @(
+    (Get-DeviceLocationFieldText $txtCity $cmbCity),
+    (Get-DeviceLocationFieldText $txtLocation $cmbLocation),
+    (Get-DeviceLocationFieldText $txtBldg $cmbBuilding),
+    (Get-DeviceLocationFieldText $txtFloor $cmbFloor),
+    (Get-DeviceLocationFieldText $txtRoom $cmbRoom),
+    (Get-DeviceLocationFieldText $txtDept $cmbDept)
+  )
+
+  foreach($value in $locationValues){
+    if([string]::IsNullOrWhiteSpace('' + $value)){ return $false }
+  }
+  return $true
+}
+
+function Update-SaveEventButtonLocationState {
+  $script:SaveButtonLocationComplete = Test-DeviceLocationFieldsComplete
+  try { Update-SearchDependentButtonStates } catch {}
+}
+
+foreach($locationControl in @($txtCity,$txtLocation,$txtBldg,$txtFloor,$txtRoom,$txtDept,$cmbCity,$cmbLocation,$cmbBuilding,$cmbFloor,$cmbRoom,$cmbDept)){
+  if($locationControl){
+    $locationControl.Add_TextChanged({ Update-SaveEventButtonLocationState })
+  }
+}
+
+Update-SaveEventButtonLocationState
+
 # Left/Right compose
 $tlpLeft.Controls.Add($grpSummary,0,0)
 $tlpLeft.Controls.Add($grpLoc,0,1)
@@ -3204,6 +3251,7 @@ $btnManualRound=New-Object ModernUI.RoundedButton; $btnManualRound.Text="Manual 
 $tip.SetToolTip($btnCheckComplete, 'Mark the checklist as complete')
 $tip.SetToolTip($btnSave, 'Save the rounding event')
 $tip.SetToolTip($btnManualRound, 'Open the manual rounding link')
+$script:SaveEventButton = $btnSave
 
 Set-SearchTextButtonBaseState -Button $btnSave -BaseEnabled $true
 
@@ -3728,6 +3776,7 @@ function Validate-Location($rec){
     if($cmbDept){ $cmbDept.BackColor = $colorD }
   } catch {}
   Update-LastLocationSelections $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text
+  Update-SaveEventButtonLocationState
 }
 function Refresh-AssocGrid($parentRec){
   $dgv.Rows.Clear(); if(-not $parentRec){ Size-AssocForRows(1) | Out-Null; return }
@@ -5152,6 +5201,7 @@ function Populate-UI($displayRec,$parentRec){
   if($btnMonitorLabel){ Set-SearchTextButtonBaseState -Button $btnMonitorLabel -BaseEnabled ([bool]$parentRec) }
   Validate-ParentAndName $displayRec $parentRec
   Update-FixNameButton $displayRec $parentRec
+  Update-SaveEventButtonLocationState
 }
 # ---- Location cascading (City > Location > Building > Floor > Room) ----
 $script:IsPopulatingLocationCombos = $false
@@ -5481,6 +5531,7 @@ function Toggle-EditLocation(){
     if($btnCancelEditLoc){ $btnCancelEditLoc.Visible = $false }
     $script:EditLocationOriginal = $null
     $btnEditLoc.Text="Edit Location"
+    Update-SaveEventButtonLocationState
   }
 }
 
@@ -5509,6 +5560,7 @@ function Cancel-EditLocation(){
   $btnEditLoc.Text = 'Edit Location'
   $script:EditLocationOriginal = $null
   $script:editing = $false
+  Update-SaveEventButtonLocationState
 }
 $btnRemove.Add_Click({
   $pc = $script:CurrentParent
@@ -5630,6 +5682,7 @@ function Clear-UI(){
   if($btnValidateDevices){ Set-SearchTextButtonBaseState -Button $btnValidateDevices -BaseEnabled $false }
   if($btnLiveDetails){ Set-SearchTextButtonBaseState -Button $btnLiveDetails -BaseEnabled $false }
   if($btnMonitorLabel){ Set-SearchTextButtonBaseState -Button $btnMonitorLabel -BaseEnabled $false }
+  Update-SaveEventButtonLocationState
   $statusLabel.Text = "Ready - scan or enter a device."
   Size-AssocForRows(1) | Out-Null
 }
