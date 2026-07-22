@@ -437,7 +437,7 @@ function Set-ScanSearchControl {
 $script:DeviceTypeSummaryControl = $null
 $script:SearchTextButtonStates = @{}
 $script:SaveEventButton = $null
-$script:SaveButtonLocationComplete = $false
+$script:SaveButtonLocationComplete = $true
 $script:EditLocationOriginal = $null
 
 function Get-CurrentSearchInputText {
@@ -2840,7 +2840,9 @@ if(-not $btnEditLoc){
   $btnEditLoc.Size = '120,26'
 }
 $btnEditLoc.Margin = New-Object System.Windows.Forms.Padding(0)
-$tip.SetToolTip($btnEditLoc, 'Edit and save the device location fields')
+$btnEditLoc.Visible = $false
+$btnEditLoc.Enabled = $false
+$tip.SetToolTip($btnEditLoc, 'Location editing is temporarily disabled')
 
 if(-not $btnCancelEditLoc){
   $btnCancelEditLoc = New-Object ModernUI.RoundedButton
@@ -2849,7 +2851,9 @@ if(-not $btnCancelEditLoc){
   $btnCancelEditLoc.Visible = $false
 }
 $btnCancelEditLoc.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
-$tip.SetToolTip($btnCancelEditLoc, 'Discard location edits')
+$btnCancelEditLoc.Visible = $false
+$btnCancelEditLoc.Enabled = $false
+$tip.SetToolTip($btnCancelEditLoc, 'Location editing is temporarily disabled')
 
 if(-not $locButtonsPanel){
   $locButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
@@ -2892,18 +2896,8 @@ function Get-DeviceLocationFieldText {
 }
 
 function Test-DeviceLocationFieldsComplete {
-  $locationValues = @(
-    (Get-DeviceLocationFieldText $txtCity $cmbCity),
-    (Get-DeviceLocationFieldText $txtLocation $cmbLocation),
-    (Get-DeviceLocationFieldText $txtBldg $cmbBuilding),
-    (Get-DeviceLocationFieldText $txtFloor $cmbFloor),
-    (Get-DeviceLocationFieldText $txtRoom $cmbRoom),
-    (Get-DeviceLocationFieldText $txtDept $cmbDept)
-  )
-
-  foreach($value in $locationValues){
-    if([string]::IsNullOrWhiteSpace('' + $value)){ return $false }
-  }
+  # Location validation/editing is temporarily disabled. Do not block save/event actions
+  # while the Device Location panel is acting as a read-only display of computer-table data.
   return $true
 }
 
@@ -3713,69 +3707,77 @@ function Get-City-ForLocation([string]$loc){
   }
   return ''
 }
+function Get-DeviceLocationSourceRecord {
+  param(
+    [object]$displayRec,
+    [object]$parentRec
+  )
+
+  $displayType = ''
+  try { if($displayRec -and $displayRec.PSObject.Properties['Type']){ $displayType = '' + $displayRec.Type } } catch {}
+
+  $source = $null
+  if($displayType -eq 'Computer'){
+    $source = Resolve-ComputerRecord $displayRec
+  } else {
+    $source = Resolve-ComputerRecord $parentRec
+    if(-not $source){ $source = Resolve-ParentComputer $displayRec }
+  }
+  if(-not $source){ $source = Resolve-ComputerRecord $displayRec }
+  if(-not $source){ $source = $parentRec }
+  if(-not $source){ $source = $displayRec }
+  return $source
+}
+
+function Set-DeviceLocationReadOnlyMode {
+  foreach($combo in @($cmbCity,$cmbLocation,$cmbBuilding,$cmbFloor,$cmbRoom,$cmbDept)){
+    try { if($combo){ $combo.Visible = $false; $combo.Enabled = $false } } catch {}
+  }
+  foreach($textBox in @($txtCity,$txtLocation,$txtBldg,$txtFloor,$txtRoom,$txtDept)){
+    try {
+      if($textBox){
+        $textBox.Visible = $true
+        $textBox.ReadOnly = $true
+        $textBox.BackColor = [System.Drawing.Color]::White
+      }
+    } catch {}
+  }
+  try { if($btnEditLoc){ $btnEditLoc.Visible = $false; $btnEditLoc.Enabled = $false } } catch {}
+  try { if($btnCancelEditLoc){ $btnCancelEditLoc.Visible = $false; $btnCancelEditLoc.Enabled = $false } } catch {}
+  $script:editing = $false
+}
+
 function Validate-Location($rec){
-  # In edit mode, do not actively validate or repaint to avoid flicker; just reflect current text.
-  if($script:editing){ return }
-  # Show raw values in UI
+  # Temporarily reduced to read-only population. Validation coloring and edit controls
+  # are intentionally disabled until the location edit/validation workflow is rebuilt.
+  Set-DeviceLocationReadOnlyMode
+
   $cityText = ''
   try {
     if($rec -and $rec.PSObject.Properties['City']){ $cityText = '' + $rec.City }
     elseif($rec -and $rec.PSObject.Properties['location.city']){ $cityText = '' + $rec.PSObject.Properties['location.city'].Value }
   } catch {}
   if([string]::IsNullOrWhiteSpace($cityText)){
-    $cityText = Get-City-ForLocation $rec.location
+    try { $cityText = Get-City-ForLocation $rec.location } catch {}
   }
-  $txtCity.Text = $cityText
+
   $deptVal = ''
   try{
     if($rec){
-      if($rec.PSObject.Properties['u_department_location']){ $deptVal = $rec.u_department_location }
-      elseif($rec.PSObject.Properties['Department']){ $deptVal = $rec.Department }
+      if($rec.PSObject.Properties['u_department_location']){ $deptVal = '' + $rec.u_department_location }
+      elseif($rec.PSObject.Properties['Department']){ $deptVal = '' + $rec.Department }
     }
   } catch {}
-  if($txtDept){ $txtDept.Text = $deptVal }
-  $txtLocation.Text = $rec.location
-  $txtBldg.Text     = $rec.u_building
-  $txtFloor.Text    = $rec.u_floor
-  $txtRoom.Text     = $rec.u_room
-  try{ $cmbDept.Text = $deptVal } catch {}
 
-  $tip.SetToolTip($txtRoom, "")
-  $okC = Test-LocationValueInColumn $txtCity.Text 'City'
-  $okL = Test-LocationValueInColumn $txtLocation.Text 'Location'
-  $okB = Test-LocationValueInColumn $txtBldg.Text 'Building'
-  $okF = Test-LocationValueInColumn $txtFloor.Text 'Floor'
-  $okR = $false
-  if(-not [string]::IsNullOrWhiteSpace($txtRoom.Text)){
-    $nRoom = Normalize-Field $txtRoom.Text
-    $okR = ($script:RoomsNorm -contains $nRoom)
-    if(-not $okR){
-      $code = Extract-RoomCode $txtRoom.Text
-      if($code -and ($script:RoomCodes -contains $code)){
-        $okR = $true
-        $tip.SetToolTip($txtRoom, "Matched by room code " + $code + " (exact text differs in LocationMaster).")
-      } else {
-        $tip.SetToolTip($txtRoom, "Room not found in LocationMaster Room column.")
-      }
-    }
-  }
-  $txtCity.BackColor     = if($okC){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
-  $txtLocation.BackColor = if($okL){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
-  $txtBldg.BackColor     = if($okB){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
-  $txtFloor.BackColor    = if($okF){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
-  $txtRoom.BackColor     = if($okR){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
-  try{
-    $d = $deptVal
-    $okD = $false
-    if(-not $script:DepartmentListNorm -or $script:DepartmentListNorm.Count -eq 0){
-      try { Load-DepartmentMaster } catch {}
-    }
-    if($d -and $script:DepartmentListNorm){ $okD = $script:DepartmentListNorm.Contains((Normalize-Field $d)) }
-    $colorD = if($okD){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
-    if($txtDept){ $txtDept.BackColor = $colorD }
-    if($cmbDept){ $cmbDept.BackColor = $colorD }
-  } catch {}
-  Update-LastLocationSelections $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text
+  try { $txtCity.Text     = $cityText } catch {}
+  try { $txtLocation.Text = if($rec){ '' + $rec.location } else { '' } } catch {}
+  try { $txtBldg.Text     = if($rec){ '' + $rec.u_building } else { '' } } catch {}
+  try { $txtFloor.Text    = if($rec){ '' + $rec.u_floor } else { '' } } catch {}
+  try { $txtRoom.Text     = if($rec){ '' + $rec.u_room } else { '' } } catch {}
+  try { if($txtDept){ $txtDept.Text = $deptVal } } catch {}
+  try { if($cmbDept){ $cmbDept.Text = $deptVal } } catch {}
+  try { $tip.SetToolTip($txtRoom, '') } catch {}
+  try { Update-LastLocationSelections $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text } catch {}
   Update-SaveEventButtonLocationState
 }
 function Refresh-AssocGrid($parentRec){
@@ -5191,7 +5193,8 @@ function Populate-UI($displayRec,$parentRec){
   $txtRITM.Text=$displayRec.RITM
   $txtRetire.Text = Fmt-DateLong $displayRec.Retire
   Show-RoundingStatus $parentRec $displayRec
-  if($parentRec){ Validate-Location $parentRec } else { Validate-Location $displayRec }
+  $locationSource = Get-DeviceLocationSourceRecord $displayRec $parentRec
+  Validate-Location $locationSource
   if($parentRec){ Refresh-AssocViews $parentRec }
   Update-CartCheckbox-State $parentRec
   Update-ManualRoundButton   $parentRec
