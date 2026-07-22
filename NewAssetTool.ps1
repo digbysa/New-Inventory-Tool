@@ -5295,9 +5295,24 @@ function Set-ComboTextIfChanged {
   Restore-ComboSelectionLater $Combo $selStart $selLength
 }
 
+function Add-ComboItemsSafely {
+  param(
+    [System.Windows.Forms.ComboBox]$Combo,
+    [object[]]$Items
+  )
+  if(-not $Combo -or -not $Items){ return }
+  foreach($item in @($Items)){
+    if($null -eq $item){ continue }
+    [void]$Combo.Items.Add([string]$item)
+  }
+}
+
 function Get-UniqueComputerLocationDropdownValues {
-  param([string]$Field)
-  $values = @($script:LocationRows | ForEach-Object { Get-LocVal $_ $Field } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { ([string]$_).Trim() } | Sort-Object -Unique)
+  param(
+    [string]$Field,
+    [object[]]$Rows = $script:LocationRows
+  )
+  $values = @($Rows | ForEach-Object { Get-LocVal $_ $Field } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { ([string]$_).Trim() } | Sort-Object -Unique)
   if($Field -eq 'Floor'){
     return @(Sort-Floors $values)
   }
@@ -5320,16 +5335,20 @@ function Populate-Location-Combos {
     $cmbCity.Items.Clear(); $cmbLocation.Items.Clear(); $cmbBuilding.Items.Clear(); $cmbFloor.Items.Clear(); $cmbRoom.Items.Clear()
 
     $cities = Get-UniqueComputerLocationDropdownValues 'City'
-    $locs = Get-UniqueComputerLocationDropdownValues 'Location'
-    $blds = Get-UniqueComputerLocationDropdownValues 'Building'
-    $floors = Get-UniqueComputerLocationDropdownValues 'Floor'
-    $rooms = Get-UniqueComputerLocationDropdownValues 'Room'
+    $locRows = Filter-LocationRows -city $city
+    $bldRows = Filter-LocationRows -city $city -location $loc
+    $floorRows = Filter-LocationRows -city $city -location $loc -building $b
+    $roomRows = Filter-LocationRows -city $city -location $loc -building $b -floor $f
+    $locs = Get-UniqueComputerLocationDropdownValues -Field 'Location' -Rows $locRows
+    $blds = Get-UniqueComputerLocationDropdownValues -Field 'Building' -Rows $bldRows
+    $floors = Get-UniqueComputerLocationDropdownValues -Field 'Floor' -Rows $floorRows
+    $rooms = Get-UniqueComputerLocationDropdownValues -Field 'Room' -Rows $roomRows
 
-    if($cities.Count -gt 0){ $cmbCity.Items.AddRange(@($cities)) }
-    if($locs.Count -gt 0){ $cmbLocation.Items.AddRange(@($locs)) }
-    if($blds.Count -gt 0){ $cmbBuilding.Items.AddRange(@($blds)) }
-    if($floors.Count -gt 0){ $cmbFloor.Items.AddRange(@($floors)) }
-    if($rooms.Count -gt 0){ $cmbRoom.Items.AddRange(@($rooms)) }
+    Add-ComboItemsSafely -Combo $cmbCity -Items $cities
+    Add-ComboItemsSafely -Combo $cmbLocation -Items $locs
+    Add-ComboItemsSafely -Combo $cmbBuilding -Items $blds
+    Add-ComboItemsSafely -Combo $cmbFloor -Items $floors
+    Add-ComboItemsSafely -Combo $cmbRoom -Items $rooms
 
     Set-ComboTextIfChanged $cmbCity $city
     Set-ComboTextIfChanged $cmbLocation $loc
