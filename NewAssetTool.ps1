@@ -437,7 +437,7 @@ function Set-ScanSearchControl {
 $script:DeviceTypeSummaryControl = $null
 $script:SearchTextButtonStates = @{}
 $script:SaveEventButton = $null
-$script:SaveButtonLocationComplete = $true
+$script:SaveButtonLocationComplete = $false
 $script:EditLocationOriginal = $null
 
 function Get-CurrentSearchInputText {
@@ -1859,13 +1859,13 @@ function Rebuild-DepartmentListFromLocations(){
   $script:DepartmentUserAdds = @()
   $script:DepartmentList = New-Object System.Collections.Generic.List[string]
   $script:DepartmentListNorm = New-Object System.Collections.Generic.HashSet[string]
-
-  # Department dropdown options must come only from u_department_location values
-  # in the selected site's Computers - *.csv data, via $script:LocationRows.
-  foreach($row in @($script:LocationRows)){
+  $rows = @()
+  if($script:LocationMasterRows){ $rows += $script:LocationMasterRows }
+  if($script:UserAddedLocationRows){ $rows += $script:UserAddedLocationRows }
+  foreach($row in $rows){
     if(-not $row){ continue }
     $dept = $null
-    try { $dept = Get-LocVal $row 'Department' } catch {}
+    try { $dept = Get-LocationMasterVal $row 'Department' } catch {}
     if($dept){ Add-DepartmentValue $dept }
   }
   $sorted = @($script:DepartmentList | Sort-Object -Unique)
@@ -1897,7 +1897,7 @@ function Populate-Department-Combo([string]$current){
       try {
         $combo.BeginUpdate()
         $combo.Items.Clear()
-        if($items.Count -gt 0){ foreach($item in @($items)){ if($null -ne $item){ [void]$combo.Items.Add([string]$item) } } }
+        if($items.Count -gt 0){ $combo.Items.AddRange(@($items)) }
         if($null -ne $current){ $combo.Text = $current }
         $combo.AutoCompleteMode  = [System.Windows.Forms.AutoCompleteMode]::SuggestAppend
         $combo.AutoCompleteSource = [System.Windows.Forms.AutoCompleteSource]::ListItems
@@ -2018,20 +2018,18 @@ function Rebuild-LocationDropdownRows(){
   $unique = @{}
   $rows = New-Object 'System.Collections.Generic.List[object]'
   $addRow = {
-    param($city,$location,$building,$floor,$room,$department)
+    param($city,$location,$building,$floor,$room)
     $locVal = if($location){ ([string]$location).Trim() } else { '' }
     $cityVal = if($city){ ([string]$city).Trim() } else { '' }
     $bldVal = if($building){ ([string]$building).Trim() } else { '' }
     $floorVal = if($floor){ ([string]$floor).Trim() } else { '' }
     $roomVal = if($room){ ([string]$room).Trim() } else { '' }
-    $deptVal = if($department){ ([string]$department).Trim() } else { '' }
-    $key = '{0}|{1}|{2}|{3}|{4}|{5}' -f `
+    $key = '{0}|{1}|{2}|{3}|{4}' -f `
       (Normalize-LocationComparisonValue $cityVal),
       (Normalize-LocationComparisonValue $locVal),
       (Normalize-LocationComparisonValue $bldVal),
       (Normalize-LocationComparisonValue $floorVal),
-      (Normalize-LocationComparisonValue $roomVal),
-      (Normalize-LocationComparisonValue $deptVal)
+      (Normalize-LocationComparisonValue $roomVal)
     if(-not $unique.ContainsKey($key)){
       $unique[$key] = $true
       [void]$rows.Add([pscustomobject]@{
@@ -2040,30 +2038,56 @@ function Rebuild-LocationDropdownRows(){
         Building = $bldVal
         Floor = $floorVal
         Room = $roomVal
-        Department = $deptVal
       })
     }
   }
 
-  # Edit Location dropdown options must come only from the selected site's Computers - *.csv data.
+  foreach($row in $script:UserAddedLocationRows){
+    if(-not $row){ continue }
+    $cityVal = $null
+    $locVal = $null
+    $bldVal = $null
+    $floorVal = $null
+    $roomVal = $null
+    try { $cityVal = $row.City } catch {}
+    try { $locVal = $row.Location } catch {}
+    try { $bldVal = $row.Building } catch {}
+    try { $floorVal = $row.Floor } catch {}
+    try { $roomVal = $row.Room } catch {}
+    & $addRow $cityVal $locVal $bldVal $floorVal $roomVal
+  }
+
+  foreach($row in $script:LocationMasterRows){
+    if(-not $row){ continue }
+    $cityVal = $null
+    $locVal = $null
+    $bldVal = $null
+    $floorVal = $null
+    $roomVal = $null
+    try { $cityVal = Get-LocationMasterVal $row 'City' } catch {}
+    try { $locVal = Get-LocationMasterVal $row 'Location' } catch {}
+    try { $bldVal = Get-LocationMasterVal $row 'Building' } catch {}
+    try { $floorVal = Get-LocationMasterVal $row 'Floor' } catch {}
+    try { $roomVal = Get-LocationMasterVal $row 'Room' } catch {}
+    & $addRow $cityVal $locVal $bldVal $floorVal $roomVal
+  }
+
   foreach($pc in $script:Computers){
     if(-not $pc){ continue }
     $cityVal = $null
     try {
-      if($pc.PSObject.Properties['location.city']){ $cityVal = $pc.PSObject.Properties['location.city'].Value }
-      elseif($pc.PSObject.Properties['City']){ $cityVal = $pc.City }
+      if($pc.PSObject.Properties['City']){ $cityVal = $pc.City }
+      elseif($pc.PSObject.Properties['location.city']){ $cityVal = $pc.PSObject.Properties['location.city'].Value }
     } catch {}
     $locVal = $null
     $bldVal = $null
     $floorVal = $null
     $roomVal = $null
-    $deptVal = $null
     try { $locVal = $pc.location } catch {}
     try { $bldVal = $pc.u_building } catch {}
     try { $floorVal = $pc.u_floor } catch {}
     try { $roomVal = $pc.u_room } catch {}
-    try { $deptVal = $pc.u_department_location } catch {}
-    & $addRow $cityVal $locVal $bldVal $floorVal $roomVal $deptVal
+    & $addRow $cityVal $locVal $bldVal $floorVal $roomVal
   }
 
   try {
@@ -2113,7 +2137,7 @@ function Select-NewAssetToolSite {
   $combo.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
   $combo.Location = New-Object System.Drawing.Point(20, 50)
   $combo.Width = 380
-  foreach($siteName in @($Sites.Name)){ if($null -ne $siteName){ [void]$combo.Items.Add([string]$siteName) } }
+  $combo.Items.AddRange(@($Sites.Name))
   $combo.SelectedIndex = 0
 
   $btnOk = New-Object System.Windows.Forms.Button
@@ -2256,7 +2280,6 @@ if(Test-Path $cfile){
     }
   }
   Rebuild-LocationDropdownRows
-  Rebuild-DepartmentListFromLocations
   Build-Indices
 }
 function Save-AllCSVs {
@@ -2817,9 +2840,7 @@ if(-not $btnEditLoc){
   $btnEditLoc.Size = '120,26'
 }
 $btnEditLoc.Margin = New-Object System.Windows.Forms.Padding(0)
-$btnEditLoc.Visible = $false
-$btnEditLoc.Enabled = $false
-$tip.SetToolTip($btnEditLoc, 'Location editing is temporarily disabled')
+$tip.SetToolTip($btnEditLoc, 'Edit and save the device location fields')
 
 if(-not $btnCancelEditLoc){
   $btnCancelEditLoc = New-Object ModernUI.RoundedButton
@@ -2828,9 +2849,7 @@ if(-not $btnCancelEditLoc){
   $btnCancelEditLoc.Visible = $false
 }
 $btnCancelEditLoc.Margin = New-Object System.Windows.Forms.Padding(8,0,0,0)
-$btnCancelEditLoc.Visible = $false
-$btnCancelEditLoc.Enabled = $false
-$tip.SetToolTip($btnCancelEditLoc, 'Location editing is temporarily disabled')
+$tip.SetToolTip($btnCancelEditLoc, 'Discard location edits')
 
 if(-not $locButtonsPanel){
   $locButtonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
@@ -2873,8 +2892,18 @@ function Get-DeviceLocationFieldText {
 }
 
 function Test-DeviceLocationFieldsComplete {
-  # Location validation/editing is temporarily disabled. Do not block save/event actions
-  # while the Device Location panel is acting as a read-only display of computer-table data.
+  $locationValues = @(
+    (Get-DeviceLocationFieldText $txtCity $cmbCity),
+    (Get-DeviceLocationFieldText $txtLocation $cmbLocation),
+    (Get-DeviceLocationFieldText $txtBldg $cmbBuilding),
+    (Get-DeviceLocationFieldText $txtFloor $cmbFloor),
+    (Get-DeviceLocationFieldText $txtRoom $cmbRoom),
+    (Get-DeviceLocationFieldText $txtDept $cmbDept)
+  )
+
+  foreach($value in $locationValues){
+    if([string]::IsNullOrWhiteSpace('' + $value)){ return $false }
+  }
   return $true
 }
 
@@ -3096,13 +3125,13 @@ $grpMaint.Padding = New-Object System.Windows.Forms.Padding(12)
 
 $lblMaintType=New-Object System.Windows.Forms.Label; $lblMaintType.Text='Maintenance Type'; $lblMaintType.AutoSize=$true
 $cmbMaintType=New-Object System.Windows.Forms.ComboBox; $cmbMaintType.DropDownStyle='DropDownList'; $cmbMaintType.Dock='None'; $cmbMaintType.Anchor='Left'
-foreach($maintType in @('Excluded','General Rounding','Mobile Cart','Critical Clinical')){ [void]$cmbMaintType.Items.Add($maintType) }
+$cmbMaintType.Items.AddRange(@('Excluded','General Rounding','Mobile Cart','Critical Clinical'))
 $cmbMaintType.TabIndex = 0
 $cmbMaintType.MinimumSize = New-Object System.Drawing.Size(0,0)
 
 $lblChkStatus=New-Object System.Windows.Forms.Label; $lblChkStatus.Text="Check Status"; $lblChkStatus.AutoSize=$true
 $cmbChkStatus=New-Object System.Windows.Forms.ComboBox; $cmbChkStatus.DropDownStyle='DropDownList'; $cmbChkStatus.Dock='None'; $cmbChkStatus.Anchor='Left'
-foreach($checkStatus in @(
+$cmbChkStatus.Items.AddRange(@(
   "Complete",
   "Inaccessible - Asset not found",
   "Inaccessible - In storage",
@@ -3111,11 +3140,11 @@ foreach($checkStatus in @(
   "Inaccessible - Other",
   "Inaccessible - Restricted area",
   "Inaccessible - Room locked - Card Swipe",
-  "Inaccessible - Room locked - Key Lock",
+ "Inaccessible - Room locked - Key Lock",
   "Inaccessible - Under renovation",
   "Inaccessible - User working at home",
   "Pending Repair"
-)){ [void]$cmbChkStatus.Items.Add($checkStatus) }; $cmbChkStatus.SelectedIndex=0
+)); $cmbChkStatus.SelectedIndex=0
 $cmbChkStatus.TabIndex = 1
 $cmbChkStatus.MinimumSize = New-Object System.Drawing.Size(0,0)
 
@@ -3684,77 +3713,69 @@ function Get-City-ForLocation([string]$loc){
   }
   return ''
 }
-function Get-DeviceLocationSourceRecord {
-  param(
-    [object]$displayRec,
-    [object]$parentRec
-  )
-
-  $displayType = ''
-  try { if($displayRec -and $displayRec.PSObject.Properties['Type']){ $displayType = '' + $displayRec.Type } } catch {}
-
-  $source = $null
-  if($displayType -eq 'Computer'){
-    $source = Resolve-ComputerRecord $displayRec
-  } else {
-    $source = Resolve-ComputerRecord $parentRec
-    if(-not $source){ $source = Resolve-ParentComputer $displayRec }
-  }
-  if(-not $source){ $source = Resolve-ComputerRecord $displayRec }
-  if(-not $source){ $source = $parentRec }
-  if(-not $source){ $source = $displayRec }
-  return $source
-}
-
-function Set-DeviceLocationReadOnlyMode {
-  foreach($combo in @($cmbCity,$cmbLocation,$cmbBuilding,$cmbFloor,$cmbRoom,$cmbDept)){
-    try { if($combo){ $combo.Visible = $false; $combo.Enabled = $false } } catch {}
-  }
-  foreach($textBox in @($txtCity,$txtLocation,$txtBldg,$txtFloor,$txtRoom,$txtDept)){
-    try {
-      if($textBox){
-        $textBox.Visible = $true
-        $textBox.ReadOnly = $true
-        $textBox.BackColor = [System.Drawing.Color]::White
-      }
-    } catch {}
-  }
-  try { if($btnEditLoc){ $btnEditLoc.Visible = $false; $btnEditLoc.Enabled = $false } } catch {}
-  try { if($btnCancelEditLoc){ $btnCancelEditLoc.Visible = $false; $btnCancelEditLoc.Enabled = $false } } catch {}
-  $script:editing = $false
-}
-
 function Validate-Location($rec){
-  # Temporarily reduced to read-only population. Validation coloring and edit controls
-  # are intentionally disabled until the location edit/validation workflow is rebuilt.
-  Set-DeviceLocationReadOnlyMode
-
+  # In edit mode, do not actively validate or repaint to avoid flicker; just reflect current text.
+  if($script:editing){ return }
+  # Show raw values in UI
   $cityText = ''
   try {
     if($rec -and $rec.PSObject.Properties['City']){ $cityText = '' + $rec.City }
     elseif($rec -and $rec.PSObject.Properties['location.city']){ $cityText = '' + $rec.PSObject.Properties['location.city'].Value }
   } catch {}
   if([string]::IsNullOrWhiteSpace($cityText)){
-    try { $cityText = Get-City-ForLocation $rec.location } catch {}
+    $cityText = Get-City-ForLocation $rec.location
   }
-
+  $txtCity.Text = $cityText
   $deptVal = ''
   try{
     if($rec){
-      if($rec.PSObject.Properties['u_department_location']){ $deptVal = '' + $rec.u_department_location }
-      elseif($rec.PSObject.Properties['Department']){ $deptVal = '' + $rec.Department }
+      if($rec.PSObject.Properties['u_department_location']){ $deptVal = $rec.u_department_location }
+      elseif($rec.PSObject.Properties['Department']){ $deptVal = $rec.Department }
     }
   } catch {}
+  if($txtDept){ $txtDept.Text = $deptVal }
+  $txtLocation.Text = $rec.location
+  $txtBldg.Text     = $rec.u_building
+  $txtFloor.Text    = $rec.u_floor
+  $txtRoom.Text     = $rec.u_room
+  try{ $cmbDept.Text = $deptVal } catch {}
 
-  try { $txtCity.Text     = $cityText } catch {}
-  try { $txtLocation.Text = if($rec){ '' + $rec.location } else { '' } } catch {}
-  try { $txtBldg.Text     = if($rec){ '' + $rec.u_building } else { '' } } catch {}
-  try { $txtFloor.Text    = if($rec){ '' + $rec.u_floor } else { '' } } catch {}
-  try { $txtRoom.Text     = if($rec){ '' + $rec.u_room } else { '' } } catch {}
-  try { if($txtDept){ $txtDept.Text = $deptVal } } catch {}
-  try { if($cmbDept){ $cmbDept.Text = $deptVal } } catch {}
-  try { $tip.SetToolTip($txtRoom, '') } catch {}
-  try { Update-LastLocationSelections $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text } catch {}
+  $tip.SetToolTip($txtRoom, "")
+  $okC = Test-LocationValueInColumn $txtCity.Text 'City'
+  $okL = Test-LocationValueInColumn $txtLocation.Text 'Location'
+  $okB = Test-LocationValueInColumn $txtBldg.Text 'Building'
+  $okF = Test-LocationValueInColumn $txtFloor.Text 'Floor'
+  $okR = $false
+  if(-not [string]::IsNullOrWhiteSpace($txtRoom.Text)){
+    $nRoom = Normalize-Field $txtRoom.Text
+    $okR = ($script:RoomsNorm -contains $nRoom)
+    if(-not $okR){
+      $code = Extract-RoomCode $txtRoom.Text
+      if($code -and ($script:RoomCodes -contains $code)){
+        $okR = $true
+        $tip.SetToolTip($txtRoom, "Matched by room code " + $code + " (exact text differs in LocationMaster).")
+      } else {
+        $tip.SetToolTip($txtRoom, "Room not found in LocationMaster Room column.")
+      }
+    }
+  }
+  $txtCity.BackColor     = if($okC){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
+  $txtLocation.BackColor = if($okL){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
+  $txtBldg.BackColor     = if($okB){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
+  $txtFloor.BackColor    = if($okF){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
+  $txtRoom.BackColor     = if($okR){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
+  try{
+    $d = $deptVal
+    $okD = $false
+    if(-not $script:DepartmentListNorm -or $script:DepartmentListNorm.Count -eq 0){
+      try { Load-DepartmentMaster } catch {}
+    }
+    if($d -and $script:DepartmentListNorm){ $okD = $script:DepartmentListNorm.Contains((Normalize-Field $d)) }
+    $colorD = if($okD){ [System.Drawing.Color]::PaleGreen } else { [System.Drawing.Color]::MistyRose }
+    if($txtDept){ $txtDept.BackColor = $colorD }
+    if($cmbDept){ $cmbDept.BackColor = $colorD }
+  } catch {}
+  Update-LastLocationSelections $txtCity.Text $txtLocation.Text $txtBldg.Text $txtFloor.Text $txtRoom.Text
   Update-SaveEventButtonLocationState
 }
 function Refresh-AssocGrid($parentRec){
@@ -5170,8 +5191,7 @@ function Populate-UI($displayRec,$parentRec){
   $txtRITM.Text=$displayRec.RITM
   $txtRetire.Text = Fmt-DateLong $displayRec.Retire
   Show-RoundingStatus $parentRec $displayRec
-  $locationSource = Get-DeviceLocationSourceRecord $displayRec $parentRec
-  Validate-Location $locationSource
+  if($parentRec){ Validate-Location $parentRec } else { Validate-Location $displayRec }
   if($parentRec){ Refresh-AssocViews $parentRec }
   Update-CartCheckbox-State $parentRec
   Update-ManualRoundButton   $parentRec
@@ -5295,30 +5315,6 @@ function Set-ComboTextIfChanged {
   Restore-ComboSelectionLater $Combo $selStart $selLength
 }
 
-function Add-ComboItemsSafely {
-  param(
-    [System.Windows.Forms.ComboBox]$Combo,
-    [object[]]$Items
-  )
-  if(-not $Combo -or -not $Items){ return }
-  foreach($item in @($Items)){
-    if($null -eq $item){ continue }
-    [void]$Combo.Items.Add([string]$item)
-  }
-}
-
-function Get-UniqueComputerLocationDropdownValues {
-  param(
-    [string]$Field,
-    [object[]]$Rows = $script:LocationRows
-  )
-  $values = @($Rows | ForEach-Object { Get-LocVal $_ $Field } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { ([string]$_).Trim() } | Sort-Object -Unique)
-  if($Field -eq 'Floor'){
-    return @(Sort-Floors $values)
-  }
-  return @($values)
-}
-
 function Populate-Location-Combos {
   param(
     [string]$city,
@@ -5334,32 +5330,130 @@ function Populate-Location-Combos {
   try {
     $cmbCity.Items.Clear(); $cmbLocation.Items.Clear(); $cmbBuilding.Items.Clear(); $cmbFloor.Items.Clear(); $cmbRoom.Items.Clear()
 
-    $cities = Get-UniqueComputerLocationDropdownValues 'City'
-    $locRows = Filter-LocationRows -city $city
-    $bldRows = Filter-LocationRows -city $city -location $loc
-    $floorRows = Filter-LocationRows -city $city -location $loc -building $b
-    $roomRows = Filter-LocationRows -city $city -location $loc -building $b -floor $f
-    $locs = Get-UniqueComputerLocationDropdownValues -Field 'Location' -Rows $locRows
-    $blds = Get-UniqueComputerLocationDropdownValues -Field 'Building' -Rows $bldRows
-    $floors = Get-UniqueComputerLocationDropdownValues -Field 'Floor' -Rows $floorRows
-    $rooms = Get-UniqueComputerLocationDropdownValues -Field 'Room' -Rows $roomRows
+    $origLoc = $loc
+    $origBuilding = $b
+    $origFloor = $f
+    $origRoom = $r
 
-    Add-ComboItemsSafely -Combo $cmbCity -Items $cities
-    Add-ComboItemsSafely -Combo $cmbLocation -Items $locs
-    Add-ComboItemsSafely -Combo $cmbBuilding -Items $blds
-    Add-ComboItemsSafely -Combo $cmbFloor -Items $floors
-    Add-ComboItemsSafely -Combo $cmbRoom -Items $rooms
+    $clearLocation = $false
+    $clearBuilding = $false
+    $clearFloor = $false
+    $clearRoom = $false
 
-    Set-ComboTextIfChanged $cmbCity $city
-    Set-ComboTextIfChanged $cmbLocation $loc
-    Set-ComboTextIfChanged $cmbBuilding $b
-    Set-ComboTextIfChanged $cmbFloor $f
-    Set-ComboTextIfChanged $cmbRoom $r
+    # City
+    $cities = $script:LocationRows | ForEach-Object { Get-LocVal $_ 'City' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
+    $cmbCity.Items.AddRange(@($cities))
+    $validCityInput = Get-ValidLocationSelection $city $cities
+    if($ChangedLevel -eq 'City'){
+      $prevCityNorm = $script:LastLocationSelections.City
+      if([string]::IsNullOrWhiteSpace($city)){
+        if($prevCityNorm -ne ''){ $clearLocation = $true; $clearBuilding = $true; $clearFloor = $true; $clearRoom = $true }
+      } elseif($validCityInput){
+        $validCityNorm = Normalize-LocationComparisonValue $validCityInput
+        if($validCityNorm -ne $prevCityNorm){ $clearLocation = $true; $clearBuilding = $true; $clearFloor = $true; $clearRoom = $true }
+      }
+    }
+    Set-ComboTextIfChanged $cmbCity ($city)
+    $validCity = Get-ValidLocationSelection $cmbCity.Text $cities
+    if(-not $validCity -and -not $PreserveInvalidSelections){ Set-ComboTextIfChanged $cmbCity '' }
+    $filterCity = if($validCity){ $validCity } else { $null }
+    if($clearLocation){
+      $loc = $null
+      $clearBuilding = $true
+      $clearFloor = $true
+      $clearRoom = $true
+    }
+
+    # Location (filtered by City if present)
+    $locRows = Filter-LocationRows $filterCity $null $null $null
+    $locs = $locRows | ForEach-Object { Get-LocVal $_ 'Location' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
+    $validLocationInput = Get-ValidLocationSelection $origLoc $locs
+    if($ChangedLevel -eq 'Location'){
+      $prevLocationNorm = $script:LastLocationSelections.Location
+      if([string]::IsNullOrWhiteSpace($origLoc)){
+        if($prevLocationNorm -ne ''){ $clearBuilding = $true; $clearFloor = $true; $clearRoom = $true }
+      } elseif($validLocationInput){
+        $validLocationNorm = Normalize-LocationComparisonValue $validLocationInput
+        if($validLocationNorm -ne $prevLocationNorm){ $clearBuilding = $true; $clearFloor = $true; $clearRoom = $true }
+      }
+    }
+    if($clearBuilding){
+      $b = $null
+      $clearFloor = $true
+      $clearRoom = $true
+    }
+    $cmbLocation.Items.AddRange(@($locs))
+    Set-ComboTextIfChanged $cmbLocation ($loc)
+    $validLocation = Get-ValidLocationSelection $cmbLocation.Text $locs
+    if(-not $validLocation -and -not $PreserveInvalidSelections){ Set-ComboTextIfChanged $cmbLocation '' }
+    $filterLocation = if($validLocation){ $validLocation } else { $null }
+
+    # Building
+    $blds = @()
+    if($filterLocation){
+      $bldRows = Filter-LocationRows $filterCity $filterLocation $null $null
+      $blds = $bldRows | ForEach-Object { Get-LocVal $_ 'Building' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
+    }
+    $validBuildingInput = Get-ValidLocationSelection $origBuilding $blds
+    if($ChangedLevel -eq 'Building'){
+      $prevBuildingNorm = $script:LastLocationSelections.Building
+      if([string]::IsNullOrWhiteSpace($origBuilding)){
+        if($prevBuildingNorm -ne ''){ $clearFloor = $true; $clearRoom = $true }
+      } elseif($validBuildingInput){
+        $validBuildingNorm = Normalize-LocationComparisonValue $validBuildingInput
+        if($validBuildingNorm -ne $prevBuildingNorm){ $clearFloor = $true; $clearRoom = $true }
+      }
+    }
+    if($clearFloor){
+      $f = $null
+      $clearRoom = $true
+    }
+    $cmbBuilding.Items.AddRange(@($blds))
+    Set-ComboTextIfChanged $cmbBuilding ($b)
+    $validBuilding = Get-ValidLocationSelection $cmbBuilding.Text $blds
+    if(-not $validBuilding -and -not $PreserveInvalidSelections){ Set-ComboTextIfChanged $cmbBuilding '' }
+    $filterBuilding = if($validBuilding){ $validBuilding } else { $null }
+
+    # Floor
+    $floors = @()
+    if($filterLocation -and $filterBuilding){
+      $floorRows = Filter-LocationRows $filterCity $filterLocation $filterBuilding $null
+      $floors = $floorRows | ForEach-Object { Get-LocVal $_ 'Floor' } | Where-Object { $_ } | Select-Object -Unique
+      $floors = Sort-Floors $floors
+    }
+    $validFloorInput = Get-ValidLocationSelection $origFloor $floors
+    if($ChangedLevel -eq 'Floor'){
+      $prevFloorNorm = $script:LastLocationSelections.Floor
+      if([string]::IsNullOrWhiteSpace($origFloor)){
+        if($prevFloorNorm -ne ''){ $clearRoom = $true }
+      } elseif($validFloorInput){
+        $validFloorNorm = Normalize-LocationComparisonValue $validFloorInput
+        if($validFloorNorm -ne $prevFloorNorm){ $clearRoom = $true }
+      }
+    }
+    if($clearRoom){ $r = $null }
+    $cmbFloor.Items.AddRange(@($floors))
+    Set-ComboTextIfChanged $cmbFloor ($f)
+    $validFloor = Get-ValidLocationSelection $cmbFloor.Text $floors
+    if(-not $validFloor -and -not $PreserveInvalidSelections){ Set-ComboTextIfChanged $cmbFloor '' }
+    $filterFloor = if($validFloor){ $validFloor } else { $null }
+
+    # Room
+    $rooms = @()
+    if($filterLocation -and $filterBuilding -and $filterFloor){
+      $roomRows = Filter-LocationRows $filterCity $filterLocation $filterBuilding $filterFloor
+      $rooms = $roomRows | ForEach-Object { Get-LocVal $_ 'Room' } | Where-Object { $_ } | Select-Object -Unique | Sort-Object
+    }
+    $cmbRoom.Items.AddRange(@($rooms))
+    Set-ComboTextIfChanged $cmbRoom ($r)
+    $validRoom = Get-ValidLocationSelection $cmbRoom.Text $rooms
+    if(-not $validRoom -and -not $PreserveInvalidSelections){ Set-ComboTextIfChanged $cmbRoom '' }
   }
   finally {
     $script:IsPopulatingLocationCombos = $false
   }
 }
+
 function Should-SkipExcludedDevice {
   param([object]$device)
   if(-not $device){ return $false }
@@ -6583,16 +6677,16 @@ $lblSort.Text = "Sort:"
 $lblSort.Location = '430,10'
 $cmbSort = New-Object System.Windows.Forms.ComboBox
 $cmbSort.DropDownStyle = 'DropDownList'
-foreach($sortOption in @(
+$cmbSort.Items.AddRange(@(
   "Host Name (A→Z)",
   "Host Name (Z→A)",
   "Room (A→Z)",
   "Room (Z→A)",
   "Last Rounded (oldest first)",
   "Last Rounded (newest first)"
-)){ [void]$cmbSort.Items.Add($sortOption) }
 try { if ($cmbSort -and $cmbSort.Items -and $cmbSort.Items.Count -gt 4) { $cmbSort.SelectedIndex = 4 } else { $cmbSort.SelectedIndex = -1 } } catch {}
 $cmbSort.Visible = $false; $cmbSort.Enabled = $false
+))
 $cmbSort.Location = '470,6'
 $cmbSort.Width = 210
 $btnClearScopes = New-Object ModernUI.RoundedButton
