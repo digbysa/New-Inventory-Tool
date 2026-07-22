@@ -1897,7 +1897,7 @@ function Populate-Department-Combo([string]$current){
       try {
         $combo.BeginUpdate()
         $combo.Items.Clear()
-        if($items.Count -gt 0){ $combo.Items.AddRange(@($items)) }
+        if($items.Count -gt 0){ foreach($item in @($items)){ if($null -ne $item){ [void]$combo.Items.Add([string]$item) } } }
         if($null -ne $current){ $combo.Text = $current }
         $combo.AutoCompleteMode  = [System.Windows.Forms.AutoCompleteMode]::SuggestAppend
         $combo.AutoCompleteSource = [System.Windows.Forms.AutoCompleteSource]::ListItems
@@ -2113,7 +2113,7 @@ function Select-NewAssetToolSite {
   $combo.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
   $combo.Location = New-Object System.Drawing.Point(20, 50)
   $combo.Width = 380
-  $combo.Items.AddRange(@($Sites.Name))
+  foreach($siteName in @($Sites.Name)){ if($null -ne $siteName){ [void]$combo.Items.Add([string]$siteName) } }
   $combo.SelectedIndex = 0
 
   $btnOk = New-Object System.Windows.Forms.Button
@@ -3096,13 +3096,13 @@ $grpMaint.Padding = New-Object System.Windows.Forms.Padding(12)
 
 $lblMaintType=New-Object System.Windows.Forms.Label; $lblMaintType.Text='Maintenance Type'; $lblMaintType.AutoSize=$true
 $cmbMaintType=New-Object System.Windows.Forms.ComboBox; $cmbMaintType.DropDownStyle='DropDownList'; $cmbMaintType.Dock='None'; $cmbMaintType.Anchor='Left'
-$cmbMaintType.Items.AddRange(@('Excluded','General Rounding','Mobile Cart','Critical Clinical'))
+foreach($maintType in @('Excluded','General Rounding','Mobile Cart','Critical Clinical')){ [void]$cmbMaintType.Items.Add($maintType) }
 $cmbMaintType.TabIndex = 0
 $cmbMaintType.MinimumSize = New-Object System.Drawing.Size(0,0)
 
 $lblChkStatus=New-Object System.Windows.Forms.Label; $lblChkStatus.Text="Check Status"; $lblChkStatus.AutoSize=$true
 $cmbChkStatus=New-Object System.Windows.Forms.ComboBox; $cmbChkStatus.DropDownStyle='DropDownList'; $cmbChkStatus.Dock='None'; $cmbChkStatus.Anchor='Left'
-$cmbChkStatus.Items.AddRange(@(
+foreach($checkStatus in @(
   "Complete",
   "Inaccessible - Asset not found",
   "Inaccessible - In storage",
@@ -3111,11 +3111,11 @@ $cmbChkStatus.Items.AddRange(@(
   "Inaccessible - Other",
   "Inaccessible - Restricted area",
   "Inaccessible - Room locked - Card Swipe",
- "Inaccessible - Room locked - Key Lock",
+  "Inaccessible - Room locked - Key Lock",
   "Inaccessible - Under renovation",
   "Inaccessible - User working at home",
   "Pending Repair"
-)); $cmbChkStatus.SelectedIndex=0
+)){ [void]$cmbChkStatus.Items.Add($checkStatus) }; $cmbChkStatus.SelectedIndex=0
 $cmbChkStatus.TabIndex = 1
 $cmbChkStatus.MinimumSize = New-Object System.Drawing.Size(0,0)
 
@@ -5295,9 +5295,24 @@ function Set-ComboTextIfChanged {
   Restore-ComboSelectionLater $Combo $selStart $selLength
 }
 
+function Add-ComboItemsSafely {
+  param(
+    [System.Windows.Forms.ComboBox]$Combo,
+    [object[]]$Items
+  )
+  if(-not $Combo -or -not $Items){ return }
+  foreach($item in @($Items)){
+    if($null -eq $item){ continue }
+    [void]$Combo.Items.Add([string]$item)
+  }
+}
+
 function Get-UniqueComputerLocationDropdownValues {
-  param([string]$Field)
-  $values = @($script:LocationRows | ForEach-Object { Get-LocVal $_ $Field } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { ([string]$_).Trim() } | Sort-Object -Unique)
+  param(
+    [string]$Field,
+    [object[]]$Rows = $script:LocationRows
+  )
+  $values = @($Rows | ForEach-Object { Get-LocVal $_ $Field } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { ([string]$_).Trim() } | Sort-Object -Unique)
   if($Field -eq 'Floor'){
     return @(Sort-Floors $values)
   }
@@ -5320,16 +5335,20 @@ function Populate-Location-Combos {
     $cmbCity.Items.Clear(); $cmbLocation.Items.Clear(); $cmbBuilding.Items.Clear(); $cmbFloor.Items.Clear(); $cmbRoom.Items.Clear()
 
     $cities = Get-UniqueComputerLocationDropdownValues 'City'
-    $locs = Get-UniqueComputerLocationDropdownValues 'Location'
-    $blds = Get-UniqueComputerLocationDropdownValues 'Building'
-    $floors = Get-UniqueComputerLocationDropdownValues 'Floor'
-    $rooms = Get-UniqueComputerLocationDropdownValues 'Room'
+    $locRows = Filter-LocationRows -city $city
+    $bldRows = Filter-LocationRows -city $city -location $loc
+    $floorRows = Filter-LocationRows -city $city -location $loc -building $b
+    $roomRows = Filter-LocationRows -city $city -location $loc -building $b -floor $f
+    $locs = Get-UniqueComputerLocationDropdownValues -Field 'Location' -Rows $locRows
+    $blds = Get-UniqueComputerLocationDropdownValues -Field 'Building' -Rows $bldRows
+    $floors = Get-UniqueComputerLocationDropdownValues -Field 'Floor' -Rows $floorRows
+    $rooms = Get-UniqueComputerLocationDropdownValues -Field 'Room' -Rows $roomRows
 
-    if($cities.Count -gt 0){ $cmbCity.Items.AddRange(@($cities)) }
-    if($locs.Count -gt 0){ $cmbLocation.Items.AddRange(@($locs)) }
-    if($blds.Count -gt 0){ $cmbBuilding.Items.AddRange(@($blds)) }
-    if($floors.Count -gt 0){ $cmbFloor.Items.AddRange(@($floors)) }
-    if($rooms.Count -gt 0){ $cmbRoom.Items.AddRange(@($rooms)) }
+    Add-ComboItemsSafely -Combo $cmbCity -Items $cities
+    Add-ComboItemsSafely -Combo $cmbLocation -Items $locs
+    Add-ComboItemsSafely -Combo $cmbBuilding -Items $blds
+    Add-ComboItemsSafely -Combo $cmbFloor -Items $floors
+    Add-ComboItemsSafely -Combo $cmbRoom -Items $rooms
 
     Set-ComboTextIfChanged $cmbCity $city
     Set-ComboTextIfChanged $cmbLocation $loc
@@ -6564,16 +6583,16 @@ $lblSort.Text = "Sort:"
 $lblSort.Location = '430,10'
 $cmbSort = New-Object System.Windows.Forms.ComboBox
 $cmbSort.DropDownStyle = 'DropDownList'
-$cmbSort.Items.AddRange(@(
+foreach($sortOption in @(
   "Host Name (A→Z)",
   "Host Name (Z→A)",
   "Room (A→Z)",
   "Room (Z→A)",
   "Last Rounded (oldest first)",
   "Last Rounded (newest first)"
+)){ [void]$cmbSort.Items.Add($sortOption) }
 try { if ($cmbSort -and $cmbSort.Items -and $cmbSort.Items.Count -gt 4) { $cmbSort.SelectedIndex = 4 } else { $cmbSort.SelectedIndex = -1 } } catch {}
 $cmbSort.Visible = $false; $cmbSort.Enabled = $false
-))
 $cmbSort.Location = '470,6'
 $cmbSort.Width = 210
 $btnClearScopes = New-Object ModernUI.RoundedButton
